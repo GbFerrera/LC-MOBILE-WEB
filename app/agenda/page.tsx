@@ -1,58 +1,449 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { DayPicker } from "react-day-picker";
+import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { api } from "@/services/api";
+import { useAuth } from "@/hooks/auth";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface Client {
+  id: number;
+  name: string;
+  phone: string;
+}
+
+interface Service {
+  id: number;
+  name: string;
+  duration: number;
+  price: number;
+}
+
+
+interface Schedule {
+  id: number;
+  professional_id: number;
+  company_id: number;
+  date: string | null;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  lunch_start_time?: string;
+  lunch_end_time?: string;
+  is_day_off: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ScheduleResponse {
+  hasSchedule: boolean;
+  schedules: Schedule[];
+}
+
+function generateTimeSlots(data: any): string[] {
+  // Verifica se temos dados válidos
+  if (!data) {
+    console.error('Dados inválidos recebidos:', data);
+    return [];
+  }
+
+  // Verifica se temos um array de agendas ou um objeto único
+  const schedule = Array.isArray(data.schedules) ? data.schedules[0] : data;
+  
+  console.log('Schedule para gerar slots:', schedule);
+  
+  // Verifica se temos horários de início e fim
+  if (!schedule || !schedule.start_time || !schedule.end_time) {
+    console.error('Horários de início ou fim não encontrados:', schedule);
+    return [];
+  }
+
+  // Extrai os horários de início, fim e almoço
+  const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+  const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+  
+  // Converte para minutos totais para facilitar os cálculos
+  const startTotalMinutes = startHour * 60 + startMinute;
+  const endTotalMinutes = endHour * 60 + endMinute;
+  
+  // Verifica se há horário de almoço definido
+  let lunchStartMinutes = null;
+  let lunchEndMinutes = null;
+  
+  if (schedule.lunch_start_time && schedule.lunch_end_time) {
+    const [lunchStartHour, lunchStartMinute] = schedule.lunch_start_time.split(':').map(Number);
+    const [lunchEndHour, lunchEndMinute] = schedule.lunch_end_time.split(':').map(Number);
+    lunchStartMinutes = lunchStartHour * 60 + lunchStartMinute;
+    lunchEndMinutes = lunchEndHour * 60 + lunchEndMinute;
+    console.log(`Horário de almoço: ${schedule.lunch_start_time} às ${schedule.lunch_end_time}`);
+  }
+  
+  const slots: string[] = [];
+  const slotDuration = 30; // 30 minutos por slot
+  
+  // Gera slots de 30 minutos dentro do horário de trabalho
+  for (let minutes = startTotalMinutes; minutes < endTotalMinutes; minutes += slotDuration) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    
+    // Verifica se o horário atual está dentro do intervalo de almoço
+    const isLunchTime = lunchStartMinutes !== null && 
+                        lunchEndMinutes !== null &&
+                        minutes >= lunchStartMinutes && 
+                        minutes < lunchEndMinutes;
+    
+    if (!isLunchTime) {
+      slots.push(timeString);
+    } else {
+      // Se for o início do horário de almoço, pula para o final do horário de almoço
+      if (lunchEndMinutes) {
+        minutes = lunchEndMinutes - slotDuration;
+      }
+    }
+  }
+
+  return slots;
+}
 
 export default function AgendaPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [date, setDate] = useState<Date>(new Date());
-  const [view, setView] = useState<"day" | "week" | "month">("day");
+  const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  
+  // Estado do diálogo de agendamento
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Dados do formulário
+  const [formData, setFormData] = useState({
+    client_id: '',
+    service_id: '',
+    notes: '',
+  });
+  
+  // Buscar agendamentos do dia
+  const fetchAppointments = async (userId: string, date: Date) => {
+    try {
+      const formattedDate = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      const response = await fetch(`https://api.linkcallendar.com/schedules/${userId}/date/${formattedDate}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'company_id': user?.company_id?.toString() || '1',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Agendamentos do dia:', data);
+        setAppointments(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Erro ao buscar agendamentos:', await response.text());
+      }
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos:', error);
+    }
+  };
 
-  // Mock data - in a real app this would come from a database
-  const appointments = [
-    {
-      id: 1,
-      clientName: "João Silva",
-      service: "Corte + Barba",
-      time: "09:00",
-      duration: 60,
-      price: 70.0,
-      status: "confirmed",
-    },
-    {
-      id: 2,
-      clientName: "Carlos Mendes",
-      service: "Corte Degradê",
-      time: "11:00",
-      duration: 45,
-      price: 45.0,
-      status: "confirmed",
-    },
-    {
-      id: 3,
-      clientName: "Pedro Alves",
-      service: "Barba",
-      time: "14:30",
-      duration: 30,
-      price: 35.0,
-      status: "pending",
-    },
-  ];
+  // Carregar clientes, serviços e agendamentos
+  useEffect(() => {
+    const fetchClientsAndServices = async () => {
+      if (!user) return;
+      
+      // Busca agendamentos do dia atual
+      fetchAppointments(user.id, date);
+      
+      if (!user) return;
+      
+      try {
+        // Buscar clientes
+        const clientsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clients`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'company_id': user?.company_id?.toString() || '0',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (clientsResponse.ok) {
+          const clientsData = await clientsResponse.json();
+          setClients(clientsData);
+        } else {
+          console.error('Erro ao buscar clientes:', await clientsResponse.text());
+        }
+        
+        // Buscar serviços
+        const servicesResponse = await fetch('https://api.linkcallendar.com/service', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'company_id': user?.company_id?.toString() || '0',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (servicesResponse.ok) {
+          const servicesData = await servicesResponse.json();
+          console.log('Serviços carregados:', servicesData);
+          setServices(servicesData);
+        } else {
+          console.error('Erro ao buscar serviços:', await servicesResponse.text());
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        toast.error('Erro ao carregar clientes e serviços');
+      }
+    };
+    
+    if (user) {
+      fetchClientsAndServices();
+    }
+  }, [user]);
 
-  // Format the current date for display
-  const formattedDate = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(date);
+  useEffect(() => {
+    // Atualiza os agendamentos quando a data mudar
+    if (user) {
+      fetchAppointments(user.id, date);
+    }
+  }, [date]);
 
-  // Capitalize the first letter of the formatted date
-  const capitalizedDate =
-    formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const resetForm = () => {
+    setFormData({
+      client_id: '',
+      service_id: '',
+      notes: ''
+    });
+    setSelectedSlot('');
+  };
+  
+  const openAppointmentDialog = (slot: string) => {
+    setSelectedSlot(slot);
+    setIsDialogOpen(true);
+  };
+  
+  const closeAppointmentDialog = () => {
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleSlotClick = (time: string) => {
+    if (!user) {
+      toast.error("Você precisa estar logado para agendar");
+      return;
+    }
+    openAppointmentDialog(time);
+  };
+  
+  const handleSubmitAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user || !selectedSlot) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Validar dados do formulário
+      if (!formData.client_id || !formData.service_id) {
+        throw new Error('Por favor, selecione o cliente e o serviço');
+      }
+      
+      // Formatar a data e hora para o formato esperado pela API
+      const formattedDate = date.toISOString().split('T')[0];
+      const [hours, minutes] = selectedSlot.split(':');
+      
+      // Definir quantidade como 1 e status como 'confirmed' por padrão
+      const quantity = 1;
+      const status = 'confirmed';
+      
+      // Encontrar o serviço selecionado para obter a duração
+      const selectedService = services.find(s => s.id.toString() === formData.service_id);
+      if (!selectedService) {
+        throw new Error('Serviço não encontrado');
+      }
+      
+      // Calcular end_time baseado na duração do serviço
+      const endTime = new Date(date);
+      endTime.setHours(parseInt(hours), parseInt(minutes) + selectedService.duration);
+      const formattedEndTime = endTime.toTimeString().slice(0, 5);
+
+      // Criar o payload do agendamento
+      const appointmentData = {
+        client_id: parseInt(formData.client_id),
+        professional_id: user.id,
+        appointment_date: formattedDate,
+        start_time: selectedSlot,
+        end_time: formattedEndTime,
+        status: status, // Usando o status 'confirmed' definido anteriormente
+        notes: formData.notes || "",
+        services: [
+          {
+            service_id: parseInt(formData.service_id),
+            professional_id: user.id,
+            quantity: quantity // Adicionando a quantidade fixa como 1
+          }
+        ]
+      };
+
+      console.log('Dados do agendamento:', appointmentData);
+
+      // Fazer a requisição para criar o agendamento
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'company_id': user.company_id?.toString() || '0',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(appointmentData)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Erro ao criar agendamento');
+      }
+
+      toast.success('Agendamento criado com sucesso!');
+      closeAppointmentDialog();
+      
+      // Recarregar os horários disponíveis
+      fetchAppointments(user.id, date);
+      
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao criar agendamento');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const fetchSchedules = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Buscar o ID do profissional do contexto de autenticação
+      const professionalId = user?.id;
+      if (!professionalId) {
+        throw new Error("ID do profissional não encontrado");
+      }
+
+      // Formatar a data para o formato YYYY-MM-DD
+      const formattedDate = date.toISOString().split('T')[0];
+      
+      // Fazer a requisição para a API com os headers necessários
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/schedules/${professionalId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'company_id': user?.company_id?.toString() || '0'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Dados recebidos da API:', data);
+      
+      // Se a API retornar horários, usamos eles
+      if (data && data.schedules && data.schedules.length > 0) {
+        const slots = generateTimeSlots(data);
+        setAvailableSlots(slots);
+      } else {
+        // Se não houver horários, retornamos array vazio
+        setAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar horários:', err);
+      setError(err instanceof Error ? err.message : "Erro ao buscar horários");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchSchedules();
+    }
+  }, [date, user]);
+
+  // Verifica se um horário está ocupado
+  const isTimeSlotBooked = (time: string) => {
+    return appointments.some(appt => {
+      if (!appt.start_time) return false;
+      // Formata o horário para garantir o mesmo formato (HH:MM)
+      const apptTime = appt.start_time.includes('T') 
+        ? appt.start_time.split('T')[1].slice(0, 5)
+        : appt.start_time.slice(0, 5);
+      return apptTime === time;
+    });
+  };
+  
+  // Formata a data para exibição (ex: "Terça-feira, 27 de maio de 2025")
+  const formatDate = (date: Date) => {
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC'
+    };
+    return new Date(date).toLocaleDateString('pt-BR', options);
+  };
+  
+  const formattedDate = formatDate(date);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -63,185 +454,178 @@ export default function AgendaPage() {
             <ChevronLeftIcon className="h-6 w-6" />
           </Link>
           <h1 className="font-bold text-xl">Agenda</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-emerald-700 hover:bg-emerald-600"
-          >
-            <PlusIcon className="h-5 w-5" />
-          </Button>
+          <div className="w-6"></div>
         </div>
       </header>
 
-      {/* Date Navigation */}
+      {/* Calendar */}
       <div className="p-4 bg-white border-b">
-        <div className="flex items-center justify-between mb-2">
-          <Button variant="ghost" size="sm" className="text-gray-600">
-            <ChevronLeftIcon className="h-5 w-5 mr-1" />
-            Anterior
-          </Button>
-          <h2 className="font-medium text-emerald-800">{capitalizedDate}</h2>
-          <Button variant="ghost" size="sm" className="text-gray-600">
-            Próximo
-            <ChevronRightIcon className="h-5 w-5 ml-1" />
-          </Button>
-        </div>
-
-        <Tabs
-          defaultValue="day"
-          className="w-full"
-          onValueChange={(v) => setView(v as "day" | "week" | "month")}
-        >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="day">Dia</TabsTrigger>
-            <TabsTrigger value="week">Semana</TabsTrigger>
-            <TabsTrigger value="month">Mês</TabsTrigger>
-          </TabsList>
-          <TabsContent value="day" className="mt-4">
-            <div className="space-y-3">
-              {appointments.length > 0 ? (
-                appointments.map((appointment) => (
-                  <AppointmentCard key={appointment.id} appointment={appointment} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p>Nenhum agendamento para hoje</p>
-                  <Button
-                    variant="outline"
-                    className="mt-4 text-emerald-700 border-emerald-200"
-                  >
-                    + Novo Agendamento
-                  </Button>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-          <TabsContent value="week">
-            <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-              {["D", "S", "T", "Q", "Q", "S", "S"].map((day, i) => (
-                <div key={i} className="py-1">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {Array.from({ length: 7 }).map((_, i) => {
-                const d = new Date();
-                d.setDate(d.getDate() - d.getDay() + i);
-                const isToday = new Date().getDate() === d.getDate();
-                return (
-                  <Button
-                    key={i}
-                    variant={isToday ? "default" : "ghost"}
-                    className={`h-10 ${
-                      isToday
-                        ? "bg-emerald-700 hover:bg-emerald-800"
-                        : "hover:bg-emerald-50"
-                    }`}
-                  >
-                    {d.getDate()}
-                  </Button>
-                );
-              })}
-            </div>
-            <div className="mt-4 space-y-3">
-              {appointments.slice(0, 2).map((appointment) => (
-                <AppointmentCard key={appointment.id} appointment={appointment} />
-              ))}
-            </div>
-          </TabsContent>
-          <TabsContent value="month">
-            <div className="mb-4">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(date) => date && setDate(date)}
-                className="rounded-md border"
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+        <style jsx global>{`
+          .rdp-day_selected {
+            border: 2px solid #059669 !important;
+            border-radius: 50% !important;
+            background-color: white !important;
+            color: #065f46 !important;
+          }
+          .rdp-day_selected:hover {
+            background-color: #ecfdf5 !important;
+            color: #065f46 !important;
+          }
+        `}</style>
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={(newDate) => newDate && setDate(newDate)}
+          className="rounded-md border"
+        />
       </div>
 
-      {/* Time Slots */}
+      {/* Available Slots */}
       <div className="p-4">
-        <h3 className="font-medium text-gray-700 mb-3">Horários Disponíveis</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {["08:00", "08:30", "09:30", "10:00", "10:30", "13:00"].map(
-            (time, i) => (
-              <Button
-                key={i}
-                variant="outline"
-                className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-              >
-                {time}
-              </Button>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mt-auto p-4">
-        <Button className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-6 rounded-xl shadow-lg">
-          + Novo Agendamento
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AppointmentCard({ appointment }: { appointment: any }) {
-  return (
-    <Card className="overflow-hidden border-none shadow-sm">
-      <CardContent className="p-0">
-        <div className="flex">
-          <div
-            className={`w-2 ${
-              appointment.status === "confirmed"
-                ? "bg-emerald-500"
-                : "bg-amber-400"
-            }`}
-          ></div>
-          <div className="flex-1 p-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-medium">{appointment.clientName}</h3>
-                <p className="text-sm text-gray-600">{appointment.service}</p>
-              </div>
-              <div className="text-right">
-                <span className="font-medium text-emerald-700">
-                  R$ {appointment.price.toFixed(2).replace(".", ",")}
-                </span>
-                <p className="text-sm text-gray-500">
-                  {appointment.duration} min
-                </p>
-              </div>
-            </div>
-            <div className="mt-2 flex justify-between items-center">
-              <span className="text-sm font-medium bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                {appointment.time}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-500 hover:text-red-500"
+        {loading ? (
+          <div className="text-center text-gray-500">Carregando horários...</div>
+        ) : error ? (
+          <div className="text-center text-red-500">{error}</div>
+        ) : availableSlots.length === 0 ? (
+          <div className="text-center text-gray-500">Nenhum horário disponível para este dia</div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {availableSlots.map((slot) => {
+              const isBooked = isTimeSlotBooked(slot);
+              const appointment = appointments.find(appt => {
+                if (!appt.start_time) return false;
+                const apptTime = appt.start_time.includes('T') 
+                  ? appt.start_time.split('T')[1].slice(0, 5)
+                  : appt.start_time.slice(0, 5);
+                return apptTime === slot;
+              });
+              
+              return (
+                <div 
+                  key={slot} 
+                  className={`p-3 mb-2 border rounded-lg cursor-pointer transition-colors ${
+                    isBooked 
+                      ? 'bg-red-50 border-red-200 text-red-600' 
+                      : 'hover:bg-emerald-50 border-emerald-200 text-emerald-700 hover:border-emerald-300'
+                  }`}
+                  onClick={!isBooked ? () => handleSlotClick(slot) : undefined}
+                  title={isBooked ? `Agendado para ${appointment?.client_name || 'Cliente'}` : 'Clique para agendar'}
                 >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-emerald-600 hover:text-emerald-700"
-                >
-                  Editar
-                </Button>
-              </div>
-            </div>
+                  <div className="font-medium">{slot}</div>
+                  {isBooked && (
+                    <div className="text-xs mt-1 truncate">
+                      {appointment?.client_name || 'Cliente'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+      
+      {/* Diálogo de Agendamento */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={handleSubmitAppointment}>
+            <DialogHeader>
+              <DialogTitle>Novo Agendamento</DialogTitle>
+              <DialogDescription>
+                Preencha os dados para criar um novo agendamento
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="client_id" className="text-right">
+                  Cliente *
+                </Label>
+                <Select
+                  name="client_id"
+                  value={formData.client_id}
+                  onValueChange={(value) => handleSelectChange('client_id', value)}
+                  required
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id.toString()}>
+                        {client.name} - {client.phone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="service_id" className="text-right">
+                  Serviço *
+                </Label>
+                <Select
+                  name="service_id"
+                  value={formData.service_id}
+                  onValueChange={(value) => handleSelectChange('service_id', value)}
+                  required
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecione um serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={service.id.toString()}>
+                        {service.name} - {service.duration} min
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="notes" className="text-right">
+                  Observações
+                </Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  placeholder="Alguma observação importante?"
+                  className="col-span-3"
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">
+                  Data
+                </Label>
+                <div className="col-span-3 text-sm">
+                  {date.toLocaleDateString('pt-BR')} às {selectedSlot}
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={closeAppointmentDialog}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {isSubmitting ? 'Salvando...' : 'Agendar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

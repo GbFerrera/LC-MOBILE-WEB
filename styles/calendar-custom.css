@@ -1,0 +1,23 @@
+/* Estilo personalizado para o calendário */
+
+/* Adiciona contorno ao dia selecionado */
+.rdp-day_selected {
+  border: 2px solid #059669 !important; /* Verde esmeralda (emerald-600) */
+  border-radius: 50% !important;
+  background-color: #ecfdf5 !important; /* Verde claro (emerald-50) */
+  color: #064e3b !important; /* Verde escuro (emerald-900) */
+}
+
+/* Mantém o contorno ao passar o mouse */
+.rdp-day_selected:hover {
+  background-color: #d1fae5 !important; /* Verde mais claro (emerald-100) */
+  border: 2px solid #059669 !important;
+  color: #064e3b !important;
+}
+
+/* Mantém o contorno ao focar */
+.rdp-day_selected:focus {
+  background-color: #d1fae5 !important;
+  border: 2px solid #059669 !important;
+  color: #064e3b !important;
+}

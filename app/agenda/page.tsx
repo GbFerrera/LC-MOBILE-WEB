@@ -157,7 +157,7 @@ export default function AgendaPage() {
   const fetchAppointments = async (userId: string, date: Date) => {
     try {
       const formattedDate = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-      const response = await fetch(`https://api.linkcallendar.com/schedules/${userId}/date/${formattedDate}`, {
+      const response = await api.get(`/schedules/${userId}/date/${formattedDate}`, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -166,15 +166,11 @@ export default function AgendaPage() {
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Agendamentos do dia:', data);
-        setAppointments(Array.isArray(data) ? data : []);
-      } else {
-        console.error('Erro ao buscar agendamentos:', await response.text());
-      }
+      console.log('Agendamentos do dia:', response.data);
+      setAppointments(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
+      toast.error('Erro ao carregar agendamentos');
     }
   };
 
@@ -190,7 +186,7 @@ export default function AgendaPage() {
       
       try {
         // Buscar clientes
-        const clientsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clients`, {
+        const clientsResponse = await api.get('/clients', {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -198,16 +194,10 @@ export default function AgendaPage() {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
-        
-        if (clientsResponse.ok) {
-          const clientsData = await clientsResponse.json();
-          setClients(clientsData);
-        } else {
-          console.error('Erro ao buscar clientes:', await clientsResponse.text());
-        }
+        setClients(clientsResponse.data || []);
         
         // Buscar serviços
-        const servicesResponse = await fetch('https://api.linkcallendar.com/service', {
+        const servicesResponse = await api.get('/service', {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -215,14 +205,8 @@ export default function AgendaPage() {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
-        
-        if (servicesResponse.ok) {
-          const servicesData = await servicesResponse.json();
-          console.log('Serviços carregados:', servicesData);
-          setServices(servicesData);
-        } else {
-          console.error('Erro ao buscar serviços:', await servicesResponse.text());
-        }
+        console.log('Serviços carregados:', servicesResponse.data);
+        setServices(servicesResponse.data || []);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar clientes e serviços');
@@ -336,21 +320,17 @@ export default function AgendaPage() {
       console.log('Dados do agendamento:', appointmentData);
 
       // Fazer a requisição para criar o agendamento
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/appointments`, {
-        method: 'POST',
+      const response = await api.post('/appointments', appointmentData, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'company_id': user.company_id?.toString() || '0',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(appointmentData)
+        }
       });
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.message || 'Erro ao criar agendamento');
+      if (!response.data) {
+        throw new Error('Erro ao criar agendamento: resposta inválida');
       }
 
       toast.success('Agendamento criado com sucesso!');
@@ -382,24 +362,21 @@ export default function AgendaPage() {
       const formattedDate = date.toISOString().split('T')[0];
       
       // Fazer a requisição para a API com os headers necessários
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/schedules/${professionalId}`, {
+      const response = await api.get(`/schedules/${professionalId}`, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'company_id': user?.company_id?.toString() || '0'
+          'company_id': user?.company_id?.toString() || '0',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
-      if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Dados recebidos da API:', data);
+      console.log('Dados recebidos da API:', response.data);
       
       // Se a API retornar horários, usamos eles
-      if (data && data.schedules && data.schedules.length > 0) {
-        const slots = generateTimeSlots(data);
+      if (response.data && response.data.schedules && response.data.schedules.length > 0) {
+        const slots = generateTimeSlots(response.data);
+        console.log('Slots gerados:', slots);
         setAvailableSlots(slots);
       } else {
         // Se não houver horários, retornamos array vazio

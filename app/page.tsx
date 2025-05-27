@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { BellIcon, CalendarIcon, SettingsIcon, UsersIcon, WalletIcon, LightbulbIcon, ShoppingBagIcon } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
+import { useAuth } from "@/hooks/auth";
 
 interface Service {
   service_id: number;
@@ -56,6 +57,7 @@ interface ScheduleResponse {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function Home() {
       try {
         const today = new Date();
         const formattedDate = today.toISOString().split('T')[0];
-        const userId = localStorage.getItem('user_id') || '13';
+        const userId = user?.id || '0';
 
         const response = await api.get(`/schedules/${userId}/date/${formattedDate}`);
         setScheduleData(response.data);
@@ -83,8 +85,7 @@ export default function Home() {
 
   // Mock data - in a real app this would come from a database
   const barberInfo = {
-    name: "Samuel",
-    businessName: "Barbearia do Sam",
+    name: user?.name || "",
     avatarUrl: "/placeholder-avatar.jpg",
     reminders: [
       {
@@ -130,7 +131,6 @@ export default function Home() {
             <div>
               <h1 className="font-bold text-xl">{barberInfo.name}</h1>
               <p className="text-emerald-100 text-sm">
-                {barberInfo.businessName}
                 {!isLoading && schedule && (
                   <span className="block text-emerald-200 mt-1">
                     {schedule.is_day_off 

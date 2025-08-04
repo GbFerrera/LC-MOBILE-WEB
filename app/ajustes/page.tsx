@@ -21,35 +21,77 @@ import {
   UploadIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function AjustesPage() {
-  // Mock data - in a real app this would come from a database
-  const barberInfo = {
-    name: "Samuel",
+  const { user, signOut } = useAuth();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
+  
+  // Estados para os switches
+  const [notifications, setNotifications] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [autoBackup, setAutoBackup] = useState(true);
+  
+  // Função para lidar com mudanças nos switches
+  const handleToggle = (setting: string, value: boolean) => {
+    switch (setting) {
+      case 'notifications':
+        setNotifications(value);
+        break;
+      case 'appearance':
+        setDarkMode(value);
+        break;
+      case 'backup':
+        setAutoBackup(value);
+        break;
+    }
+    
+    toast({
+      title: "Configuração atualizada",
+      description: `${setting === 'notifications' ? 'Notificações' : setting === 'appearance' ? 'Modo escuro' : 'Backup automático'} ${value ? 'ativado' : 'desativado'}.`,
+    });
+  };
+  
+  // Função para logout
+  const handleLogout = () => {
+    signOut();
+    toast({
+      title: "Logout realizado",
+      description: "Você foi desconectado com sucesso.",
+    });
+  };
+
+  // Dados do usuário atual ou mock data
+  const userInfo = {
+    name: user?.name || "Usuário",
     businessName: "Barbearia Link",
-    email: "samuel@barbearialink.com.br",
+    email: user?.email || "usuario@barbearialink.com.br",
     phone: "(11) 99876-5432",
     avatarUrl: "/barber-avatar.png",
   };
 
   // Definindo tipos para os itens de configuração
-type SettingItem = {
-  id: string;
-  title: string;
-  icon: React.ComponentType<any>;
-  color: string;
-  bgColor: string;
-  toggle?: boolean;
-  toggleValue?: boolean;
-  danger?: boolean;
-};
+  type SettingItem = {
+    id: string;
+    title: string;
+    icon: React.ComponentType<any>;
+    color: string;
+    bgColor: string;
+    toggle?: boolean;
+    toggleValue?: boolean;
+    danger?: boolean;
+  };
 
-type SettingGroup = {
-  title: string;
-  items: SettingItem[];
-};
+  type SettingGroup = {
+    title: string;
+    items: SettingItem[];
+  };
 
-const settingsGroups: SettingGroup[] = [
+  const settingsGroups: SettingGroup[] = [
     {
       title: "Perfil e Negócio",
       items: [
@@ -86,7 +128,7 @@ const settingsGroups: SettingGroup[] = [
           color: "text-purple-500",
           bgColor: "bg-purple-100",
           toggle: true,
-          toggleValue: true,
+          toggleValue: notifications,
         },
         {
           id: "schedule",
@@ -104,10 +146,12 @@ const settingsGroups: SettingGroup[] = [
         },
         {
           id: "appearance",
-          title: "Aparência",
+          title: "Modo Escuro",
           icon: PaletteIcon,
           color: "text-pink-500",
           bgColor: "bg-pink-100",
+          toggle: true,
+          toggleValue: darkMode,
         },
       ],
     },
@@ -116,10 +160,12 @@ const settingsGroups: SettingGroup[] = [
       items: [
         {
           id: "backup",
-          title: "Backup de Dados",
+          title: "Backup Automático",
           icon: UploadIcon,
           color: "text-cyan-500",
           bgColor: "bg-cyan-100",
+          toggle: true,
+          toggleValue: autoBackup,
         },
         {
           id: "privacy",
@@ -153,46 +199,46 @@ const settingsGroups: SettingGroup[] = [
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-emerald-800 text-white p-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="text-emerald-100">
-            <ChevronLeftIcon className="h-6 w-6" />
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-6 shadow-lg">
+        <div className="flex items-center justify-between mb-4">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+              <ChevronLeftIcon className="h-5 w-5" />
+            </Button>
           </Link>
-          <h1 className="font-bold text-xl">Ajustes</h1>
-          <div className="w-6"></div> {/* Empty div for spacing */}
+          <h1 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Ajustes</h1>
+          <div className="w-10" />
         </div>
-      </header>
 
-      {/* Profile Card */}
-      <div className="p-4">
-        <Card className="border-none shadow-sm overflow-hidden mb-6">
+        {/* Profile Card */}
+        <Card className="border-none shadow-sm overflow-hidden">
           <CardContent className="p-0">
             <div className="bg-gradient-to-r from-emerald-700 to-emerald-900 p-4">
               <div className="flex items-center">
-                <Avatar className="h-16 w-16 border-2 border-white mr-4">
+                <Avatar className={`${isMobile ? 'h-12 w-12' : 'h-16 w-16'} border-2 border-white mr-4`}>
                   <AvatarImage
-                    src={barberInfo.avatarUrl}
-                    alt={barberInfo.name}
+                    src={userInfo.avatarUrl}
+                    alt={userInfo.name}
                   />
                   <AvatarFallback className="bg-emerald-600 text-white">
-                    {barberInfo.name.substring(0, 2)}
+                    {userInfo.name.substring(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-white">
-                  <h2 className="font-bold text-lg">{barberInfo.name}</h2>
-                  <p className="text-emerald-100 text-sm">
-                    {barberInfo.businessName}
+                  <h2 className={`font-bold ${isMobile ? 'text-base' : 'text-lg'}`}>{userInfo.name}</h2>
+                  <p className={`text-emerald-100 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                    {userInfo.businessName}
                   </p>
-                  <p className="text-emerald-200 text-xs mt-1">
-                    {barberInfo.email}
+                  <p className={`text-emerald-200 ${isMobile ? 'text-xs' : 'text-xs'} mt-1`}>
+                    {userInfo.email}
                   </p>
                 </div>
               </div>
               <Button
                 variant="outline"
-                size="sm"
+                size={isMobile ? "sm" : "default"}
                 className="mt-3 w-full text-white border-emerald-100 hover:bg-emerald-800"
               >
                 Editar Perfil
@@ -200,16 +246,19 @@ const settingsGroups: SettingGroup[] = [
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      {/* Main Content */}
+      <div className={`${isMobile ? 'px-2 py-4' : 'px-4 py-6'}`}>
         {/* Settings Groups */}
-        <div className="space-y-6">
+        <div className={`${isMobile ? 'space-y-4' : 'space-y-6'}`}>
           {settingsGroups.map((group) => (
             <div key={group.title}>
               <h3 className="font-medium text-gray-700 mb-3">{group.title}</h3>
               <Card className="border-none shadow-sm overflow-hidden">
                 <CardContent className="p-0">
                   <div className="divide-y divide-gray-100">
-                    {group.items.map((item, index) => (
+                    {group.items.map((item) => (
                       <div
                         key={item.id}
                         className={`flex items-center justify-between p-3 ${
@@ -231,7 +280,19 @@ const settingsGroups: SettingGroup[] = [
                           </span>
                         </div>
                         {item.toggle ? (
-                          <Switch defaultChecked={item.toggleValue} />
+                          <Switch 
+                            checked={item.toggleValue} 
+                            onCheckedChange={(checked) => handleToggle(item.id, checked)}
+                          />
+                        ) : item.id === 'logout' ? (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={handleLogout}
+                            className="text-red-500 hover:text-red-600"
+                          >
+                            Sair
+                          </Button>
                         ) : (
                           <ChevronRightIcon className="h-5 w-5 text-gray-400" />
                         )}

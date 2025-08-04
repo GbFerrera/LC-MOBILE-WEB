@@ -173,6 +173,13 @@ export default function AgendaPage() {
   // Estado do drawer de detalhes do agendamento
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [formIntervals, setFormIntervals] = useState({
+    professional_id: user.id, 
+    appointment_date: "", 
+    start_time: "", 
+    end_time: "", 
+    notes: ""
+  })
   
   // Dados do formulário
   const [formData, setFormData] = useState({
@@ -465,6 +472,21 @@ export default function AgendaPage() {
   
   const formattedDate = formatDate(date);
 
+  const freeInterval = async () => {
+    try {
+      const response = await api.post("/free-interval", formIntervals, {
+        headers: {
+          company_id: user?.company_id?.toString() || '1',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      toast.success("Intervalo liberado com sucesso", response.data)
+    } catch (error) {
+      toast.error(error.response.data.message)
+    }
+  }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       {/* Header */}
@@ -488,8 +510,9 @@ export default function AgendaPage() {
           {/* Date Selector Section */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
+              <div className="flex justify-between bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
                 <h2 className="font-semibold text-white text-lg">Selecionar Data</h2>
+                <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white cursor-pointer">Selecionar Intervalo</Button>
               </div>
               <div className="p-6">
                 {/* Custom Date Navigation */}

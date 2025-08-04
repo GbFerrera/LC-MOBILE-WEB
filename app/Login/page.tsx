@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,20 +21,21 @@ import { useAuth } from "@/hooks/auth";
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: "",
-    password: ""
+    password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const { signIn, loading } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   // Função para atualizar os dados do formulário
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -37,12 +45,12 @@ export default function LoginPage() {
       setError("Preencha todos os campos");
       return false;
     }
-    
+
     if (formData.password.length < 4) {
       setError("A senha deve ter pelo menos 4 caracteres");
       return false;
     }
-    
+
     return true;
   };
 
@@ -50,25 +58,36 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       // Usar o hook de autenticação para fazer login
       await signIn({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
       });
-      
+
       // O redirecionamento é feito automaticamente pelo hook de autenticação
-      
     } catch (error: any) {
       console.error("Erro no login:", error);
-      setError(error.message || "Ocorreu um erro ao fazer login. Tente novamente.");
+      setError(
+        error.message || "Ocorreu um erro ao fazer login. Tente novamente."
+      );
     }
   };
+
+  const verifyUser = () => {
+    if (user) {
+      router.push("/");
+    }
+  };
+
+  useEffect(() => {
+    verifyUser();
+  }, [user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-emerald-50 to-emerald-100 p-4">
@@ -90,7 +109,7 @@ export default function LoginPage() {
               Entre com suas credenciais para acessar o sistema
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
@@ -98,29 +117,29 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input 
+                <Input
                   id="email"
-                  name="email" 
-                  type="email" 
-                  placeholder="seu@email.com" 
+                  name="email"
+                  type="email"
+                  placeholder="seu@email.com"
                   value={formData.email}
                   onChange={handleInputChange}
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Senha</Label>
                 </div>
                 <div className="relative">
-                  <Input 
+                  <Input
                     id="password"
-                    name="password" 
-                    type={showPassword ? "text" : "password"} 
+                    name="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleInputChange}
@@ -140,10 +159,10 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="remember" 
+                <Checkbox
+                  id="remember"
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
                 />
@@ -154,17 +173,33 @@ export default function LoginPage() {
                   Lembrar de mim
                 </label>
               </div>
-              
-              <Button 
-                type="submit" 
+
+              <Button
+                type="submit"
                 className="w-full bg-[#236F5D] hover:bg-[#1a5346]"
                 disabled={loading}
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     Entrando...
                   </>
@@ -174,7 +209,7 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
-              
+
               {/* Dica para teste */}
               <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-700">
                 <p className="font-medium">Credenciais para teste:</p>

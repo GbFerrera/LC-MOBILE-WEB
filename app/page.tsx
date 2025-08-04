@@ -9,6 +9,7 @@ import { BellIcon, CalendarIcon, SettingsIcon, UsersIcon, WalletIcon, LightbulbI
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
+import { useRouter } from "next/navigation";
 
 interface Service {
   service_id: number;
@@ -62,6 +63,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const router = useRouter();
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -115,6 +117,15 @@ export default function Home() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  const verifyUser = () => {
+    if (!user) {
+      router.push("/login");
+    }
+  };
+  useEffect(() => {
+    verifyUser();
+  },[user]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">

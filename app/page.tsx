@@ -66,12 +66,21 @@ export default function Home() {
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
+        // Aguarda o usuário estar carregado antes de fazer a requisição
+        if (!user?.id) {
+          console.log('Usuário ainda não carregado, pulando busca de agendamentos');
+          setIsLoading(false);
+          return;
+        }
+
         const today = new Date();
         const formattedDate = today.toISOString().split('T')[0];
-        const userId = user?.id || '0';
+        const userId = user.id;
 
+        console.log('Buscando agendamentos para:', { userId, formattedDate });
         const response = await api.get(`/schedules/${userId}/date/${formattedDate}`);
         setScheduleData(response.data);
+        setError(null); // Limpa erro anterior se sucesso
       } catch (err) {
         console.error('Erro ao buscar agendamentos:', err);
         setError('Não foi possível carregar os agendamentos');
@@ -81,7 +90,7 @@ export default function Home() {
     };
 
     fetchAppointments();
-  }, []);
+  }, [user]); // Adiciona user como dependência
 
   // Mock data - in a real app this would come from a database
   const barberInfo = {
@@ -273,7 +282,7 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="flex-1 ml-4">
-                          <div className="font-semibold text-gray-900 mb-1">{appointment.client.name}</div>
+                          <div className="font-semibold text-gray-900 mb-1">{appointment.client?.name}</div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">
                               {appointment.services.map(s => s.service_name).join(', ')}

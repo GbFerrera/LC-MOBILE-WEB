@@ -143,7 +143,10 @@ export default function FinancasPage() {
   // Função para calcular total de comissões (todas)
   const getTotalCommissions = () => {
     if (!professionalData) return 0;
-    const allCommissions = [...professionalData.commissions_general, ...professionalData.commissions_services];
+    const allCommissions = [
+      ...(professionalData.commissions_general || []),
+      ...(professionalData.commissions_services || [])
+    ];
     return allCommissions.length;
   };
 

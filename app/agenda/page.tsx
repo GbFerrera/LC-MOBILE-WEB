@@ -52,6 +52,14 @@ interface Service {
   price: number;
 }
 
+interface FilteredClient extends Client {
+  selected?: boolean;
+}
+
+interface FilteredService extends Service {
+  selected?: boolean;
+}
+
 
 interface Schedule {
   id: number;
@@ -181,6 +189,16 @@ export default function AgendaPage() {
     notes: '',
   });
   
+  // Estados para busca de cliente e serviço
+  const [clientSearch, setClientSearch] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [selectedClientName, setSelectedClientName] = useState('');
+  const [selectedServiceName, setSelectedServiceName] = useState('');
+  
   // Buscar agendamentos do dia
   const fetchAppointments = async (userId: string, date: Date) => {
     try {
@@ -279,7 +297,92 @@ export default function AgendaPage() {
       notes: ''
     });
     setSelectedSlot('');
+    setClientSearch('');
+    setServiceSearch('');
+    setSelectedClientName('');
+    setSelectedServiceName('');
+    setShowClientDropdown(false);
+    setShowServiceDropdown(false);
   };
+  
+  // Filtrar clientes baseado na busca
+  useEffect(() => {
+    if (clientSearch.trim() === '') {
+      setFilteredClients(clients.slice(0, 10)); // Mostrar apenas os primeiros 10
+    } else {
+      const filtered = clients.filter(client =>
+        client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+        (client.phone && client.phone.includes(clientSearch))
+      ).slice(0, 10);
+      setFilteredClients(filtered);
+    }
+  }, [clientSearch, clients]);
+  
+  // Filtrar serviços baseado na busca
+  useEffect(() => {
+    if (serviceSearch.trim() === '') {
+      setFilteredServices(services.slice(0, 10)); // Mostrar apenas os primeiros 10
+    } else {
+      const filtered = services.filter(service =>
+        service.name.toLowerCase().includes(serviceSearch.toLowerCase())
+      ).slice(0, 10);
+      setFilteredServices(filtered);
+    }
+  }, [serviceSearch, services]);
+  
+  // Função para selecionar cliente
+  const selectClient = (client: Client) => {
+    setFormData(prev => ({ ...prev, client_id: client.id.toString() }));
+    setSelectedClientName(client.name);
+    setClientSearch(client.name);
+    setShowClientDropdown(false);
+  };
+  
+  // Função para selecionar serviço
+  const selectService = (service: Service) => {
+    setFormData(prev => ({ ...prev, service_id: service.id.toString() }));
+    setSelectedServiceName(service.name);
+    setServiceSearch(service.name);
+    setShowServiceDropdown(false);
+  };
+  
+  // Função para lidar com mudança no input de cliente
+  const handleClientSearchChange = (value: string) => {
+    setClientSearch(value);
+    setShowClientDropdown(true);
+    if (value !== selectedClientName) {
+      setFormData(prev => ({ ...prev, client_id: '' }));
+      setSelectedClientName('');
+    }
+  };
+  
+  // Função para lidar com mudança no input de serviço
+  const handleServiceSearchChange = (value: string) => {
+    setServiceSearch(value);
+    setShowServiceDropdown(true);
+    if (value !== selectedServiceName) {
+      setFormData(prev => ({ ...prev, service_id: '' }));
+      setSelectedServiceName('');
+    }
+  };
+  
+  // Fechar dropdowns ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-client-dropdown]') && !target.closest('#client_search')) {
+        setShowClientDropdown(false);
+      }
+      if (!target.closest('[data-service-dropdown]') && !target.closest('#service_search')) {
+        setShowServiceDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   const openAppointmentDialog = (slot: string) => {
     setSelectedSlot(slot);
@@ -730,67 +833,121 @@ export default function AgendaPage() {
               </div>
 
               {/* Cliente */}
-              <div className="space-y-2">
-                <Label htmlFor="client_id" className="text-sm font-semibold text-gray-700 flex items-center">
+              <div className="space-y-2 relative">
+                <Label htmlFor="client_search" className="text-sm font-semibold text-gray-700 flex items-center">
                   <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7-7h14a7 7 0 00-7-7z" />
                   </svg>
                   Cliente *
                 </Label>
-                <Select
-                  name="client_id"
-                  value={formData.client_id}
-                  onValueChange={(value) => handleSelectChange('client_id', value)}
-                  required
-                >
-                  <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg">
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id.toString()}>
-                        <div className="flex items-center space-x-2">
-                          <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center">
-                            <span className="text-xs font-semibold text-emerald-600">
+                <div className="relative">
+                  <Input
+                    id="client_search"
+                    type="text"
+                    placeholder="Digite o nome ou telefone do cliente..."
+                    value={clientSearch}
+                    onChange={(e) => handleClientSearchChange(e.target.value)}
+                    onFocus={() => setShowClientDropdown(true)}
+                    className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg pr-10"
+                    required
+                  />
+                  <svg 
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  
+                  {/* Dropdown de resultados */}
+                  {showClientDropdown && filteredClients.length > 0 && (
+                    <div data-client-dropdown className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredClients.map((client) => (
+                        <div
+                          key={client.id}
+                          className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => selectClient(client)}
+                        >
+                          <div className="bg-emerald-100 rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-semibold text-emerald-600">
                               {client.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <span>{client.name} - {client.phone}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
+                            <p className="text-xs text-gray-500">{client.phone}</p>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Mensagem quando não há resultados */}
+                  {showClientDropdown && clientSearch.trim() !== '' && filteredClients.length === 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center">
+                      <p className="text-sm text-gray-500">Nenhum cliente encontrado</p>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Serviço */}
-              <div className="space-y-2">
-                <Label htmlFor="service_id" className="text-sm font-semibold text-gray-700 flex items-center">
+              <div className="space-y-2 relative">
+                <Label htmlFor="service_search" className="text-sm font-semibold text-gray-700 flex items-center">
                   <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 01-2 2H10a2 2 0 01-2-2V6" />
                   </svg>
                   Serviço *
                 </Label>
-                <Select
-                  name="service_id"
-                  value={formData.service_id}
-                  onValueChange={(value) => handleSelectChange('service_id', value)}
-                  required
-                >
-                  <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg">
-                    <SelectValue placeholder="Selecione um serviço" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id.toString()}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{service.name}</span>
-                          <span className="text-sm text-gray-500 ml-2">{service.duration} min</span>
+                <div className="relative">
+                  <Input
+                    id="service_search"
+                    type="text"
+                    placeholder="Digite o nome do serviço..."
+                    value={serviceSearch}
+                    onChange={(e) => handleServiceSearchChange(e.target.value)}
+                    onFocus={() => setShowServiceDropdown(true)}
+                    className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg pr-10"
+                    required
+                  />
+                  <svg 
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  
+                  {/* Dropdown de resultados */}
+                  {showServiceDropdown && filteredServices.length > 0 && (
+                    <div data-service-dropdown className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredServices.map((service) => (
+                        <div
+                          key={service.id}
+                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => selectService(service)}
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">{service.name}</p>
+                            <p className="text-xs text-gray-500">{service.duration} minutos</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-emerald-600">R$ {Number(service.price || 0).toFixed(2)}</p>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Mensagem quando não há resultados */}
+                  {showServiceDropdown && serviceSearch.trim() !== '' && filteredServices.length === 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center">
+                      <p className="text-sm text-gray-500">Nenhum serviço encontrado</p>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Observações */}

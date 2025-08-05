@@ -3,23 +3,15 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ChevronLeftIcon,
-  BellIcon,
   ClockIcon,
-  CreditCardIcon,
-  UserIcon,
-  PaletteIcon,
-  ShieldIcon,
-  HelpCircleIcon,
   LogOutIcon,
   ScissorsIcon,
   StoreIcon,
-  UploadIcon,
   PencilIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -33,8 +25,17 @@ export default function AjustesPage() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isServiceHoursDialogOpen, setIsServiceHoursDialogOpen] = useState(false);
+  const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
+  const [isServicesDialogOpen, setIsServicesDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [serviceHoursLoading, setServiceHoursLoading] = useState(false);
+  const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [serviceHours, setServiceHours] = useState<any[]>([]);
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const [services, setServices] = useState<any[]>([]);
   const [editForm, setEditForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -43,8 +44,8 @@ export default function AjustesPage() {
     password: ""
   });
   const [currentUserData, setCurrentUserData] = useState({
-    name: user?.name || "Samuel",
-    email: user?.email || "samuel@barbearialink.com.br",
+    name: user?.name || "Nome do profissional",
+    email: user?.email || "email@dominio.com",
     phone_number: "",
     position: ""
   });
@@ -186,7 +187,7 @@ export default function AjustesPage() {
     }
   };
 
-  // Configurações filtradas - removido "Informações Pessoais" (já está no Profile Card)
+  // Configurações filtradas
   const settingButtons = [
     {
       id: "services",
@@ -217,6 +218,149 @@ export default function AjustesPage() {
   const handleLogout = () => {
     signOut();
     router.push("/Login");
+  };
+
+  // Buscar horários de funcionamento do usuário
+  const fetchServiceHours = async () => {
+    if (!user?.id) {
+      toast.error("Usuário não identificado");
+      return;
+    }
+
+    setServiceHoursLoading(true);
+    try {
+      const response = await api.get(`/schedules/${user.id}`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+      setServiceHours(response.data?.schedules || []);
+    } catch (error: any) {
+      console.error('Erro ao buscar horários:', error);
+      toast.error("Erro ao carregar horários de serviço");
+    } finally {
+      setServiceHoursLoading(false);
+    }
+  };
+
+  // Abrir modal de horários de funcionamento
+  const handleScheduleClick = () => {
+    setIsServiceHoursDialogOpen(true);
+    fetchServiceHours();
+  };
+
+  // Formatar dia da semana
+  const formatDayOfWeek = (dayOfWeek: string | number) => {
+    // Se for string (como vem da API)
+    if (typeof dayOfWeek === 'string') {
+      const dayMap: { [key: string]: string } = {
+        'Sunday': 'Domingo',
+        'Monday': 'Segunda-feira',
+        'Tuesday': 'Terça-feira', 
+        'Wednesday': 'Quarta-feira',
+        'Thursday': 'Quinta-feira',
+        'Friday': 'Sexta-feira',
+        'Saturday': 'Sábado'
+      };
+      return dayMap[dayOfWeek] || dayOfWeek;
+    }
+    // Se for número (fallback)
+    const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    return days[dayOfWeek] || 'N/A';
+  };
+
+  // Ordenar horários por dia da semana
+  const sortSchedulesByDay = (schedules: any[]) => {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return schedules.sort((a, b) => {
+      if (a.day_of_week && b.day_of_week) {
+        return dayOrder.indexOf(a.day_of_week) - dayOrder.indexOf(b.day_of_week);
+      }
+      return 0;
+    });
+  };
+
+  // Formatar hora
+  const formatTime = (time: string) => {
+    if (!time) return 'N/A';
+    return time.substring(0, 5); // Remove seconds if present
+  };
+
+  // Buscar detalhes da empresa
+  const viewDetailsCompany = async () => {
+    if (!user?.company_id) {
+      toast.error("ID da empresa não identificado");
+      return;
+    }
+
+    setCompanyDetailsLoading(true);
+    try {
+      const response = await api.get(`/companies/details`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+      setCompanyDetails(response.data);
+    } catch (error: any) {
+      console.error('Erro ao buscar detalhes da empresa:', error);
+      toast.error("Erro ao carregar detalhes da empresa");
+    } finally {
+      setCompanyDetailsLoading(false);
+    }
+  };
+
+  // Abrir modal de detalhes da empresa
+  const handleCompanyDetailsClick = () => {
+    setIsCompanyDetailsDialogOpen(true);
+    viewDetailsCompany();
+  };
+
+  // Buscar serviços da empresa
+  const fetchServices = async () => {
+    if (!user?.company_id) {
+      toast.error("ID da empresa não identificado");
+      return;
+    }
+
+    setServicesLoading(true);
+    try {
+      const response = await api.get(`/service`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+      setServices(response.data || []);
+    } catch (error: any) {
+      console.error('Erro ao buscar serviços:', error);
+      toast.error("Erro ao carregar serviços");
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  // Abrir modal de serviços
+  const handleServicesClick = () => {
+    setIsServicesDialogOpen(true);
+    fetchServices();
+  };
+
+  // Formatar preço em reais
+  const formatPrice = (price: number | string) => {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(numPrice || 0);
+  };
+
+  // Formatar duração em minutos
+  const formatDuration = (duration: number) => {
+    if (duration >= 60) {
+      const hours = Math.floor(duration / 60);
+      const minutes = duration % 60;
+      return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+    }
+    return `${duration}min`;
   };
 
   return (
@@ -365,6 +509,299 @@ export default function AjustesPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+
+                {/* Service Hours Dialog */}
+                <Dialog open={isServiceHoursDialogOpen} onOpenChange={setIsServiceHoursDialogOpen}>
+                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                          <ClockIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Horários de Serviço
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Seus horários de trabalho configurados
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                      {serviceHoursLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600 mb-4"></div>
+                          <p className="text-gray-500 font-medium">Carregando horários...</p>
+                        </div>
+                      ) : serviceHours.length > 0 ? (
+                        <div className="space-y-4">
+                          {sortSchedulesByDay(serviceHours).map((schedule, index) => (
+                            <div key={index} className="relative group">
+                              <div className={`p-4 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] ${
+                                schedule.is_day_off 
+                                  ? 'bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-100' 
+                                  : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-100'
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-4 h-4 rounded-full shadow-lg ${
+                                      schedule.is_day_off ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'
+                                    }`}></div>
+                                    <div className="flex-1">
+                                      <h3 className="font-bold text-lg text-gray-800 mb-1">
+                                        {schedule.day_of_week 
+                                          ? formatDayOfWeek(schedule.day_of_week)
+                                          : schedule.date
+                                            ? new Date(schedule.date).toLocaleDateString('pt-BR')
+                                            : 'Data específica'
+                                        }
+                                      </h3>
+                                      {schedule.is_day_off ? (
+                                        <div className="flex items-center gap-2">
+                                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                            🏖️ Dia de folga
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
+                                              🕐 {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
+                                            </span>
+                                          </div>
+                                          {schedule.lunch_start_time && schedule.lunch_end_time && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                🍽️ Almoço: {formatTime(schedule.lunch_start_time)} - {formatTime(schedule.lunch_end_time)}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {!schedule.is_day_off && (
+                                    <div className="text-right">
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${
+                                        schedule.date 
+                                          ? 'bg-blue-100 text-blue-800' 
+                                          : 'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {schedule.date ? '📅 Específico' : '🔄 Semanal'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                            <ClockIcon className="h-10 w-10 text-gray-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum horário configurado</h3>
+                          <p className="text-gray-500 mb-4">Configure seus horários de trabalho para começar</p>
+                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium">
+                            💡 Dica: Use a seção "Horário de Funcionamento" para configurar
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button 
+                        onClick={() => setIsServiceHoursDialogOpen(false)}
+                        className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Company Details Dialog */}
+                <Dialog open={isCompanyDetailsDialogOpen} onOpenChange={setIsCompanyDetailsDialogOpen}>
+                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                          <StoreIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Dados da Barbearia
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Informações da sua empresa
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="max-h-96 overflow-y-auto">
+                      {companyDetailsLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600 mb-4"></div>
+                          <p className="text-gray-500 font-medium">Carregando detalhes...</p>
+                        </div>
+                      ) : companyDetails ? (
+                        <div className="bg-gray-50 rounded-xl p-6">
+                          <div className="grid grid-cols-1 gap-4">
+                            {/* Nome da Empresa */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Nome da Empresa</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {companyDetails.name || 'Não informado'}
+                              </span>
+                            </div>
+
+                            {/* Email */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Email</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {companyDetails.email || 'Não informado'}
+                              </span>
+                            </div>
+
+                            {/* Telefone */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Telefone</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {companyDetails.phone_number || 'Não informado'}
+                              </span>
+                            </div>
+
+                            {/* Endereço */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Endereço</span>
+                              <span className="text-sm font-semibold text-gray-900 text-right">
+                                {companyDetails.address || 'Não informado'}
+                              </span>
+                            </div>
+
+                            {/* Documento */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Documento</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {companyDetails.document || 'Não informado'}
+                              </span>
+                            </div>
+
+                            {/* Subdomínio */}
+                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                              <span className="text-sm font-medium text-gray-600">Subdomínio</span>
+                              <span className="text-sm font-semibold text-emerald-600">
+                                {companyDetails.subdomain || 'Não definido'}
+                              </span>
+                            </div>
+
+                            {/* Data de Criação */}
+                            <div className="flex items-center justify-between py-3">
+                              <span className="text-sm font-medium text-gray-600">Empresa desde</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {companyDetails.created_at 
+                                  ? new Date(companyDetails.created_at).toLocaleDateString('pt-BR')
+                                  : 'Não informado'
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                            <StoreIcon className="h-10 w-10 text-gray-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum detalhe encontrado</h3>
+                          <p className="text-gray-500 mb-4">Não foi possível carregar os dados da empresa</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button 
+                        onClick={() => setIsCompanyDetailsDialogOpen(false)}
+                        className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Services Dialog */}
+                <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                          <ScissorsIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Serviços e Preços
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Todos os serviços oferecidos pela sua barbearia
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="max-h-96 overflow-y-auto">
+                      {servicesLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200 border-t-amber-600 mb-4"></div>
+                          <p className="text-gray-500 font-medium">Carregando serviços...</p>
+                        </div>
+                      ) : services.length > 0 ? (
+                        <div className="grid gap-4">
+                          {services.map((service, index) => (
+                            <div key={service.id || index} className="group">
+                              <div className="p-5 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <div className="w-4 h-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-lg"></div>
+                                    <div className="flex-1">
+                                      <h3 className="font-bold text-lg text-gray-800 mb-1">
+                                        {service.name}
+                                      </h3>
+                                      {service.description && (
+                                        <p className="text-sm text-gray-600 mb-3">
+                                          {service.description}
+                                        </p>
+                                      )}
+                                      <div className="flex items-center gap-4">
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
+                                          💰 {formatPrice(service.price)}
+                                        </span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                                          ⏱️ {formatDuration(service.duration)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                            <ScissorsIcon className="h-10 w-10 text-gray-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum serviço cadastrado</h3>
+                          <p className="text-gray-500 mb-4">Cadastre seus serviços para começar a receber agendamentos</p>
+                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium">
+                            💡 Dica: Use o sistema administrativo para cadastrar serviços
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button 
+                        onClick={() => setIsServicesDialogOpen(false)}
+                        className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 
                 {/* Logout Button */}
                 <Button
@@ -402,9 +839,25 @@ export default function AjustesPage() {
                     </div>
                     <Button 
                       size="sm"
+                      onClick={
+                        setting.id === 'services'
+                          ? handleServicesClick
+                          : setting.id === 'schedule' 
+                          ? handleScheduleClick 
+                          : setting.id === 'business'
+                            ? handleCompanyDetailsClick
+                            : undefined
+                      }
                       className={`bg-gradient-to-r ${setting.gradient} hover:shadow-lg transition-all duration-300 text-white font-semibold px-4 py-2 rounded-xl text-sm flex-shrink-0`}
                     >
-                      Configurar
+                      {setting.id === 'services'
+                        ? 'Ver Serviços'
+                        : setting.id === 'schedule' 
+                        ? 'Horários' 
+                        : setting.id === 'business'
+                          ? 'Detalhes'
+                          : 'Configurar'
+                      }
                     </Button>
                   </div>
                 </div>

@@ -9,6 +9,7 @@ import { BellIcon, CalendarIcon, SettingsIcon, UsersIcon, WalletIcon, LightbulbI
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
+import { useRouter } from "next/navigation";
 
 interface Service {
   service_id: number;
@@ -62,15 +63,29 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const router = useRouter();
 
   useEffect(() => {
     const fetchAppointments = async () => {
+      // Só executa se o usuário estiver carregado
+      if (!user || !user.id) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const today = new Date();
         const formattedDate = today.toISOString().split('T')[0];
-        const userId = user?.id || '0';
+        const userId = user.id;
 
-        const response = await api.get(`/schedules/${userId}/date/${formattedDate}`);
+        const response = await api.get(`/schedules/${userId}/date/${formattedDate}`, {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user?.company_id?.toString() || "1",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
         setScheduleData(response.data);
       } catch (err) {
         console.error('Erro ao buscar agendamentos:', err);
@@ -81,7 +96,7 @@ export default function Home() {
     };
 
     fetchAppointments();
-  }, []);
+  }, [user]); // Adiciona user como dependência
 
   // Mock data - in a real app this would come from a database
   const barberInfo = {
@@ -115,6 +130,13 @@ export default function Home() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if(!user) {
+      router.push("/login");
+    }
+  }, [])
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -273,13 +295,13 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="flex-1 ml-4">
-                          <div className="font-semibold text-gray-900 mb-1">{appointment.client.name}</div>
+                          <div className="font-semibold text-gray-900 mb-1">{appointment.client?.name || 'Cliente não informado'}</div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">
-                              {appointment.services.map(s => s.service_name).join(', ')}
+                              {appointment.services?.map(s => s.service_name).join(', ') || 'Serviços não informados'}
                             </span>
                             <span className="text-sm font-medium text-emerald-600">
-                              R$ {appointment.services.reduce((sum, s) => sum + parseFloat(s.price), 0).toFixed(2)}
+                              R$ {appointment.services?.reduce((sum, s) => sum + parseFloat(s.price || '0'), 0).toFixed(2) || '0.00'}
                             </span>
                           </div>
                         </div>
@@ -343,17 +365,22 @@ export default function Home() {
               {(() => {
                 // Calcular estatísticas dos serviços a partir dos agendamentos
                 const serviceStats = appointments.reduce((acc, appointment) => {
-                  appointment.services.forEach(service => {
-                    if (!acc[service.service_name]) {
-                      acc[service.service_name] = {
-                        name: service.service_name,
-                        count: 0,
-                        revenue: 0
-                      };
-                    }
-                    acc[service.service_name].count += service.quantity;
-                    acc[service.service_name].revenue += parseFloat(service.price) * service.quantity;
-                  });
+                  // Verificar se services existe e é um array
+                  if (appointment.services && Array.isArray(appointment.services)) {
+                    appointment.services.forEach(service => {
+                      if (service && service.service_name) {
+                        if (!acc[service.service_name]) {
+                          acc[service.service_name] = {
+                            name: service.service_name,
+                            count: 0,
+                            revenue: 0
+                          };
+                        }
+                        acc[service.service_name].count += service.quantity || 1;
+                        acc[service.service_name].revenue += parseFloat(service.price || '0') * (service.quantity || 1);
+                      }
+                    });
+                  }
                   return acc;
                 }, {} as Record<string, { name: string; count: number; revenue: number }>);
 

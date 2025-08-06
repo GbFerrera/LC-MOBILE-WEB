@@ -184,6 +184,7 @@ export default function AgendaPage() {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [lunchSlots, setLunchSlots] = useState<string[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [isLoadingButton, setIsLoadingButton] = useState(false);
 
   // Estado do diálogo de agendamento
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -582,30 +583,34 @@ export default function AgendaPage() {
   // Obtém horas disponíveis (que têm pelo menos um slot livre)
   const getAvailableHours = () => {
     const availableHours = new Set<string>();
-    
-    availableSlots.forEach(slot => {
-      const hour = slot.split(':')[0];
+
+    availableSlots.forEach((slot) => {
+      const hour = slot.split(":")[0];
       // Verifica se o slot não está ocupado nem é intervalo livre
       if (!isTimeSlotBooked(slot) && !isFreeInterval(slot)) {
         availableHours.add(hour);
       }
     });
-    
+
     return Array.from(availableHours).sort();
   };
 
   // Obtém minutos disponíveis para uma hora específica
   const getAvailableMinutes = (selectedHour: string) => {
     const availableMinutes = new Set<string>();
-    
-    availableSlots.forEach(slot => {
-      const [hour, minute] = slot.split(':');
+
+    availableSlots.forEach((slot) => {
+      const [hour, minute] = slot.split(":");
       // Se a hora coincide e o slot está disponível
-      if (hour === selectedHour && !isTimeSlotBooked(slot) && !isFreeInterval(slot)) {
+      if (
+        hour === selectedHour &&
+        !isTimeSlotBooked(slot) &&
+        !isFreeInterval(slot)
+      ) {
         availableMinutes.add(minute);
       }
     });
-    
+
     return Array.from(availableMinutes).sort();
   };
 
@@ -667,9 +672,9 @@ export default function AgendaPage() {
       if (user) {
         fetchAppointments(user.id, date);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao configurar intervalo:", error);
-      toast.error("Erro ao configurar intervalo");
+      toast.error(error.response.data.message);
     }
   };
 
@@ -1496,10 +1501,7 @@ export default function AgendaPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {getAvailableHours().map((hour) => (
-                            <SelectItem
-                              key={hour}
-                              value={hour}
-                            >
+                            <SelectItem key={hour} value={hour}>
                               {hour}
                             </SelectItem>
                           ))}
@@ -1564,10 +1566,7 @@ export default function AgendaPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {getAvailableHours().map((hour) => (
-                            <SelectItem
-                              key={hour}
-                              value={hour}
-                            >
+                            <SelectItem key={hour} value={hour}>
                               {hour}
                             </SelectItem>
                           ))}
@@ -1626,6 +1625,7 @@ export default function AgendaPage() {
             <div className="flex flex-col sm:flex-row gap-3 w-full">
               <Button
                 onClick={handleIntervalSubmit}
+                disabled={isLoadingButton}
                 className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 <span className="flex items-center justify-center space-x-2">

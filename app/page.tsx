@@ -64,6 +64,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const router = useRouter();
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -74,10 +75,18 @@ export default function Home() {
       }
 
       try {
+        // Aguarda o usuário estar carregado antes de fazer a requisição
+        if (!user?.id) {
+          console.log('Usuário ainda não carregado, pulando busca de agendamentos');
+          setIsLoading(false);
+          return;
+        }
+
         const today = new Date();
         const formattedDate = today.toISOString().split('T')[0];
         const userId = user.id;
 
+        console.log('Buscando agendamentos para:', { userId, formattedDate });
         const response = await api.get(`/schedules/${userId}/date/${formattedDate}`, {
           headers: {
             "Content-Type": "application/json",
@@ -87,6 +96,7 @@ export default function Home() {
           },
         });
         setScheduleData(response.data);
+        setError(null); // Limpa erro anterior se sucesso
       } catch (err) {
         console.error('Erro ao buscar agendamentos:', err);
         setError('Não foi possível carregar os agendamentos');
@@ -97,28 +107,6 @@ export default function Home() {
 
     fetchAppointments();
   }, [user]); // Adiciona user como dependência
-
-  // Mock data - in a real app this would come from a database
-  const barberInfo = {
-    name: user?.name || "",
-    avatarUrl: "/placeholder-avatar.jpg",
-    reminders: [
-      {
-        id: 1,
-        title: "Comprar produtos",
-        description: "Repor estoque de gel e pomada",
-        icon: ShoppingBagIcon,
-        color: "bg-blue-100 text-blue-600",
-      },
-      {
-        id: 2,
-        title: "Manutenção",
-        description: "Fazer manutenção nas máquinas",
-        icon: LightbulbIcon,
-        color: "bg-yellow-100 text-yellow-600",
-      },
-    ],
-  };
 
   const appointments = scheduleData?.appointments || [];
   const schedule = scheduleData?.schedule;
@@ -137,6 +125,23 @@ export default function Home() {
     }
   }, [])
 
+  // Buscar foto do perfil
+  const fetchProfilePhoto = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await api.get(`/team-photos/${user.id}`);
+      if (response.data?.photo_url) {
+        setProfilePhoto(response.data.photo_url);
+      }
+    } catch (error) {
+      console.log('Foto de perfil não encontrada ou erro:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfilePhoto();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -145,14 +150,14 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-3 border-white/20 shadow-xl">
-                <AvatarImage src={barberInfo.avatarUrl} alt={barberInfo.name} />
+              <Avatar className="h-16 w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
+                <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
                 <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg font-bold">
-                  {barberInfo.name.substring(0, 2)}
+                  {user?.name.substring(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="font-bold text-2xl tracking-wide">Olá, {barberInfo.name}!</h1>
+                <h1 className="font-bold text-2xl tracking-wide">Olá, {user?.name}!</h1>
                 <p className="text-emerald-100 text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
@@ -173,9 +178,6 @@ export default function Home() {
             <div className="flex gap-3">
               <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-200">
                 <BellIcon className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-200">
-                <WalletIcon className="h-5 w-5" />
               </Button>
             </div>
           </div>

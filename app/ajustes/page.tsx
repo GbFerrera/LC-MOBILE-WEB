@@ -53,16 +53,16 @@ export default function AjustesPage() {
   // Dados do barbeiro - agora usando estado local que pode ser atualizado
   const barberInfo = {
     name: currentUserData.name,
-    businessName: "Barbearia Link",
-    email: currentUserData.email,
-    phone: currentUserData.phone_number || "(11) 99876-5432",
+    businessName: companyDetails?.name,
+    email: currentUserData.email || "email@exemplo.com",
+    phone: currentUserData.phone_number || "(00) 00000-0000",
     avatarUrl: profilePhoto || "/barber-avatar.png",
   };
 
   // Buscar foto do perfil
   const fetchProfilePhoto = async () => {
     if (!user?.id) return;
-    
+
     try {
       const response = await api.get(`/team-photos/${user.id}`);
       if (response.data?.photo_url) {
@@ -76,7 +76,7 @@ export default function AjustesPage() {
   // Buscar dados completos do usuário
   const fetchUserData = async () => {
     if (!user?.id) return;
-    
+
     try {
       const response = await api.get(`/teams/${user.id}`);
       const userData = response.data;
@@ -86,10 +86,10 @@ export default function AjustesPage() {
         phone_number: userData.phone_number || "",
         position: userData.position || ""
       };
-      
+
       setEditForm({ ...userInfo, password: "" });
       setCurrentUserData(userInfo);
-      
+
       if (userData.photo_url) {
         setProfilePhoto(userData.photo_url);
       }
@@ -119,17 +119,18 @@ export default function AjustesPage() {
       };
       setEditForm({ ...initialData, password: "" });
       setCurrentUserData(initialData);
-      
+
       // Então tenta buscar dados mais detalhados da API
       fetchUserData();
       fetchProfilePhoto();
+      viewDetailsCompany();
     }
   }, [user]);
 
   // Atualizar perfil
   const handleUpdateProfile = async () => {
     if (!user?.id) return;
-    
+
     setIsLoading(true);
     try {
       const updateData: any = {
@@ -138,26 +139,26 @@ export default function AjustesPage() {
         phone_number: editForm.phone_number,
         position: editForm.position
       };
-      
+
       // Só inclui senha se foi preenchida
       if (editForm.password.trim()) {
         updateData.password = editForm.password;
       }
-      
+
       // Adicionar headers necessários (company_id pode ser requerido)
       const config = {
         headers: {
           'company_id': user.company_id || '1' // Usa company_id do usuário ou fallback
         }
       };
-      
+
       console.log('Tentando atualizar perfil:', { userId: user.id, updateData, headers: config.headers });
-      
+
       const response = await api.put(`/teams/${user.id}`, updateData, config);
-      
+
       toast.success("Perfil atualizado com sucesso!");
       setIsEditDialogOpen(false);
-      
+
       // Atualizar dados localmente imediatamente
       const updatedData = {
         name: editForm.name,
@@ -166,14 +167,14 @@ export default function AjustesPage() {
         position: editForm.position
       };
       setCurrentUserData(updatedData);
-      
+
       // Atualizar foto se vier na resposta
       if (response.data?.user?.photo_url) {
         setProfilePhoto(response.data.user.photo_url);
       }
     } catch (error: any) {
       console.error('Erro ao atualizar perfil:', error);
-      
+
       // Melhor tratamento de erros
       if (error.response?.status === 404) {
         toast.error("Usuário não encontrado. Verifique se você tem permissão para editar este perfil.");
@@ -256,7 +257,7 @@ export default function AjustesPage() {
       const dayMap: { [key: string]: string } = {
         'Sunday': 'Domingo',
         'Monday': 'Segunda-feira',
-        'Tuesday': 'Terça-feira', 
+        'Tuesday': 'Terça-feira',
         'Wednesday': 'Quarta-feira',
         'Thursday': 'Quinta-feira',
         'Friday': 'Sexta-feira',
@@ -324,7 +325,7 @@ export default function AjustesPage() {
 
     setServicesLoading(true);
     try {
-      const response = await api.get(`/service`, {
+      const response = await api.get(`/team-services/professional/${user.id}`, {
         headers: {
           company_id: user?.company_id
         }
@@ -390,6 +391,7 @@ export default function AjustesPage() {
                   <AvatarImage
                     src={barberInfo.avatarUrl}
                     alt={barberInfo.name}
+                    className="object-cover bg-gray-100"
                   />
                   <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-3xl font-bold">
                     {barberInfo.name.substring(0, 2)}
@@ -398,7 +400,7 @@ export default function AjustesPage() {
                 <div className="text-white flex-1">
                   <h2 className="font-bold text-4xl tracking-wide mb-3">{barberInfo.name}</h2>
                   <p className="text-emerald-100 text-2xl font-medium mb-2">
-                    {barberInfo.businessName}
+                    {companyDetails?.name}
                   </p>
                   <p className="text-emerald-200 text-lg">
                     {barberInfo.email}
@@ -410,7 +412,7 @@ export default function AjustesPage() {
                   )}
                 </div>
               </div>
-              
+
               {/* Action Buttons Row */}
               <div className="flex gap-4 items-center justify-end">
                 {/* Edit Profile Icon Button */}
@@ -466,17 +468,6 @@ export default function AjustesPage() {
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="position" className="text-right">
-                          Cargo
-                        </Label>
-                        <Input
-                          id="position"
-                          value={editForm.position}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, position: e.target.value }))}
-                          className="col-span-3"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="password" className="text-right">
                           Nova Senha
                         </Label>
@@ -491,20 +482,98 @@ export default function AjustesPage() {
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => setIsEditDialogOpen(false)}
                       >
                         Cancelar
                       </Button>
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         onClick={handleUpdateProfile}
                         disabled={isLoading}
                         className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                       >
                         {isLoading ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Services Dialog */}
+                <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                          <ScissorsIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Serviços e Preços
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Todos os serviços oferecidos pela sua barbearia
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="max-h-96 overflow-y-auto">
+                      {servicesLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200 border-t-amber-600 mb-4"></div>
+                          <p className="text-gray-500 font-medium">Carregando serviços...</p>
+                        </div>
+                      ) : services.length > 0 ? (
+                        <div className="grid gap-4">
+                          {services.map((service, index) => (
+                            <div key={service.id || index} className="group">
+                              <div className="p-5 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <div className="w-4 h-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-lg"></div>
+                                    <div className="flex-1">
+                                       <h3 className="font-bold text-lg text-gray-800 mb-1">
+                                         {service.service_name}
+                                       </h3>
+                                       {service.service_description && (
+                                         <p className="text-sm text-gray-600 mb-3">
+                                           {service.service_description}
+                                         </p>
+                                       )}
+                                       <div className="flex items-center gap-4">
+                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
+                                           💰 {formatPrice(service.base_price)}
+                                         </span>
+                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                                           ⏱️ {formatDuration(service.base_duration)}
+                                         </span>
+                                       </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                            <ScissorsIcon className="h-10 w-10 text-gray-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum serviço cadastrado</h3>
+                          <p className="text-gray-500 mb-4">Cadastre seus serviços para começar a receber agendamentos</p>
+                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium">
+                            💡 Dica: Use o sistema administrativo para cadastrar serviços
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        onClick={() => setIsServicesDialogOpen(false)}
+                        className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        Fechar
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -524,7 +593,7 @@ export default function AjustesPage() {
                         Seus horários de trabalho configurados
                       </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                       {serviceHoursLoading ? (
                         <div className="flex flex-col items-center justify-center py-12">
@@ -535,19 +604,17 @@ export default function AjustesPage() {
                         <div className="space-y-4">
                           {sortSchedulesByDay(serviceHours).map((schedule, index) => (
                             <div key={index} className="relative group">
-                              <div className={`p-4 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] ${
-                                schedule.is_day_off 
-                                  ? 'bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-100' 
+                              <div className={`p-4 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] ${schedule.is_day_off
+                                  ? 'bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-100'
                                   : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-100'
-                              }`}>
+                                }`}>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className={`w-4 h-4 rounded-full shadow-lg ${
-                                      schedule.is_day_off ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'
-                                    }`}></div>
+                                    <div className={`w-4 h-4 rounded-full shadow-lg ${schedule.is_day_off ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'
+                                      }`}></div>
                                     <div className="flex-1">
                                       <h3 className="font-bold text-lg text-gray-800 mb-1">
-                                        {schedule.day_of_week 
+                                        {schedule.day_of_week
                                           ? formatDayOfWeek(schedule.day_of_week)
                                           : schedule.date
                                             ? new Date(schedule.date).toLocaleDateString('pt-BR')
@@ -580,11 +647,10 @@ export default function AjustesPage() {
                                   </div>
                                   {!schedule.is_day_off && (
                                     <div className="text-right">
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${
-                                        schedule.date 
-                                          ? 'bg-blue-100 text-blue-800' 
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${schedule.date
+                                          ? 'bg-blue-100 text-blue-800'
                                           : 'bg-gray-100 text-gray-700'
-                                      }`}>
+                                        }`}>
                                         {schedule.date ? '📅 Específico' : '🔄 Semanal'}
                                       </span>
                                     </div>
@@ -607,9 +673,9 @@ export default function AjustesPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <DialogFooter className="pt-6 border-t border-gray-100">
-                      <Button 
+                      <Button
                         onClick={() => setIsServiceHoursDialogOpen(false)}
                         className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
@@ -633,7 +699,7 @@ export default function AjustesPage() {
                         Informações da sua empresa
                       </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="max-h-96 overflow-y-auto">
                       {companyDetailsLoading ? (
                         <div className="flex flex-col items-center justify-center py-12">
@@ -648,14 +714,6 @@ export default function AjustesPage() {
                               <span className="text-sm font-medium text-gray-600">Nome da Empresa</span>
                               <span className="text-sm font-semibold text-gray-900">
                                 {companyDetails.name || 'Não informado'}
-                              </span>
-                            </div>
-
-                            {/* Email */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Email</span>
-                              <span className="text-sm font-semibold text-gray-900">
-                                {companyDetails.email || 'Não informado'}
                               </span>
                             </div>
 
@@ -683,19 +741,11 @@ export default function AjustesPage() {
                               </span>
                             </div>
 
-                            {/* Subdomínio */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Subdomínio</span>
-                              <span className="text-sm font-semibold text-emerald-600">
-                                {companyDetails.subdomain || 'Não definido'}
-                              </span>
-                            </div>
-
                             {/* Data de Criação */}
                             <div className="flex items-center justify-between py-3">
                               <span className="text-sm font-medium text-gray-600">Empresa desde</span>
                               <span className="text-sm font-semibold text-gray-900">
-                                {companyDetails.created_at 
+                                {companyDetails.created_at
                                   ? new Date(companyDetails.created_at).toLocaleDateString('pt-BR')
                                   : 'Não informado'
                                 }
@@ -713,9 +763,9 @@ export default function AjustesPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <DialogFooter className="pt-6 border-t border-gray-100">
-                      <Button 
+                      <Button
                         onClick={() => setIsCompanyDetailsDialogOpen(false)}
                         className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
@@ -725,84 +775,8 @@ export default function AjustesPage() {
                   </DialogContent>
                 </Dialog>
 
-                {/* Services Dialog */}
-                <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white">
-                    <DialogHeader className="pb-6">
-                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
-                          <ScissorsIcon className="h-6 w-6 text-white" />
-                        </div>
-                        Serviços e Preços
-                      </DialogTitle>
-                      <DialogDescription className="text-gray-600 text-base">
-                        Todos os serviços oferecidos pela sua barbearia
-                      </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="max-h-96 overflow-y-auto">
-                      {servicesLoading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200 border-t-amber-600 mb-4"></div>
-                          <p className="text-gray-500 font-medium">Carregando serviços...</p>
-                        </div>
-                      ) : services.length > 0 ? (
-                        <div className="grid gap-4">
-                          {services.map((service, index) => (
-                            <div key={service.id || index} className="group">
-                              <div className="p-5 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-4 h-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-lg"></div>
-                                    <div className="flex-1">
-                                      <h3 className="font-bold text-lg text-gray-800 mb-1">
-                                        {service.name}
-                                      </h3>
-                                      {service.description && (
-                                        <p className="text-sm text-gray-600 mb-3">
-                                          {service.description}
-                                        </p>
-                                      )}
-                                      <div className="flex items-center gap-4">
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
-                                          💰 {formatPrice(service.price)}
-                                        </span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                                          ⏱️ {formatDuration(service.duration)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                            <ScissorsIcon className="h-10 w-10 text-gray-400" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum serviço cadastrado</h3>
-                          <p className="text-gray-500 mb-4">Cadastre seus serviços para começar a receber agendamentos</p>
-                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium">
-                            💡 Dica: Use o sistema administrativo para cadastrar serviços
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <DialogFooter className="pt-6 border-t border-gray-100">
-                      <Button 
-                        onClick={() => setIsServicesDialogOpen(false)}
-                        className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                      >
-                        Fechar
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-                
+
+
                 {/* Logout Button */}
                 <Button
                   onClick={handleLogout}
@@ -817,10 +791,10 @@ export default function AjustesPage() {
         </Card>
 
         {/* Settings Buttons - Vertical Stack */}
-        <div className="flex flex-col gap-4 w-full max-w-lg mx-auto mt-6 px-4 sm:px-0">
+        <div className="flex flex-col gap-4 w-full max-w-lg mx-auto mt-6 px-4 sm:px-0 pb-24">
           {settingButtons.map((setting, index) => (
-            <Card 
-              key={setting.id} 
+            <Card
+              key={setting.id}
               className="border-none shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer overflow-hidden hover:shadow-emerald-200"
             >
               <CardContent className="p-0">
@@ -837,26 +811,26 @@ export default function AjustesPage() {
                         {setting.description}
                       </p>
                     </div>
-                    <Button 
+                    <Button
                       size="sm"
                       onClick={
                         setting.id === 'services'
                           ? handleServicesClick
-                          : setting.id === 'schedule' 
-                          ? handleScheduleClick 
-                          : setting.id === 'business'
-                            ? handleCompanyDetailsClick
-                            : undefined
+                          : setting.id === 'schedule'
+                            ? handleScheduleClick
+                            : setting.id === 'business'
+                              ? handleCompanyDetailsClick
+                              : undefined
                       }
                       className={`bg-gradient-to-r ${setting.gradient} hover:shadow-lg transition-all duration-300 text-white font-semibold px-4 py-2 rounded-xl text-sm flex-shrink-0`}
                     >
                       {setting.id === 'services'
                         ? 'Ver Serviços'
-                        : setting.id === 'schedule' 
-                        ? 'Horários' 
-                        : setting.id === 'business'
-                          ? 'Detalhes'
-                          : 'Configurar'
+                        : setting.id === 'schedule'
+                          ? 'Horários'
+                          : setting.id === 'business'
+                            ? 'Detalhes'
+                            : 'Configurar'
                       }
                     </Button>
                   </div>
@@ -867,19 +841,9 @@ export default function AjustesPage() {
         </div>
 
         {/* App Version */}
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          width: '100%',
-          zIndex: 999,
-          background: '#fff',
-          textAlign: 'center',
-          padding: '8px 0',
-          boxShadow: '0 -2px 8px rgba(0,0,0,0.03)'
-        }}>
-          <p className="text-sm text-gray-500 font-medium">Barbearia Link v1.0.0</p>
-          <p className="text-sm text-gray-400 mt-2">
+        <div className="fixed bottom-0 left-0 w-full z-[999] bg-gradient-to-r from-emerald-600 to-teal-600 text-center py-2 mt-5 shadow-[0_-2px_8px_rgba(0,0,0,0.03)]">
+          <p className="text-sm text-white font-medium">{companyDetails?.name || 'Barbearia Link'}</p>
+          <p className="text-sm text-white mt-2">
             © 2025 Todos os direitos reservados
           </p>
         </div>

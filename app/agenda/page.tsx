@@ -18,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Drawer,
@@ -27,10 +28,10 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
+  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,7 +39,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CircleX } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { CircleX, Search } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface Client {
   id: number;
@@ -142,9 +157,9 @@ function generateTimeSlots(
 
   const availableSlots: string[] = [];
   const lunchSlots: string[] = [];
-  const slotDuration = 30; // 30 minutos por slot
+  const slotDuration = 15; // 15 minutos por slot
 
-  // Gera slots de 30 minutos dentro do horário de trabalho
+  // Gera slots de 15 minutos dentro do horário de trabalho
   for (
     let minutes = startTotalMinutes;
     minutes < endTotalMinutes;
@@ -203,6 +218,21 @@ export default function AgendaPage() {
     start_time: "",
     end_time: "",
     notes: "",
+  });
+
+  // Estado para busca de clientes
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+
+  // Filtrar clientes com base na busca
+  const filteredClients = clients.filter((client) => {
+    if (!clientSearch.trim()) return false; // Se não houver texto de busca, não mostra nenhum cliente
+    
+    const searchTerm = clientSearch.toLowerCase().trim();
+    const nameMatch = client.name?.toLowerCase().includes(searchTerm);
+    const phoneMatch = client.phone?.includes(searchTerm);
+    
+    return nameMatch || phoneMatch;
   });
 
   // Dados do formulário
@@ -1125,7 +1155,7 @@ export default function AgendaPage() {
                 </div>
               </div>
 
-              {/* Cliente */}
+              {/* Cliente - Com busca */}
               <div className="space-y-2">
                 <Label
                   htmlFor="client_id"
@@ -1146,34 +1176,90 @@ export default function AgendaPage() {
                   </svg>
                   Cliente *
                 </Label>
-                <Select
-                  name="client_id"
-                  value={formData.client_id}
-                  onValueChange={(value) =>
-                    handleSelectChange("client_id", value)
-                  }
-                  required
-                >
-                  <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg">
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id.toString()}>
-                        <div className="flex items-center space-x-2">
-                          <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center">
-                            <span className="text-xs font-semibold text-emerald-600">
-                              {client.name.charAt(0).toUpperCase()}
-                            </span>
+                <div className="relative">
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Search size={18} />
+                    </div>
+                    <Input
+                      id="client_search"
+                      name="client_id"
+                      placeholder="Buscar cliente por nome ou telefone..."
+                      value={clientSearch}
+                      onChange={(e) => {
+                        setClientSearch(e.target.value);
+                        setShowClientDropdown(true);
+                      }}
+                      onFocus={() => {
+                        // Se já tiver um cliente selecionado e o campo estiver preenchido com o nome do cliente,
+                        // limpa o campo para facilitar uma nova busca
+                        if (formData.client_id && clientSearch) {
+                          setClientSearch("");
+                        }
+                        setShowClientDropdown(true);
+                      }}
+                      onBlur={() => {
+                        // Pequeno delay para permitir que o clique no item da lista seja processado
+                        setTimeout(() => setShowClientDropdown(false), 150);
+                      }}
+                      className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg pl-10 pr-10"
+                      autoComplete="off"
+                      required
+                    />
+                  </div>
+                  {/* Indicador visual do cliente selecionado */}
+                  {formData.client_id && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                      <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
+                        <span className="text-xs font-semibold text-emerald-600">
+                          {clients.find(c => c.id.toString() === formData.client_id)?.name.charAt(0).toUpperCase() || "C"}
+                        </span>
+                      </div>
+                      <CircleX
+                        className="h-4 w-4 text-gray-500 cursor-pointer hover:text-red-500"
+                        onClick={() => {
+                          handleSelectChange("client_id", "");
+                          setClientSearch("");
+                        }}
+                      />
+                    </div>
+                  )}
+                  {/* Mostrar resultados da busca abaixo do input */}
+                  {clientSearch.trim() && showClientDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-auto border border-gray-200 animate-in fade-in-50 slide-in-from-top-5 duration-200">
+                      {filteredClients.length > 0 ? (
+                        filteredClients.map((client) => (
+                          <div 
+                            key={client.id} 
+                            className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
+                            onClick={() => {
+                              handleSelectChange("client_id", client.id.toString());
+                              setClientSearch(client.name);
+                              setShowClientDropdown(false);
+                            }}
+                          >
+                            <div className="font-medium flex items-center">
+                              <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  {client.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              {client.name}
+                            </div>
+                            <div className="text-sm text-gray-500 ml-7">{client.phone}</div>
                           </div>
-                          <span>
-                            {client.name} - {client.phone}
-                          </span>
+                        ))
+                      ) : (
+                        <div className="p-3 text-gray-500 text-center">
+                          <div className="flex justify-center mb-2">
+                            <Search size={18} className="text-gray-400" />
+                          </div>
+                          Nenhum cliente encontrado
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Serviço */}

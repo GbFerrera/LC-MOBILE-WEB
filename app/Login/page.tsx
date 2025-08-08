@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
-import { useState, useEffect } from "react";
-=======
 import { useEffect, useState } from "react";
->>>>>>> feature/redesigner
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,12 +36,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
-<<<<<<< HEAD
-  const { signIn, loading } = useAuth();
-  const { user } = useAuth();
-=======
   const { signIn, loading, user } = useAuth();
->>>>>>> feature/redesigner
   const router = useRouter();
 
   // Função para atualizar os dados do formulário
@@ -87,10 +78,6 @@ export default function LoginPage() {
         email: formData.email,
         password: formData.password,
       });
-<<<<<<< HEAD
-
-=======
->>>>>>> feature/redesigner
       // O redirecionamento é feito automaticamente pelo hook de autenticação
     } catch (error: any) {
       console.error("Erro no login:", error);
@@ -100,24 +87,11 @@ export default function LoginPage() {
     }
   };
 
-<<<<<<< HEAD
-  const verifyUser = () => {
-    if (user) {
-      router.push("/");
-    }
-  };
-
-  useEffect(() => {
-    verifyUser();
-  }, [user]);
-
-=======
   useEffect(() => {
     if(user) {
       router.push("/")
     }
   }, [])
->>>>>>> feature/redesigner
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background elements */}
@@ -197,10 +171,6 @@ export default function LoginPage() {
                 </div>
               )}
 
-<<<<<<< HEAD
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-=======
               <div
                 className="space-y-3 transform transition-all duration-500 animate-fade-in-up"
                 style={{ animationDelay: "0.5s" }}
@@ -211,7 +181,6 @@ export default function LoginPage() {
                 >
                   <Mail className="h-4 w-4 text-emerald-600" /> Email
                 </Label>
->>>>>>> feature/redesigner
                 <Input
                   id="email"
                   name="email"
@@ -224,14 +193,10 @@ export default function LoginPage() {
                 />
               </div>
 
-<<<<<<< HEAD
-              <div className="space-y-2">
-=======
               <div
                 className="space-y-3 transform transition-all duration-500 animate-fade-in-up"
                 style={{ animationDelay: "0.7s" }}
               >
->>>>>>> feature/redesigner
                 <div className="flex items-center justify-between">
                   <Label
                     htmlFor="password"
@@ -265,30 +230,9 @@ export default function LoginPage() {
                 </div>
               </div>
 
-<<<<<<< HEAD
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="remember"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked === true)}
-                />
-                <label
-                  htmlFor="remember"
-                  className="text-sm font-medium leading-none"
-                >
-                  Lembrar de mim
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-[#236F5D] hover:bg-[#1a5346]"
-                disabled={loading}
-=======
               <div
                 className="flex items-center justify-between transform transition-all duration-500 animate-fade-in-up"
                 style={{ animationDelay: "0.9s" }}
->>>>>>> feature/redesigner
               >
                 <div className="flex items-center space-x-3">
                   <Checkbox
@@ -327,11 +271,7 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <svg
-<<<<<<< HEAD
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-=======
                       className="animate-spin -ml-1 mr-3 h-6 w-6 text-white"
->>>>>>> feature/redesigner
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -363,13 +303,6 @@ export default function LoginPage() {
                 )}
               </Button>
 
-<<<<<<< HEAD
-              {/* Dica para teste */}
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-700">
-                <p className="font-medium">Credenciais para teste:</p>
-                <p>Email: admin@barbearialink.com</p>
-                <p>Senha: 123456</p>
-=======
               {/* Dica para teste com animação */}
               <div
                 className="mt-8 p-5 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-2 border-amber-200 rounded-2xl text-sm text-amber-800 transform transition-all duration-500 animate-fade-in-up shadow-lg hover:shadow-xl hover:scale-105"
@@ -396,7 +329,6 @@ export default function LoginPage() {
                     </span>
                   </p>
                 </div>
->>>>>>> feature/redesigner
               </div>
             </form>
           </CardContent>

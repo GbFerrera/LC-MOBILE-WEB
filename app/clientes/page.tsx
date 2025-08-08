@@ -15,7 +15,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { ChevronLeftIcon, PlusIcon, SearchIcon, StarIcon, PhoneIcon, MailIcon, CalendarIcon, UserIcon } from "lucide-react";
+import { ChevronLeftIcon, PlusIcon, SearchIcon, StarIcon, PhoneIcon, MailIcon, CalendarIcon, UserIcon, XIcon, UsersIcon, EyeIcon, AlertTriangleIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, setupAPIInterceptors } from "@/services/api"
@@ -119,7 +119,7 @@ export default function ClientesPage() {
                 onClick={() => setSearchTerm('')}
                 className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                ✕
+                <XIcon className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -148,7 +148,7 @@ export default function ClientesPage() {
         ) : error ? (
           <div className="text-center py-12">
             <div className="bg-red-50 rounded-xl p-8 max-w-md mx-auto">
-              <div className="text-red-500 text-6xl mb-4">⚠️</div>
+              <div className="text-red-500 text-6xl mb-4 flex justify-center"><AlertTriangleIcon className="h-16 w-16 text-red-500" /></div>
               <h3 className="text-lg font-semibold text-red-900 mb-2">Erro ao Carregar</h3>
               <p className="text-red-700">{error}</p>
             </div>
@@ -158,7 +158,7 @@ export default function ClientesPage() {
             <div className="bg-gray-50 rounded-xl p-8 max-w-md mx-auto">
               {searchTerm ? (
                 <>
-                  <div className="text-gray-400 text-6xl mb-4">🔍</div>
+                  <div className="text-gray-400 text-6xl mb-4"><SearchIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Resultado</h3>
                   <p className="text-gray-600 mb-4">Não encontramos clientes com "{searchTerm}"</p>
                   <Button 
@@ -171,7 +171,7 @@ export default function ClientesPage() {
                 </>
               ) : (
                 <>
-                  <div className="text-gray-400 text-6xl mb-4">👥</div>
+                  <div className="text-gray-400 text-6xl mb-4"><UsersIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Cliente</h3>
                   <p className="text-gray-600 mb-4">Você ainda não possui clientes cadastrados</p>
                   <Button className="bg-emerald-600 hover:bg-emerald-700">
@@ -239,20 +239,20 @@ function ClientCard({ client }: { client: Client }) {
                     {client.name}
                   </h3>
                   <div className="flex flex-col sm:flex-col gap-1 mt-2">
-                    <span className="text-sm text-gray-600 font-medium truncate">
-                      📞 {formatPhone(client.phone_number)}
+                    <span className="text-sm text-gray-600 font-medium truncate flex items-center gap-1">
+                      <PhoneIcon className="h-3 w-3 text-blue-500" /> {formatPhone(client.phone_number)}
                     </span>
                     {client.email && (
-                      <span className="text-sm text-gray-600 truncate">
-                        ✉️ {client.email}
+                      <span className="text-sm text-gray-600 truncate flex items-center gap-1">
+                        <MailIcon className="h-3 w-3 text-blue-500" /> {client.email}
                       </span>
                     )}
                   </div>
                 </div>
                 
                 <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 justify-center sm:justify-end flex-shrink-0">
-                  <span className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-full shadow-sm whitespace-nowrap">
-                    ⭐ Cliente
+                  <span className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-full shadow-sm whitespace-nowrap flex items-center gap-1">
+                    <StarIcon className="h-3 w-3 text-yellow-300" /> Cliente
                   </span>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
                     {daysSinceCreated === 0 ? 'Hoje' : 
@@ -271,7 +271,7 @@ function ClientCard({ client }: { client: Client }) {
                   onClick={handleSchedule}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm flex-1 sm:flex-none px-4 py-2"
                 >
-                  📅 Agendar
+                  <CalendarIcon className="h-4 w-4 mr-1 text-white" /> Agendar
                 </Button>
                 
                 {/* Drawer para Ver Mais */}
@@ -282,7 +282,7 @@ function ClientCard({ client }: { client: Client }) {
                       size="sm"
                       className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 text-xs sm:text-sm flex-1 sm:flex-none px-4 py-2"
                     >
-                      👁️ Ver Mais
+                      <EyeIcon className="h-4 w-4 mr-1 text-emerald-700" /> Ver Mais
                     </Button>
                   </DrawerTrigger>
                   <DrawerContent>
@@ -307,7 +307,7 @@ function ClientCard({ client }: { client: Client }) {
                         <div className="space-y-4">
                           {/* Telefone */}
                           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <PhoneIcon className="h-5 w-5 text-emerald-600" />
+                            <PhoneIcon className="h-5 w-5 text-blue-500" />
                             <div>
                               <p className="text-sm font-medium text-gray-900">Telefone</p>
                               <p className="text-sm text-gray-600">{formatPhone(client.phone_number)}</p>
@@ -317,7 +317,7 @@ function ClientCard({ client }: { client: Client }) {
                           {/* Email */}
                           {client.email && (
                             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                              <MailIcon className="h-5 w-5 text-emerald-600" />
+                              <MailIcon className="h-5 w-5 text-blue-500" />
                               <div>
                                 <p className="text-sm font-medium text-gray-900">Email</p>
                                 <p className="text-sm text-gray-600">{client.email}</p>
@@ -328,7 +328,7 @@ function ClientCard({ client }: { client: Client }) {
                           {/* Documento */}
                           {client.document && (
                             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                              <UserIcon className="h-5 w-5 text-emerald-600" />
+                              <UserIcon className="h-5 w-5 text-orange-500" />
                               <div>
                                 <p className="text-sm font-medium text-gray-900">Documento</p>
                                 <p className="text-sm text-gray-600">{client.document}</p>
@@ -338,7 +338,7 @@ function ClientCard({ client }: { client: Client }) {
                           
                           {/* Data de Cadastro */}
                           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <CalendarIcon className="h-5 w-5 text-emerald-600" />
+                            <CalendarIcon className="h-5 w-5 text-blue-500" />
                             <div>
                               <p className="text-sm font-medium text-gray-900">Cadastrado em</p>
                               <p className="text-sm text-gray-600">
@@ -362,7 +362,7 @@ function ClientCard({ client }: { client: Client }) {
                             onClick={handleSchedule}
                             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
                           >
-                            📅 Agendar Serviço
+                            <CalendarIcon className="h-4 w-4 mr-1 text-white" /> Agendar Serviço
                           </Button>
                           <DrawerClose asChild>
                             <Button variant="outline" className="flex-1">

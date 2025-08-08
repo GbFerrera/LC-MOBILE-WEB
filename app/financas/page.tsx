@@ -2,46 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-<<<<<<< HEAD
-import { useAuth } from "@/hooks/auth";
-import { useIsMobile } from "@/hooks/use-mobile";
-
-export default function FinancasPage() {
-  const { user } = useAuth();
-  const isMobile = useIsMobile();
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className={`text-center p-8 bg-white rounded-xl shadow-lg border border-gray-200 max-w-md w-full ${isMobile ? 'mx-2' : 'mx-4'}`}>
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 mb-6">
-          <svg
-            className="h-10 w-10 text-emerald-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-900 mb-4`}>Em Desenvolvimento</h1>
-        <p className={`text-gray-600 mb-8 ${isMobile ? 'text-base' : 'text-lg'}`}>
-          {user ? `Olá ${user.name}, e` : 'E'}stamos trabalhando para trazer recursos financeiros incríveis para o seu negócio. Volte em breve!
-        </p>
-        <Link
-          href="/"
-          className={`inline-flex items-center ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base'} border border-transparent font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200`}
-        >
-          Voltar para página principal
-        </Link>
-=======
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
+import { ArrowLeft, Calendar, CheckCircle, DollarSign, Filter, RotateCcw, Settings, TrendingUp, Wallet } from "lucide-react";
 
 // Interfaces para tipagem
 interface Commission {
@@ -241,8 +205,8 @@ export default function FinancasPage() {
       <div className="max-w-4xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Comissões</h1>
-          <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm">
-            ← Voltar
+          <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm flex items-center">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Link>
         </div>
         {/* Filtros Simples */}
@@ -302,7 +266,9 @@ export default function FinancasPage() {
         {/* Ganhos do Período (se houver filtro de data) */}
         {earningsReport && (
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded border border-green-200 p-4 mb-6">
-            <h2 className="text-lg font-semibold text-green-800 mb-3">💰 Seus Ganhos no Período</h2>
+            <h2 className="text-lg font-semibold text-green-800 mb-3 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-700" /> Seus Ganhos no Período
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-700">{earningsReport.summary.total_appointments}</div>
@@ -352,9 +318,7 @@ export default function FinancasPage() {
           <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
               <h2 className="text-white font-semibold text-lg flex items-center gap-2">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CheckCircle className="h-5 w-5 text-white" />
                 Suas Comissões Gerais ({getGeneralCommissions().length})
               </h2>
               <p className="text-emerald-100 text-sm mt-1">Aplicam-se a todos os serviços prestados</p>
@@ -399,10 +363,8 @@ export default function FinancasPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <CheckCircle className="h-8 w-8 text-gray-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Geral</h3>
                   <p className="text-gray-600">Você não possui comissões gerais {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
@@ -415,9 +377,7 @@ export default function FinancasPage() {
           <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
               <h2 className="text-white font-semibold text-lg flex items-center gap-2">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+                <Settings className="h-5 w-5 text-white" />
                 Suas Comissões por Serviço ({getServiceCommissions().length})
               </h2>
               <p className="text-blue-100 text-sm mt-1">Comissões específicas para serviços individuais</p>
@@ -465,10 +425,8 @@ export default function FinancasPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
+                  <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <Settings className="h-8 w-8 text-gray-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Específica</h3>
                   <p className="text-gray-600">Você não possui comissões específicas por serviço {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
@@ -479,7 +437,6 @@ export default function FinancasPage() {
         </div>
 
 
->>>>>>> feature/redesigner
       </div>
     </div>
   );

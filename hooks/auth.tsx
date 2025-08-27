@@ -49,6 +49,12 @@ function AuthProvider({ children }: AuthProviderProps) {
 
   const loadUserData = () => {
     try {
+      // Verifica se estamos no lado do cliente
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem("@linkCallendar:token");
       const user = localStorage.getItem("@linkCallendar:user");
 
@@ -104,9 +110,11 @@ function AuthProvider({ children }: AuthProviderProps) {
         };
         const mockToken = 'mock-token-123456';
         
-        // Salva os dados no localStorage
-        localStorage.setItem("@linkCallendar:user", JSON.stringify(mockUser));
-        localStorage.setItem("@linkCallendar:token", mockToken);
+        // Salva os dados no localStorage (apenas no cliente)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("@linkCallendar:user", JSON.stringify(mockUser));
+          localStorage.setItem("@linkCallendar:token", mockToken);
+        }
         
         // Configura o interceptor com o company_id
         setupAPIInterceptors(mockUser.company_id);
@@ -170,9 +178,11 @@ function AuthProvider({ children }: AuthProviderProps) {
         position: userData.position || ''
       };
 
-      // Salva os dados no localStorage
-      localStorage.setItem("@linkCallendar:user", JSON.stringify(user));
-      localStorage.setItem("@linkCallendar:token", token);
+      // Salva os dados no localStorage (apenas no cliente)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("@linkCallendar:user", JSON.stringify(user));
+        localStorage.setItem("@linkCallendar:token", token);
+      }
       
       // Configura o interceptor com o company_id
       if (user.company_id) {
@@ -206,8 +216,10 @@ function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signOut = () => {
-    localStorage.removeItem("@linkCallendar:token");
-    localStorage.removeItem("@linkCallendar:user");
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("@linkCallendar:token");
+      localStorage.removeItem("@linkCallendar:user");
+    }
     setData({ user: null, token: null });
     // Removido o redirecionamento automático para a página de Login
   };
@@ -215,6 +227,8 @@ function AuthProvider({ children }: AuthProviderProps) {
   // Verifica se o token está expirado a cada minuto
   useEffect(() => {
     const checkTokenExpiration = () => {
+      if (typeof window === 'undefined') return;
+      
       const token = localStorage.getItem("@linkCallendar:token");
       if (token && isTokenExpired(token)) {
         signOut();

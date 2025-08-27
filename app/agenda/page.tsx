@@ -213,7 +213,7 @@ export default function AgendaPage() {
   // Estado do drawer de seleção de intervalo
   const [isIntervalDrawerOpen, setIsIntervalDrawerOpen] = useState(false);
   const [formIntervals, setFormIntervals] = useState({
-    professional_id: user.id,
+    professional_id: user?.id || "",
     appointment_date: "",
     start_time: "",
     end_time: "",
@@ -290,22 +290,107 @@ export default function AgendaPage() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setClients(clientsResponse.data || []);
+        // Filtrar apenas clientes válidos com id definido
+        const validClients = (clientsResponse.data || []).filter(client => client && client.id);
+        setClients(validClients);
 
-        // Buscar serviços
-        const servicesResponse = await api.get("/service", {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            company_id: user?.company_id?.toString() || "0",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        console.log("Serviços carregados:", servicesResponse.data);
-        setServices(servicesResponse.data || []);
+        // Buscar serviços - tentar diferentes endpoints
+        let servicesResponse;
+        let servicesData = [];
+        
+        const serviceEndpoints = ["/service", "/service"];
+        
+        for (const endpoint of serviceEndpoints) {
+          try {
+            console.log(`Tentando buscar serviços no endpoint: ${endpoint}`);
+            servicesResponse = await api.get(endpoint, {
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                company_id: user?.company_id?.toString() || "0",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            });
+            
+            console.log(`Resposta do endpoint ${endpoint}:`, servicesResponse);
+            console.log(`Dados do endpoint ${endpoint}:`, servicesResponse.data);
+            
+            // Verificar se a resposta tem a estrutura esperada
+            servicesData = servicesResponse.data;
+            
+            // Se a resposta for um objeto com uma propriedade que contém os serviços
+            if (servicesData && typeof servicesData === 'object' && !Array.isArray(servicesData)) {
+              // Tentar encontrar a propriedade que contém os serviços
+              const possibleKeys = ['services', 'data', 'items', 'results'];
+              for (const key of possibleKeys) {
+                if (servicesData[key] && Array.isArray(servicesData[key])) {
+                  servicesData = servicesData[key];
+                  break;
+                }
+              }
+            }
+            
+            // Se encontrou dados válidos, sair do loop
+            if (Array.isArray(servicesData) && servicesData.length > 0) {
+              console.log(`Serviços encontrados no endpoint ${endpoint}:`, servicesData);
+              break;
+            }
+            
+          } catch (endpointError) {
+            console.error(`Erro no endpoint ${endpoint}:`, endpointError);
+            if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
+              // Se é o último endpoint, propagar o erro
+              throw endpointError;
+            }
+          }
+        }
+        
+        console.log("Dados processados dos serviços:", servicesData);
+        
+        // Normalizar e filtrar serviços válidos
+        const validServices = Array.isArray(servicesData) 
+          ? servicesData
+              .filter(service => {
+                console.log("Verificando serviço:", service);
+                console.log("Tem ID?", !!service?.id);
+                console.log("Tem service_id?", !!service?.service_id);
+                
+                // Verificar se tem id ou service_id
+                return service && (service.id || service.service_id);
+              })
+              .map(service => {
+                // Normalizar a estrutura do serviço
+                const normalizedService = {
+                  id: service.id || service.service_id,
+                  name: service.name || service.service_name || service.title || `Serviço ${service.id || service.service_id}`,
+                  duration: service.duration || service.time || service.duration_minutes || 30,
+                  price: service.price || service.value || service.cost || 0,
+                  description: service.description || service.desc || '',
+                  // Manter dados originais para debug
+                  _original: service
+                };
+                
+                console.log("Serviço normalizado:", normalizedService);
+                return normalizedService;
+              })
+          : [];
+        
+        console.log("Serviços válidos filtrados:", validServices);
+        console.log("Quantidade de serviços:", validServices.length);
+        
+        setServices(validServices);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
-        toast.error("Erro ao carregar clientes e serviços");
+        console.error("Detalhes do erro:", error.response?.data);
+        console.error("Status do erro:", error.response?.status);
+        
+        if (error.response?.status === 404) {
+          toast.error("Endpoint de serviços não encontrado. Verifique a API.");
+        } else if (error.response?.status === 401) {
+          toast.error("Não autorizado. Verifique o token de autenticação.");
+        } else {
+          toast.error("Erro ao carregar clientes e serviços");
+        }
       }
     };
 
@@ -388,7 +473,7 @@ export default function AgendaPage() {
 
       // Encontrar o serviço selecionado para obter a duração
       const selectedService = services.find(
-        (s) => s.id.toString() === formData.service_id
+        (s) => s.id && s.id.toString() === formData.service_id
       );
       if (!selectedService) {
         throw new Error("Serviço não encontrado");
@@ -660,14 +745,14 @@ export default function AgendaPage() {
 
       toast.success("Intervalo liberado com sucesso", response.data);
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Erro ao liberar intervalo");
     }
   };
 
   // Handlers para o drawer de seleção de intervalo
   const openIntervalDrawer = () => {
     setFormIntervals({
-      professional_id: user.id,
+      professional_id: user?.id || "",
       appointment_date: date.toISOString().split("T")[0],
       start_time: "",
       end_time: "",
@@ -704,7 +789,7 @@ export default function AgendaPage() {
       }
     } catch (error) {
       console.error("Erro ao configurar intervalo:", error);
-      toast.error(error.response.data.message);
+      toast.error(error?.response?.data?.message || "Erro ao configurar intervalo");
     }
   };
 
@@ -1212,7 +1297,7 @@ export default function AgendaPage() {
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                       <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
                         <span className="text-xs font-semibold text-emerald-600">
-                          {clients.find(c => c.id.toString() === formData.client_id)?.name.charAt(0).toUpperCase() || "C"}
+                          {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
                         </span>
                       </div>
                       <CircleX
@@ -1233,7 +1318,7 @@ export default function AgendaPage() {
                             key={client.id} 
                             className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
                             onClick={() => {
-                              handleSelectChange("client_id", client.id.toString());
+                              handleSelectChange("client_id", client.id?.toString() || "");
                               setClientSearch(client.name);
                               setShowClientDropdown(false);
                             }}
@@ -1241,7 +1326,7 @@ export default function AgendaPage() {
                             <div className="font-medium flex items-center">
                               <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
                                 <span className="text-xs font-semibold text-emerald-600">
-                                  {client.name.charAt(0).toUpperCase()}
+                                  {client.name?.charAt(0)?.toUpperCase() || "C"}
                                 </span>
                               </div>
                               {client.name}
@@ -1295,19 +1380,26 @@ export default function AgendaPage() {
                     <SelectValue placeholder="Selecione um serviço" />
                   </SelectTrigger>
                   <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem
-                        key={service.id}
-                        value={service.id.toString()}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{service.name}</span>
-                          <span className="text-sm text-gray-500 ml-2">
-                            {service.duration} min
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {(() => {
+                      console.log("Renderizando select de serviços. Estado atual:", services);
+                      console.log("Quantidade de serviços no estado:", services.length);
+                      return services.map((service) => {
+                        console.log("Renderizando serviço:", service);
+                        return (
+                          <SelectItem
+                            key={service.id}
+                            value={service.id?.toString() || ""}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{service.name}</span>
+                              <span className="text-sm text-gray-500 ml-2">
+                                {service.duration} min
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      });
+                    })()}
                   </SelectContent>
                 </Select>
               </div>

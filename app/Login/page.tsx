@@ -301,35 +301,7 @@ export default function LoginPage() {
                     <Sparkles className="ml-3 h-5 w-5 animate-pulse" />
                   </>
                 )}
-              </Button>
-
-              {/* Dica para teste com animação */}
-              <div
-                className="mt-8 p-5 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-2 border-amber-200 rounded-2xl text-sm text-amber-800 transform transition-all duration-500 animate-fade-in-up shadow-lg hover:shadow-xl hover:scale-105"
-                style={{ animationDelay: "1.3s" }}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
-                  <p className="font-bold text-amber-900 text-base flex items-center gap-2">
-                    <Target className="h-4 w-4 text-amber-600" /> Credenciais
-                    para teste:
-                  </p>
-                </div>
-                <div className="space-y-2 ml-6">
-                  <p className="flex items-center gap-3 font-mono">
-                    <Mail className="h-4 w-4 text-amber-600" />
-                    <span className="bg-white/70 px-3 py-2 rounded-lg text-xs font-bold border border-amber-200 hover:bg-white transition-colors duration-300">
-                      admin@barbearialink.com
-                    </span>
-                  </p>
-                  <p className="flex items-center gap-3 font-mono">
-                    <Key className="h-4 w-4 text-amber-600" />
-                    <span className="bg-white/70 px-3 py-2 rounded-lg text-xs font-bold border border-amber-200 hover:bg-white transition-colors duration-300">
-                      123456
-                    </span>
-                  </p>
-                </div>
-              </div>
+              </Button>              
             </form>
           </CardContent>
         </Card>

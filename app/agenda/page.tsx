@@ -213,7 +213,7 @@ export default function AgendaPage() {
   // Estado do drawer de seleção de intervalo
   const [isIntervalDrawerOpen, setIsIntervalDrawerOpen] = useState(false);
   const [formIntervals, setFormIntervals] = useState({
-    professional_id: user.id,
+    professional_id: user?.id || "",
     appointment_date: "",
     start_time: "",
     end_time: "",
@@ -223,6 +223,9 @@ export default function AgendaPage() {
   // Estado para busca de clientes
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  
+  // Estado para dropdown de serviços
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   // Filtrar clientes com base na busca
   const filteredClients = clients.filter((client) => {
@@ -238,7 +241,7 @@ export default function AgendaPage() {
   // Dados do formulário
   const [formData, setFormData] = useState({
     client_id: "",
-    service_id: "",
+    service_ids: [] as string[], // Array para múltiplos serviços
     notes: "",
   });
 
@@ -290,22 +293,107 @@ export default function AgendaPage() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setClients(clientsResponse.data || []);
+        // Filtrar apenas clientes válidos com id definido
+        const validClients = (clientsResponse.data || []).filter(client => client && client.id);
+        setClients(validClients);
 
-        // Buscar serviços
-        const servicesResponse = await api.get("/service", {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            company_id: user?.company_id?.toString() || "0",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        console.log("Serviços carregados:", servicesResponse.data);
-        setServices(servicesResponse.data || []);
+        // Buscar serviços - tentar diferentes endpoints
+        let servicesResponse;
+        let servicesData = [];
+        
+        const serviceEndpoints = ["/service", "/service"];
+        
+        for (const endpoint of serviceEndpoints) {
+          try {
+            console.log(`Tentando buscar serviços no endpoint: ${endpoint}`);
+            servicesResponse = await api.get(endpoint, {
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                company_id: user?.company_id?.toString() || "0",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            });
+            
+            console.log(`Resposta do endpoint ${endpoint}:`, servicesResponse);
+            console.log(`Dados do endpoint ${endpoint}:`, servicesResponse.data);
+            
+            // Verificar se a resposta tem a estrutura esperada
+            servicesData = servicesResponse.data;
+            
+            // Se a resposta for um objeto com uma propriedade que contém os serviços
+            if (servicesData && typeof servicesData === 'object' && !Array.isArray(servicesData)) {
+              // Tentar encontrar a propriedade que contém os serviços
+              const possibleKeys = ['services', 'data', 'items', 'results'];
+              for (const key of possibleKeys) {
+                if (servicesData[key] && Array.isArray(servicesData[key])) {
+                  servicesData = servicesData[key];
+                  break;
+                }
+              }
+            }
+            
+            // Se encontrou dados válidos, sair do loop
+            if (Array.isArray(servicesData) && servicesData.length > 0) {
+              console.log(`Serviços encontrados no endpoint ${endpoint}:`, servicesData);
+              break;
+            }
+            
+          } catch (endpointError) {
+            console.error(`Erro no endpoint ${endpoint}:`, endpointError);
+            if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
+              // Se é o último endpoint, propagar o erro
+              throw endpointError;
+            }
+          }
+        }
+        
+        console.log("Dados processados dos serviços:", servicesData);
+        
+        // Normalizar e filtrar serviços válidos
+        const validServices = Array.isArray(servicesData) 
+          ? servicesData
+              .filter(service => {
+                console.log("Verificando serviço:", service);
+                console.log("Tem ID?", !!service?.id);
+                console.log("Tem service_id?", !!service?.service_id);
+                
+                // Verificar se tem id ou service_id
+                return service && (service.id || service.service_id);
+              })
+              .map(service => {
+                // Normalizar a estrutura do serviço
+                const normalizedService = {
+                  id: service.id || service.service_id,
+                  name: service.name || service.service_name || service.title || `Serviço ${service.id || service.service_id}`,
+                  duration: service.duration || service.time || service.duration_minutes || 30,
+                  price: service.price || service.value || service.cost || 0,
+                  description: service.description || service.desc || '',
+                  // Manter dados originais para debug
+                  _original: service
+                };
+                
+                console.log("Serviço normalizado:", normalizedService);
+                return normalizedService;
+              })
+          : [];
+        
+        console.log("Serviços válidos filtrados:", validServices);
+        console.log("Quantidade de serviços:", validServices.length);
+        
+        setServices(validServices);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
-        toast.error("Erro ao carregar clientes e serviços");
+        console.error("Detalhes do erro:", error.response?.data);
+        console.error("Status do erro:", error.response?.status);
+        
+        if (error.response?.status === 404) {
+          toast.error("Endpoint de serviços não encontrado. Verifique a API.");
+        } else if (error.response?.status === 401) {
+          toast.error("Não autorizado. Verifique o token de autenticação.");
+        } else {
+          toast.error("Erro ao carregar clientes e serviços");
+        }
       }
     };
 
@@ -338,10 +426,46 @@ export default function AgendaPage() {
     }));
   };
 
+  // Função para gerenciar seleção/deseleção de serviços
+  const handleServiceToggle = (serviceId: string) => {
+    setFormData((prev) => {
+      const currentServices = prev.service_ids;
+      const isSelected = currentServices.includes(serviceId);
+      
+      if (isSelected) {
+        // Remove o serviço se já estiver selecionado
+        return {
+          ...prev,
+          service_ids: currentServices.filter(id => id !== serviceId)
+        };
+      } else {
+        // Adiciona o serviço se não estiver selecionado
+        return {
+          ...prev,
+          service_ids: [...currentServices, serviceId]
+        };
+      }
+    });
+  };
+
+  // Calcular preço total dos serviços selecionados
+  const getTotalPrice = () => {
+    return services
+      .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
+      .reduce((total, service) => total + (service.price || 0), 0);
+  };
+
+  // Calcular duração total dos serviços selecionados
+  const getTotalDuration = () => {
+    return services
+      .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
+      .reduce((total, service) => total + (service.duration || 0), 0);
+  };
+
   const resetForm = () => {
     setFormData({
       client_id: "",
-      service_id: "",
+      service_ids: [],
       notes: "",
     });
     setSelectedSlot("");
@@ -374,8 +498,8 @@ export default function AgendaPage() {
       setIsSubmitting(true);
 
       // Validar dados do formulário
-      if (!formData.client_id || !formData.service_id) {
-        throw new Error("Por favor, selecione o cliente e o serviço");
+      if (!formData.client_id || formData.service_ids.length === 0) {
+        throw new Error("Por favor, selecione o cliente e pelo menos um serviço");
       }
 
       // Formatar a data e hora para o formato esperado pela API
@@ -386,19 +510,22 @@ export default function AgendaPage() {
       const quantity = 1;
       const status = "confirmed";
 
-      // Encontrar o serviço selecionado para obter a duração
-      const selectedService = services.find(
-        (s) => s.id.toString() === formData.service_id
+      // Encontrar os serviços selecionados e calcular duração total
+      const selectedServices = services.filter(
+        (s) => s.id && formData.service_ids.includes(s.id.toString())
       );
-      if (!selectedService) {
-        throw new Error("Serviço não encontrado");
+      if (selectedServices.length === 0) {
+        throw new Error("Serviços não encontrados");
       }
 
-      // Calcular end_time baseado na duração do serviço
+      // Calcular duração total de todos os serviços
+      const totalDuration = selectedServices.reduce((total, service) => total + service.duration, 0);
+
+      // Calcular end_time baseado na duração total
       const endTime = new Date(date);
       endTime.setHours(
         parseInt(hours),
-        parseInt(minutes) + selectedService.duration
+        parseInt(minutes) + totalDuration
       );
       const formattedEndTime = endTime.toTimeString().slice(0, 5);
 
@@ -411,13 +538,11 @@ export default function AgendaPage() {
         end_time: formattedEndTime,
         status: status, // Usando o status 'confirmed' definido anteriormente
         notes: formData.notes || "",
-        services: [
-          {
-            service_id: parseInt(formData.service_id),
-            professional_id: user.id,
-            quantity: quantity, // Adicionando a quantidade fixa como 1
-          },
-        ],
+        services: selectedServices.map(service => ({
+          service_id: parseInt(service.id.toString()),
+          professional_id: user.id,
+          quantity: quantity, // Adicionando a quantidade fixa como 1
+        })),
       };
 
       console.log("Dados do agendamento:", appointmentData);
@@ -660,14 +785,14 @@ export default function AgendaPage() {
 
       toast.success("Intervalo liberado com sucesso", response.data);
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Erro ao liberar intervalo");
     }
   };
 
   // Handlers para o drawer de seleção de intervalo
   const openIntervalDrawer = () => {
     setFormIntervals({
-      professional_id: user.id,
+      professional_id: user?.id || "",
       appointment_date: date.toISOString().split("T")[0],
       start_time: "",
       end_time: "",
@@ -704,7 +829,7 @@ export default function AgendaPage() {
       }
     } catch (error) {
       console.error("Erro ao configurar intervalo:", error);
-      toast.error(error.response.data.message);
+      toast.error(error?.response?.data?.message || "Erro ao configurar intervalo");
     }
   };
 
@@ -1024,8 +1149,10 @@ export default function AgendaPage() {
                                 {appointment.client?.name || "Cliente"}
                               </div>
                               <div className="text-xs text-red-500 truncate mb-1">
-                                {appointment.services?.[0]?.service_name ||
-                                  "Serviço"}
+                                {appointment.services && appointment.services.length > 1 
+                                  ? `${appointment.services.length} serviços`
+                                  : appointment.services?.[0]?.service_name || "Serviço"
+                                }
                               </div>
                               <div className="flex items-center text-xs text-red-500">
                                 <svg
@@ -1212,7 +1339,7 @@ export default function AgendaPage() {
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                       <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
                         <span className="text-xs font-semibold text-emerald-600">
-                          {clients.find(c => c.id.toString() === formData.client_id)?.name.charAt(0).toUpperCase() || "C"}
+                          {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
                         </span>
                       </div>
                       <CircleX
@@ -1233,7 +1360,7 @@ export default function AgendaPage() {
                             key={client.id} 
                             className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
                             onClick={() => {
-                              handleSelectChange("client_id", client.id.toString());
+                              handleSelectChange("client_id", client.id?.toString() || "");
                               setClientSearch(client.name);
                               setShowClientDropdown(false);
                             }}
@@ -1241,7 +1368,7 @@ export default function AgendaPage() {
                             <div className="font-medium flex items-center">
                               <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
                                 <span className="text-xs font-semibold text-emerald-600">
-                                  {client.name.charAt(0).toUpperCase()}
+                                  {client.name?.charAt(0)?.toUpperCase() || "C"}
                                 </span>
                               </div>
                               {client.name}
@@ -1262,12 +1389,9 @@ export default function AgendaPage() {
                 </div>
               </div>
 
-              {/* Serviço */}
+              {/* Serviços - Select com Dropdown Customizado */}
               <div className="space-y-2">
-                <Label
-                  htmlFor="service_id"
-                  className="text-sm font-semibold text-gray-700 flex items-center"
-                >
+                <Label className="text-sm font-semibold text-gray-700 flex items-center">
                   <svg
                     className="w-4 h-4 mr-2 text-gray-500"
                     fill="none"
@@ -1281,35 +1405,125 @@ export default function AgendaPage() {
                       d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 01-2 2H10a2 2 0 01-2-2V6"
                     />
                   </svg>
-                  Serviço *
+                  Serviços *
                 </Label>
-                <Select
-                  name="service_id"
-                  value={formData.service_id}
-                  onValueChange={(value) =>
-                    handleSelectChange("service_id", value)
-                  }
-                  required
-                >
-                  <SelectTrigger className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg">
-                    <SelectValue placeholder="Selecione um serviço" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem
-                        key={service.id}
-                        value={service.id.toString()}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{service.name}</span>
-                          <span className="text-sm text-gray-500 ml-2">
-                            {service.duration} min
-                          </span>
+                
+                {/* Select Customizado */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                    className="w-full h-12 px-3 py-2 text-left bg-white border-2 border-gray-200 rounded-lg hover:border-emerald-400 focus:border-emerald-400 focus:outline-none transition-colors duration-200 flex items-center justify-between"
+                  >
+                    <span className="flex-1 text-gray-900">
+                      {formData.service_ids.length === 0 
+                        ? "Selecione os serviços" 
+                        : formData.service_ids.length === 1
+                        ? `${services.find(s => s.id?.toString() === formData.service_ids[0])?.name || 'Serviço'}`
+                        : `${formData.service_ids.length} serviços selecionados`
+                      }
+                    </span>
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+                        showServiceDropdown ? 'rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Dropdown */}
+                  {showServiceDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+                      {/* Cabeçalho */}
+                      {formData.service_ids.length > 0 && (
+                        <div className="p-3 border-b border-gray-200 bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">Resumo</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">
+                                {getTotalDuration()} min
+                              </span>
+                              <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full font-semibold">
+                                R$ {getTotalPrice().toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      )}
+                      
+                      {/* Lista de serviços com scroll */}
+                      <div className="max-h-64 overflow-y-auto">
+                        {services.length > 0 ? (
+                          services.map((service) => {
+                            const isSelected = formData.service_ids.includes(service.id?.toString() || "");
+                            return (
+                              <div
+                                key={service.id}
+                                className={`flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
+                                  isSelected ? 'bg-emerald-50' : ''
+                                }`}
+                                onClick={() => handleServiceToggle(service.id?.toString() || "")}
+                              >
+                                {/* Checkbox */}
+                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center mr-3 transition-all duration-200 ${
+                                  isSelected 
+                                    ? 'bg-emerald-500 border-emerald-500' 
+                                    : 'border-gray-300'
+                                }`}>
+                                  {isSelected && (
+                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                
+                                {/* Informações do serviço */}
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className={`text-sm font-medium ${
+                                      isSelected ? 'text-emerald-800' : 'text-gray-800'
+                                    }`}>
+                                      {service.name}
+                                    </span>
+                                    <div className="flex items-center space-x-2 ml-2">
+                                      <span className="text-xs text-gray-500">
+                                        {service.duration}min
+                                      </span>
+                                      <span className="text-xs text-gray-600 font-medium">
+                                        R$ {(service.price || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="p-4 text-center text-gray-500">
+                            <span className="text-sm">Nenhum serviço disponível</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Resumo dos serviços selecionados (fora do dropdown) */}
+                {formData.service_ids.length > 0 && (
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-3 border border-emerald-200 mt-2">
+                    <div className="text-xs text-emerald-700">
+                      <span className="font-medium">Selecionados: </span>
+                      {services
+                        .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
+                        .map(service => service.name)
+                        .join(", ")}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Observações */}
@@ -1414,8 +1628,10 @@ export default function AgendaPage() {
               {selectedAppointment?.client?.name || "Cliente"}
             </DrawerTitle>
             <DrawerDescription className="text-gray-600">
-              {selectedAppointment?.services?.[0]?.service_name || "Serviço"} •
-              R$ {selectedAppointment?.services?.[0]?.price || "0.00"}
+              {selectedAppointment?.services && selectedAppointment.services.length > 1 
+                ? `${selectedAppointment.services.length} serviços • R$ ${selectedAppointment.services.reduce((total, service) => total + (parseFloat(service.price) || 0), 0).toFixed(2)}`
+                : `${selectedAppointment?.services?.[0]?.service_name || "Serviço"} • R$ ${selectedAppointment?.services?.[0]?.price || "0.00"}`
+              }
             </DrawerDescription>
           </DrawerHeader>
 
@@ -1457,6 +1673,27 @@ export default function AgendaPage() {
                         : "Cancelado"}
                     </span>
                   </div>
+
+                  {/* Lista de Serviços */}
+                  {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <span className="text-gray-600 text-sm mb-2 block">
+                        {selectedAppointment.services.length > 1 ? 'Serviços:' : 'Serviço:'}
+                      </span>
+                      <div className="space-y-2">
+                        {selectedAppointment.services.map((service, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white rounded-lg p-2 border border-gray-200">
+                            <span className="text-gray-800 font-medium text-sm">
+                              {service.service_name}
+                            </span>
+                            <span className="text-emerald-600 font-semibold text-sm">
+                              R$ {service.price}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {selectedAppointment.notes && (
                     <div className="pt-2 border-t border-gray-200">

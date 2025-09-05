@@ -1,6 +1,6 @@
 {
   "name": "Link Calendar - Barbeiro",
-  "short_name": "LC Barbeiro",
+  "short_name": "Link Callendar",
   "description": "Aplicativo de agendamento para barbearias",
   "start_url": "/",
   "display": "standalone",
@@ -10,25 +10,25 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icon-256x256.png",
+      "src": "/icon.png",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icon-384x384.png",
+      "src": "/icon.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
@@ -36,5 +36,9 @@
   ],
   "categories": ["business", "productivity"],
   "lang": "pt-BR",
-  "dir": "ltr"
+  "dir": "ltr",
+  "permissions": [
+    "notifications"
+  ],
+  "gcm_sender_id": "103953800507"
 }

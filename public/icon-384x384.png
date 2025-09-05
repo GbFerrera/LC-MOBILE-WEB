@@ -1,7 +1,0 @@
-<svg width="384" height="384" viewBox="0 0 384 384" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="384" height="384" rx="48" fill="#000000"/>
-  <path d="M96 192C96 138.98 138.98 96 192 96C245.02 96 288 138.98 288 192C288 245.02 245.02 288 192 288C138.98 288 96 245.02 96 192Z" fill="#ffffff"/>
-  <path d="M160 160H224V176H208V208H176V176H160V160Z" fill="#000000"/>
-  <path d="M176 224H208V240H176V224Z" fill="#000000"/>
-  <text x="192" y="280" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#ffffff">LC</text>
-</svg>

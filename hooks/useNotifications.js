@@ -49,6 +49,20 @@ export const useNotifications = () => {
       throw new Error('Service Worker não registrado');
     }
 
+    // Aguardar o service worker ficar ativo
+    if (!registration.active) {
+      await new Promise((resolve) => {
+        const checkActive = () => {
+          if (registration.active) {
+            resolve();
+          } else {
+            setTimeout(checkActive, 100);
+          }
+        };
+        checkActive();
+      });
+    }
+
     const defaultOptions = {
       body: 'Nova notificação',
       icon: '/icon.png',
@@ -78,17 +92,29 @@ export const useNotifications = () => {
     }
   };
 
-  const showTestNotification = () => {
+  const showTestNotification = async () => {
     if (!registration) {
       throw new Error('Service Worker não registrado');
     }
 
-    // Enviar mensagem para o service worker
-    if (registration.active) {
-      registration.active.postMessage({
-        type: 'SHOW_TEST_NOTIFICATION'
+    // Aguardar o service worker ficar ativo
+    if (!registration.active) {
+      await new Promise((resolve) => {
+        const checkActive = () => {
+          if (registration.active) {
+            resolve();
+          } else {
+            setTimeout(checkActive, 100);
+          }
+        };
+        checkActive();
       });
     }
+
+    // Enviar mensagem para o service worker
+    registration.active.postMessage({
+      type: 'SHOW_TEST_NOTIFICATION'
+    });
   };
 
   const scheduleNotification = (title, options = {}, delay = 5000) => {

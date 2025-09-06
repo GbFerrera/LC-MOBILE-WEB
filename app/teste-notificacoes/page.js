@@ -46,12 +46,15 @@ export default function TesteNotificacoes() {
     }
   };
 
-  const handleTestNotification = () => {
+  const handleTestNotification = async () => {
+    setLoading(true);
     try {
-      showTestNotification();
+      await showTestNotification();
       setMessage('Notificação de teste enviada!');
     } catch (error) {
       setMessage(`Erro: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -130,9 +133,10 @@ export default function TesteNotificacoes() {
               <>
                 <button
                   onClick={handleTestNotification}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                  disabled={loading}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
                 >
-                  🧪 Notificação de Teste Rápida
+                  {loading ? 'Enviando...' : '🧪 Notificação de Teste Rápida'}
                 </button>
 
                 <button

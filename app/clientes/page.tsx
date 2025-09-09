@@ -81,114 +81,99 @@ export default function ClientesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Header Moderno */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 shadow-xl">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/" 
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200"
-              >
-                <ChevronLeftIcon className="h-5 w-5 text-white" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Clientes</h1>
-                <p className="text-emerald-100 text-sm">Gerencie sua base de clientes</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-x-hidden">
+      <div className="w-full max-w-4xl mx-auto px-4 py-6">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/" 
+              className="p-2 rounded-lg bg-emerald-700/80 hover:bg-emerald-700 transition-colors duration-200"
+            >
+              <ChevronLeftIcon className="h-5 w-5 text-white" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
+              <p className="text-gray-600 text-sm">Gerencie sua base de clientes</p>
             </div>
-          
           </div>
         </div>
-      </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Barra de Busca Aprimorada */}
-        <div className="mb-8">
-          <div className="relative max-w-full sm:max-w-md">
-            <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <Input
-              placeholder="Buscar por nome, telefone ou email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-12 text-lg bg-white shadow-md border-0 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:shadow-lg transition-all duration-200 w-full"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <XIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          {searchTerm && (
-            <div className="mt-2 text-sm text-gray-600">
-              {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''} encontrado{filteredClients.length !== 1 ? 's' : ''}
+        {/* Barra de busca */}
+        <div className="relative w-full mb-6">
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar clientes..."
+            className="pl-10 w-full max-w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* Lista de clientes */}
+        <div className="space-y-4 w-full">
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <div className="bg-red-50 rounded-xl p-8 max-w-md mx-auto">
+                <div className="text-red-500 text-6xl mb-4 flex justify-center"><AlertTriangleIcon className="h-16 w-16 text-red-500" /></div>
+                <h3 className="text-lg font-semibold text-red-900 mb-2">Erro ao Carregar</h3>
+                <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          ) : filteredClients.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="bg-gray-50 rounded-xl p-8 max-w-md mx-auto">
+                {searchTerm ? (
+                  <>
+                    <div className="text-gray-400 text-6xl mb-4"><SearchIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Resultado</h3>
+                    <p className="text-gray-600 mb-4">Não encontramos clientes com "{searchTerm}"</p>
+                    <Button 
+                      onClick={() => setSearchTerm('')}
+                      variant="outline" 
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      Limpar Busca
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-gray-400 text-6xl mb-4"><UsersIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Cliente</h3>
+                    <p className="text-gray-600 mb-4">Você ainda não possui clientes cadastrados</p>
+                    <Link href="/clientes/novo">
+                      <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white">
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Cadastrar Primeiro Cliente
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {filteredClients.map((client) => (
+                <ClientCard key={client.id} client={client} />
+              ))}
             </div>
           )}
         </div>
-
-        {/* Lista de Clientes */}
-        {loading ? (
-          <div className="space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
-                <div className="flex items-center space-x-4">
-                  <div className="w-14 h-14 bg-gray-200 rounded-full"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <div className="bg-red-50 rounded-xl p-8 max-w-md mx-auto">
-              <div className="text-red-500 text-6xl mb-4 flex justify-center"><AlertTriangleIcon className="h-16 w-16 text-red-500" /></div>
-              <h3 className="text-lg font-semibold text-red-900 mb-2">Erro ao Carregar</h3>
-              <p className="text-red-700">{error}</p>
-            </div>
-          </div>
-        ) : filteredClients.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="bg-gray-50 rounded-xl p-8 max-w-md mx-auto">
-              {searchTerm ? (
-                <>
-                  <div className="text-gray-400 text-6xl mb-4"><SearchIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Resultado</h3>
-                  <p className="text-gray-600 mb-4">Não encontramos clientes com "{searchTerm}"</p>
-                  <Button 
-                    onClick={() => setSearchTerm('')}
-                    variant="outline" 
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                  >
-                    Limpar Busca
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div className="text-gray-400 text-6xl mb-4"><UsersIcon className="h-16 w-16 mx-auto text-gray-400" /></div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Cliente</h3>
-                  <p className="text-gray-600 mb-4">Você ainda não possui clientes cadastrados</p>
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Cadastrar Primeiro Cliente
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {filteredClients.map((client) => (
-              <ClientCard key={client.id} client={client} />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -214,9 +199,9 @@ function ClientCard({ client }: { client: Client }) {
   };
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
-      <CardContent className="p-0">
-        <div className="p-4 sm:p-6">
+    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md hover:-translate-y-1 bg-white/80 backdrop-blur-sm w-full max-w-full overflow-hidden">
+      <CardContent className="p-0 max-w-full">
+        <div className="p-4 sm:p-6 w-full">
           {/* Layout Responsivo: Vertical em mobile, horizontal em desktop */}
           <div className="flex flex-col sm:flex-row items-start gap-4">
             {/* Avatar com gradiente */}
@@ -235,10 +220,10 @@ function ClientCard({ client }: { client: Client }) {
               {/* Cabeçalho do cliente - Stack em mobile */}
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0 text-center sm:text-left">
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate group-hover:text-emerald-700 transition-colors">
-                    {client.name}
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate group-hover:text-emerald-700 transition-colors" title={client.name}>
+                    {client.name.length > 8 ? `${client.name.substring(0, 8)}...` : client.name}
                   </h3>
-                  <div className="flex flex-col sm:flex-col gap-1 mt-2">
+                  <div className="grid grid-cols-1 gap-4 w-full">
                     <span className="text-sm text-gray-600 font-medium truncate flex items-center gap-1">
                       <PhoneIcon className="h-3 w-3 text-blue-500" /> {formatPhone(client.phone_number)}
                     </span>

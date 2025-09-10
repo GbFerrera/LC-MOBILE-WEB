@@ -15,7 +15,20 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { ChevronLeftIcon, PlusIcon, SearchIcon, StarIcon, PhoneIcon, MailIcon, CalendarIcon, UserIcon, XIcon, UsersIcon, EyeIcon, AlertTriangleIcon } from "lucide-react";
+import { 
+  ChevronLeftIcon, 
+  PlusIcon, 
+  SearchIcon, 
+  FilterIcon, 
+  UserIcon, 
+  XIcon, 
+  AlertTriangleIcon,
+  UsersIcon,
+  PhoneIcon,
+  MailIcon,
+  CalendarIcon,
+  EyeIcon
+} from 'lucide-react';
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, setupAPIInterceptors } from "@/services/api"
@@ -30,6 +43,11 @@ interface Client {
   phone_number: string;
   created_at: string;
   updated_at: string;
+  last_appointment?: {
+    appointment_date: string;
+    start_time: string;
+    end_time: string;
+  } | null;
 }
 
 export default function ClientesPage() {
@@ -38,6 +56,14 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'ativo' | 'ocioso' | 'inativo'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Função para limpar todos os filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedStatus('all');
+  };
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -68,8 +94,75 @@ export default function ClientesPage() {
     fetchClients();
   }, []);
 
-  // Filtrar clientes baseado na busca
+  // Função para determinar o status do cliente baseado no last_appointment
+  const getClientStatus = (client: Client): {
+    status: "ativo" | "ocioso" | "inativo";
+    color: string;
+    bgColor: string;
+  } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function parseDateWithoutTime(dateString: string): Date {
+      const [year, month, day] = dateString.split("-").map(Number);
+      return new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+
+    const lastAppointment = client.last_appointment;
+    if (!lastAppointment || !lastAppointment.appointment_date) {
+      return {
+        status: "inativo",
+        color: "text-red-700",
+        bgColor: "bg-red-100",
+      };
+    }
+
+    const appointmentDate = parseDateWithoutTime(lastAppointment.appointment_date);
+    const diffInMs = today.getTime() - appointmentDate.getTime();
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInDays < 0) {
+      // Agendamento futuro
+      return {
+        status: "ativo",
+        color: "text-emerald-700",
+        bgColor: "bg-emerald-100",
+      };
+    } else if (diffInDays < 30) {
+      // Último agendamento há menos de 30 dias
+      return {
+        status: "ativo",
+        color: "text-emerald-700", 
+        bgColor: "bg-emerald-100",
+      };
+    } else if (diffInDays <= 45) {
+      // Último agendamento entre 30 e 45 dias
+      return {
+        status: "ocioso",
+        color: "text-yellow-700",
+        bgColor: "bg-yellow-100",
+      };
+    } else {
+      // Último agendamento há mais de 45 dias
+      return {
+        status: "inativo",
+        color: "text-red-700",
+        bgColor: "bg-red-100",
+      };
+    }
+  };
+
+  // Filtrar clientes baseado na busca e status
   const filteredClients = clients.filter(client => {
+    // Filtro por status
+    if (selectedStatus !== 'all') {
+      const clientStatus = getClientStatus(client);
+      if (clientStatus.status !== selectedStatus) {
+        return false;
+      }
+    }
+
+    // Filtro por busca
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -81,47 +174,151 @@ export default function ClientesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-x-hidden">
-      <div className="w-full max-w-4xl mx-auto px-4 py-6">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="w-full mx-auto px-4 py-4">
+        {/* Cabeçalho Compacto */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <Link 
               href="/" 
-              className="p-2 rounded-lg bg-emerald-700/80 hover:bg-emerald-700 transition-colors duration-200"
+              className="p-2 rounded-full bg-emerald-600 hover:bg-emerald-700 transition-colors"
             >
-              <ChevronLeftIcon className="h-5 w-5 text-white" />
+              <ChevronLeftIcon className="h-4 w-4 text-white" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-              <p className="text-gray-600 text-sm">Gerencie sua base de clientes</p>
+              <h1 className="text-xl font-bold text-gray-900">Clientes</h1>
+              <p className="text-gray-500 text-xs">Gerencie seus clientes</p>
             </div>
+          </div>
+          
+          {/* Botões de ação */}
+          <div className="flex items-center gap-2">
+            {/* Botão Filtro */}
+            <Button
+              size="sm"
+              variant={showFilters ? "default" : "outline"}
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-9 px-3 ${
+                showFilters 
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              }`}
+            >
+              <FilterIcon className="h-4 w-4" />
+            </Button>
+            
+            {/* Botão Adicionar Cliente */}
+            <Drawer>
+              <DrawerTrigger asChild>
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 px-3"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                </Button>
+              </DrawerTrigger>
+              <CreateClientDrawer onClientCreated={() => window.location.reload()} />
+            </Drawer>
           </div>
         </div>
 
-        {/* Barra de busca */}
-        <div className="relative w-full mb-6">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Buscar clientes..."
-            className="pl-10 w-full max-w-full"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        {/* Filtros - Aparece apenas quando showFilters é true */}
+        {showFilters && (
+          <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 rounded-xl p-3 mb-3 shadow-md border border-white/20">
+            <div className="space-y-2">
+              {/* Filtro por Status */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-white font-medium text-xs min-w-[50px]">
+                  <UsersIcon className="h-3.5 w-3.5" />
+                  Status:
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'ativo' | 'ocioso' | 'inativo')}
+                    className="w-full h-9 rounded-lg border-0 bg-white/25 backdrop-blur-sm text-white text-sm font-medium focus:ring-1 focus:ring-white/40 focus:border-transparent transition-all duration-200 pr-8 pl-3"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      backdropFilter: 'blur(15px)',
+                    }}
+                  >
+                    <option value="all" className="text-gray-900 font-medium">Todos</option>
+                    <option value="ativo" className="text-gray-900 font-medium">🟢 Ativo</option>
+                    <option value="ocioso" className="text-gray-900 font-medium">🟡 Ocioso</option>
+                    <option value="inativo" className="text-gray-900 font-medium">🔴 Inativo</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Filtro por Cliente */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-white font-medium text-xs min-w-[50px]">
+                  <UserIcon className="h-3.5 w-3.5" />
+                  Cliente:
+                </div>
+                <div className="relative flex-1">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-white/80" />
+                  <Input
+                    type="text"
+                    placeholder="Digite o nome..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 pr-4 h-9 rounded-lg border-0 bg-white/25 backdrop-blur-sm text-white placeholder-white/80 focus:ring-1 focus:ring-white/40 focus:border-transparent transition-all duration-200 text-sm font-medium"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      backdropFilter: 'blur(15px)',
+                    }}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/80 hover:text-white transition-colors"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Botão Limpar Filtros - Aparece quando não há resultados */}
+        {filteredClients.length === 0 && !loading && (searchTerm || selectedStatus !== 'all') && (
+          <div className="text-center mb-6">
+            <div className="inline-flex flex-col items-center gap-3 p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <AlertTriangleIcon className="h-12 w-12 text-gray-400" />
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Nenhum cliente encontrado
+                </h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Não encontramos clientes com os filtros aplicados
+                </p>
+                <Button
+                  onClick={clearAllFilters}
+                  variant="outline"
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
+                >
+                  <XIcon className="h-4 w-4 mr-2" />
+                  Limpar filtros
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Lista de clientes */}
         <div className="space-y-4 w-full">
           {loading ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 bg-gray-200 rounded-full"></div>
+                <div key={i} className="bg-white rounded-2xl shadow-sm p-4 animate-pulse">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
                     </div>
                   </div>
                 </div>
@@ -167,9 +364,9 @@ export default function ClientesPage() {
               </div>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-3">
               {filteredClients.map((client) => (
-                <ClientCard key={client.id} client={client} />
+                <ClientCard key={client.id} client={client} getClientStatus={getClientStatus} />
               ))}
             </div>
           )}
@@ -179,7 +376,180 @@ export default function ClientesPage() {
   );
 }
 
-function ClientCard({ client }: { client: Client }) {
+function CreateClientDrawer({ onClientCreated }: { onClientCreated: () => void }) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone_number: '',
+    document: '',
+    birthday: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone_number.trim() || !formData.document.trim()) {
+      alert('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (loading) return;
+    
+    try {
+      setLoading(true);
+      
+      await api.post("/clients", {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone_number: formData.phone_number.trim(),
+        document: formData.document.trim(),
+        birthday: formData.birthday || undefined,
+        password: "12345"
+      }, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      // Limpar formulário
+      setFormData({
+        name: '',
+        email: '',
+        phone_number: '',
+        document: '',
+        birthday: ''
+      });
+      
+      alert('Cliente criado com sucesso!');
+      onClientCreated();
+    } catch (error: any) {
+      console.error("Erro ao criar cliente:", error);
+      const errorMessage = error.response?.data?.message || 'Erro ao criar cliente';
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <DrawerContent>
+      <div className="mx-auto w-full max-w-sm">
+        <DrawerHeader className="text-center pb-4">
+          <DrawerTitle className="text-xl font-bold text-gray-900">
+            Novo Cliente
+          </DrawerTitle>
+          <DrawerDescription className="text-gray-600">
+            Preencha as informações do cliente
+          </DrawerDescription>
+        </DrawerHeader>
+        
+        <form onSubmit={handleSubmit} className="px-4 space-y-4">
+          {/* Nome - Campo obrigatório */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Nome completo *
+            </label>
+            <Input
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              placeholder="Nome do cliente"
+              className="w-full"
+              required
+            />
+          </div>
+
+          {/* Data de nascimento */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Data de nascimento
+            </label>
+            <Input
+              type="date"
+              value={formData.birthday}
+              onChange={(e) => handleInputChange('birthday', e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          {/* Email - Campo obrigatório */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Email *
+            </label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              placeholder="Email do cliente"
+              className="w-full"
+              required
+            />
+          </div>
+
+          {/* Telefone - Campo obrigatório */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Telefone *
+            </label>
+            <Input
+              type="tel"
+              value={formData.phone_number}
+              onChange={(e) => handleInputChange('phone_number', e.target.value)}
+              placeholder="Telefone do cliente"
+              className="w-full"
+              required
+            />
+          </div>
+
+          {/* CPF/CNPJ - Campo obrigatório */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              CPF/CNPJ *
+            </label>
+            <Input
+              type="text"
+              value={formData.document}
+              onChange={(e) => handleInputChange('document', e.target.value)}
+              placeholder="CPF ou CNPJ do cliente"
+              className="w-full"
+              required
+            />
+          </div>
+        </form>
+        
+        <DrawerFooter className="pt-6">
+          <Button 
+            onClick={handleSubmit}
+            disabled={loading || !formData.name.trim()}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 disabled:bg-gray-300"
+          >
+            {loading ? 'Criando...' : 'Criar Cliente'}
+          </Button>
+          <DrawerClose asChild>
+            <Button variant="outline" className="w-full">
+              Cancelar
+            </Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </div>
+    </DrawerContent>
+  );
+}
+
+function ClientCard({ client, getClientStatus }: { 
+  client: Client;
+  getClientStatus: (client: Client) => {
+    status: "ativo" | "ocioso" | "inativo";
+    color: string;
+    bgColor: string;
+  };
+}) {
   const initials = client.name
     .split(" ")
     .map((n: string) => n[0])
@@ -199,168 +569,164 @@ function ClientCard({ client }: { client: Client }) {
   };
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md hover:-translate-y-1 bg-white/80 backdrop-blur-sm w-full max-w-full overflow-hidden">
-      <CardContent className="p-0 max-w-full">
-        <div className="p-4 sm:p-6 w-full">
-          {/* Layout Responsivo: Vertical em mobile, horizontal em desktop */}
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            {/* Avatar com gradiente */}
-            <div className="relative flex-shrink-0 mx-auto sm:mx-0">
-              <Avatar className="h-14 w-14 sm:h-16 sm:w-16 border-4 border-white shadow-lg ring-2 ring-emerald-100">
-                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-base sm:text-lg">
+    <Card className="bg-white rounded-2xl shadow-sm border-0 overflow-hidden">
+      <CardContent className="p-0">
+        <div className="p-4">
+          {/* Header com avatar e info básica */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 ring-2 ring-emerald-100">
+                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold text-sm">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-semibold text-gray-900 truncate">
+                  {client.name}
+                </h3>
+                <div className="flex items-center gap-1 text-sm text-gray-500">
+                  <PhoneIcon className="h-3 w-3" />
+                  <span className="truncate">{formatPhone(client.phone_number)}</span>
+                </div>
               </div>
             </div>
             
-            <div className="flex-1 w-full min-w-0">
-              {/* Cabeçalho do cliente - Stack em mobile */}
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                <div className="flex-1 min-w-0 text-center sm:text-left">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate group-hover:text-emerald-700 transition-colors" title={client.name}>
-                    {client.name.length > 8 ? `${client.name.substring(0, 8)}...` : client.name}
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4 w-full">
-                    <span className="text-sm text-gray-600 font-medium truncate flex items-center gap-1">
-                      <PhoneIcon className="h-3 w-3 text-blue-500" /> {formatPhone(client.phone_number)}
-                    </span>
-                    {client.email && (
-                      <span className="text-sm text-gray-600 truncate flex items-center gap-1">
-                        <MailIcon className="h-3 w-3 text-blue-500" /> {client.email}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 justify-center sm:justify-end flex-shrink-0">
-                  <span className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-full shadow-sm whitespace-nowrap flex items-center gap-1">
-                    <StarIcon className="h-3 w-3 text-yellow-300" /> Cliente
+            {/* Status badge */}
+            <div className="flex-shrink-0">
+              {(() => {
+                const clientStatus = getClientStatus(client);
+                return (
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${clientStatus.bgColor} ${clientStatus.color}`}>
+                    {clientStatus.status}
                   </span>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
-                    {daysSinceCreated === 0 ? 'Hoje' : 
-                     daysSinceCreated === 1 ? '1 dia' : 
-                     daysSinceCreated < 30 ? `${daysSinceCreated} dias` :
-                     `${Math.floor(daysSinceCreated / 30)} mês${Math.floor(daysSinceCreated / 30) > 1 ? 'es' : ''}`
-                    }
-                  </span>
-                </div>
-              </div>
-              
-              {/* Botões de ação - Centralizados em mobile */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-100">
+                );
+              })()}
+            </div>
+          </div>
+          
+          {/* Email se existir */}
+          {client.email && (
+            <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
+              <MailIcon className="h-3 w-3" />
+              <span className="truncate">{client.email}</span>
+            </div>
+          )}
+          
+          {/* Ações */}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={handleSchedule}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm font-medium"
+            >
+              <CalendarIcon className="h-4 w-4 mr-1" />
+              Agendar
+            </Button>
+            
+            <Drawer>
+              <DrawerTrigger asChild>
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={handleSchedule}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm flex-1 sm:flex-none px-4 py-2"
+                  className="px-3 h-9 border-gray-200 text-gray-600 hover:bg-gray-50"
                 >
-                  <CalendarIcon className="h-4 w-4 mr-1 text-white" /> Agendar
+                  <EyeIcon className="h-4 w-4" />
                 </Button>
-                
-                {/* Drawer para Ver Mais */}
-                <Drawer>
-                  <DrawerTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 text-xs sm:text-sm flex-1 sm:flex-none px-4 py-2"
-                    >
-                      <EyeIcon className="h-4 w-4 mr-1 text-emerald-700" /> Ver Mais
-                    </Button>
-                  </DrawerTrigger>
-                  <DrawerContent>
-                    <div className="mx-auto w-full max-w-sm">
-                      <DrawerHeader className="text-center">
-                        <div className="mx-auto mb-4">
-                          <Avatar className="h-20 w-20 border-4 border-white shadow-lg ring-4 ring-emerald-100">
-                            <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-xl">
-                              {initials}
-                            </AvatarFallback>
-                          </Avatar>
+              </DrawerTrigger>
+              <DrawerContent>
+                <div className="mx-auto w-full max-w-sm">
+                  <DrawerHeader className="text-center pb-4">
+                    <div className="mx-auto mb-4">
+                      <Avatar className="h-16 w-16 ring-4 ring-emerald-100">
+                        <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-bold text-lg">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <DrawerTitle className="text-xl font-bold text-gray-900">
+                      {client.name}
+                    </DrawerTitle>
+                    <DrawerDescription className="text-emerald-600">
+                      Informações completas
+                    </DrawerDescription>
+                  </DrawerHeader>
+                  
+                  <div className="px-4 space-y-3">
+                    {/* Telefone */}
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        <PhoneIcon className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Telefone</p>
+                        <p className="text-sm font-medium text-gray-900">{formatPhone(client.phone_number)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Email */}
+                    {client.email && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                        <div className="p-2 bg-purple-100 rounded-full">
+                          <MailIcon className="h-4 w-4 text-purple-600" />
                         </div>
-                        <DrawerTitle className="text-2xl font-bold text-gray-900">
-                          {client.name}
-                        </DrawerTitle>
-                        <DrawerDescription className="text-emerald-600 font-medium">
-                          Detalhes do Cliente
-                        </DrawerDescription>
-                      </DrawerHeader>
-                      
-                      <div className="px-4 pb-6">
-                        <div className="space-y-4">
-                          {/* Telefone */}
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <PhoneIcon className="h-5 w-5 text-blue-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">Telefone</p>
-                              <p className="text-sm text-gray-600">{formatPhone(client.phone_number)}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Email */}
-                          {client.email && (
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                              <MailIcon className="h-5 w-5 text-blue-500" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">Email</p>
-                                <p className="text-sm text-gray-600">{client.email}</p>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Documento */}
-                          {client.document && (
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                              <UserIcon className="h-5 w-5 text-orange-500" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">Documento</p>
-                                <p className="text-sm text-gray-600">{client.document}</p>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Data de Cadastro */}
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <CalendarIcon className="h-5 w-5 text-blue-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">Cadastrado em</p>
-                              <p className="text-sm text-gray-600">
-                                {new Date(client.created_at).toLocaleDateString('pt-BR')} 
-                                <span className="text-xs text-gray-500 ml-2">
-                                  ({daysSinceCreated === 0 ? 'hoje' : 
-                                    daysSinceCreated === 1 ? 'há 1 dia' : 
-                                    daysSinceCreated < 30 ? `há ${daysSinceCreated} dias` :
-                                    `há ${Math.floor(daysSinceCreated / 30)} mês${Math.floor(daysSinceCreated / 30) > 1 ? 'es' : ''}`
-                                  })
-                                </span>
-                              </p>
-                            </div>
-                          </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
+                          <p className="text-sm font-medium text-gray-900 break-all">{client.email}</p>
                         </div>
                       </div>
-                      
-                      <DrawerFooter>
-                        <div className="flex gap-2">
-                          <Button 
-                            onClick={handleSchedule}
-                            className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-                          >
-                            <CalendarIcon className="h-4 w-4 mr-1 text-white" /> Agendar Serviço
-                          </Button>
-                          <DrawerClose asChild>
-                            <Button variant="outline" className="flex-1">
-                              Fechar
-                            </Button>
-                          </DrawerClose>
+                    )}
+                    
+                    {/* Documento */}
+                    {client.document && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                        <div className="p-2 bg-orange-100 rounded-full">
+                          <UserIcon className="h-4 w-4 text-orange-600" />
                         </div>
-                      </DrawerFooter>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Documento</p>
+                          <p className="text-sm font-medium text-gray-900">{client.document}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Data de Cadastro */}
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="p-2 bg-green-100 rounded-full">
+                        <CalendarIcon className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente desde</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {new Date(client.created_at).toLocaleDateString('pt-BR')}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {daysSinceCreated === 0 ? 'Cadastrado hoje' : 
+                           daysSinceCreated === 1 ? 'Cadastrado há 1 dia' : 
+                           daysSinceCreated < 30 ? `Cadastrado há ${daysSinceCreated} dias` :
+                           `Cadastrado há ${Math.floor(daysSinceCreated / 30)} mês${Math.floor(daysSinceCreated / 30) > 1 ? 'es' : ''}`
+                          }
+                        </p>
+                      </div>
                     </div>
-                  </DrawerContent>
-                </Drawer>
-              </div>
-            </div>
+                  </div>
+                  
+                  <DrawerFooter className="pt-6">
+                    <Button 
+                      onClick={handleSchedule}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      Agendar Serviço
+                    </Button>
+                    <DrawerClose asChild>
+                      <Button variant="outline" className="w-full">
+                        Fechar
+                      </Button>
+                    </DrawerClose>
+                  </DrawerFooter>
+                </div>
+              </DrawerContent>
+            </Drawer>
           </div>
         </div>
       </CardContent>

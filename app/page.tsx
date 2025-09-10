@@ -5,7 +5,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BellIcon, CalendarIcon, SettingsIcon, UsersIcon, WalletIcon, LightbulbIcon, ShoppingBagIcon, ClockIcon, UmbrellaIcon, CheckIcon, SmileIcon, TrendingUpIcon } from "lucide-react";
+import { 
+  CalendarIcon, 
+  UsersIcon, 
+  WalletIcon, 
+  SettingsIcon, 
+  PlusIcon, 
+  RefreshCwIcon,
+  EyeIcon,
+  CheckIcon,
+  XIcon,
+  ClockIcon,
+  MapPinIcon,
+  ShoppingBagIcon,
+  UmbrellaIcon,
+  BellIcon,
+  SmileIcon
+} from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
@@ -230,6 +246,15 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Base de clientes</p>
             </div>
           </Link>
+          <Link href="/comandas" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <ShoppingBagIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-orange-600 transition-colors">Comandas</span>
+              <p className="text-xs text-gray-500 mt-1">Gerenciar vendas</p>
+            </div>
+          </Link>
           <Link href="/financas" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
@@ -239,6 +264,10 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Controle financeiro</p>
             </div>
           </Link>
+        </div>
+
+        {/* Segunda linha para Ajustes */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Link href="/ajustes" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">

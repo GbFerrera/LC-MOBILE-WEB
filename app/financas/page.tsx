@@ -34,8 +34,55 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/auth";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/services/api";
 
 // Interfaces
+interface Commission {
+  id: number;
+  company_id: number;
+  professional_id: number;
+  service_id: number | null;
+  type: 'fixed' | 'percentage';
+  value: string;
+  active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  service_name?: string;
+  service_price?: string;
+  service_duration?: number;
+}
+
+interface ProfessionalData {
+  professional_id: number;
+  name: string;
+  position: string;
+  email: string;
+  phone: string;
+  commissions_general: Commission[];
+  commissions_services: Commission[];
+}
+
+interface EarningsReport {
+  professional: {
+    id: number;
+    name: string;
+    position: string;
+  };
+  period: {
+    start_date: string;
+    end_date: string;
+  };
+  summary: {
+    total_appointments: number;
+    total_services: number;
+    total_value: number;
+    total_commission: number;
+  };
+  services: any[];
+  appointments_detail: any[];
+}
+
 interface CashDrawer {
   id: number;
   company_id: number;
@@ -109,6 +156,18 @@ export default function FinancePage() {
   
   // Estados principais
   const [currentDrawer, setCurrentDrawer] = useState<CashDrawer | null>(null);
+  const [professionalData, setProfessionalData] = useState<ProfessionalData | null>(null);
+  const [earningsReport, setEarningsReport] = useState<EarningsReport | null>(null);
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    return firstDay.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [balance, setBalance] = useState<CashBalance>({
     balance: 0,
@@ -138,6 +197,51 @@ export default function FinancePage() {
     description: ''
   });
   
+  // Função para buscar dados das comissões do profissional logado
+  const fetchCommissions = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      // Buscar comissões do profissional
+      const commissionsResponse = await api.get(`/commissions/team/${user.id}?${params.toString()}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      console.log('Dados das comissões retornados:', commissionsResponse.data);
+      setProfessionalData(commissionsResponse.data);
+      
+      // Sempre buscar relatório de ganhos (com datas padrão ou selecionadas)
+      const earningsResponse = await api.get(`/commissions/professional/${user.id}/report?start_date=${startDate}&end_date=${endDate}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      console.log('Dados do relatório de ganhos:', earningsResponse.data);
+      setEarningsReport(earningsResponse.data);
+      
+    } catch (error: any) {
+      console.error('Erro ao carregar dados:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || 'Erro ao carregar dados das comissões',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Funções da API (simuladas)
   const fetchCurrentDrawer = async () => {
     try {
@@ -342,10 +446,50 @@ export default function FinancePage() {
     }
   };
   
+  // Função para formatar o valor da comissão
+  const formatCommissionValue = (commission: Commission) => {
+    if (commission.type === 'percentage') {
+      return `${commission.value}%`;
+    } else {
+      return `R$ ${parseFloat(commission.value).toFixed(2)}`;
+    }
+  };
+
+  // Função para calcular total de comissões (todas)
+  const getTotalCommissions = () => {
+    if (!professionalData) return 0;
+    const allCommissions = [
+      ...(professionalData.commissions_general || []),
+      ...(professionalData.commissions_services || [])
+    ];
+    return allCommissions.length;
+  };
+
+  // Função para obter comissões gerais
+  const getGeneralCommissions = () => {
+    return professionalData?.commissions_general || [];
+  };
+
+  // Função para obter comissões por serviço
+  const getServiceCommissions = () => {
+    return professionalData?.commissions_services || [];
+  };
+
+  // Filtrar comissões baseado no filtro selecionado
+  const getFilteredCommissions = (commissionsArray: Commission[]) => {
+    if (filter === 'all') return commissionsArray;
+    return commissionsArray.filter(c => filter === 'active' ? c.active : !c.active);
+  };
+
   // Effects
   useEffect(() => {
     fetchCurrentDrawer();
+    fetchCommissions();
   }, []);
+
+  useEffect(() => {
+    fetchCommissions();
+  }, [user?.id, startDate, endDate]);
   
   useEffect(() => {
     if (currentDrawer) {
@@ -602,6 +746,243 @@ export default function FinancePage() {
                 Fechar Gaveta
               </Button>
             </div>
+
+            {/* Filtros de Data para Ganhos */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-lg">
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                    <Calendar className="h-4 w-4 text-white" />
+                  </div>
+                  Filtros de Período
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => setFilter('active')}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filter === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Ativas
+                  </button>
+                  <button
+                    onClick={() => setFilter('inactive')}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filter === 'inactive' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Inativas
+                  </button>
+                  <button
+                    onClick={() => setFilter('all')}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm flex-1"
+                    placeholder="De"
+                  />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm flex-1"
+                    placeholder="Até"
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      onClick={() => { setStartDate(''); setEndDate(''); }}
+                      className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Ganhos do Período */}
+            {earningsReport && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200 p-6 mb-6 shadow-lg">
+                <h2 className="text-lg font-semibold text-green-800 mb-3 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-700" /> Seus Ganhos no Período
+                </h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center bg-white/50 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-green-700">{earningsReport.summary.total_appointments}</div>
+                    <div className="text-sm text-green-600">Agendamentos</div>
+                  </div>
+                  <div className="text-center bg-white/50 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-green-700">{earningsReport.summary.total_services}</div>
+                    <div className="text-sm text-green-600">Serviços</div>
+                  </div>
+                  <div className="text-center bg-white/50 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-green-700">
+                      R$ {earningsReport.summary.total_value.toFixed(2).replace('.', ',')}
+                    </div>
+                    <div className="text-sm text-green-600">Faturamento</div>
+                  </div>
+                  <div className="text-center bg-white/50 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-green-700">
+                      R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}
+                    </div>
+                    <div className="text-sm text-green-600">Comissão</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Resumo de Comissões */}
+            {professionalData && (
+              <div className="bg-white rounded-2xl border shadow-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-[#236F5D]" />
+                  Resumo das Suas Comissões
+                </h3>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-xl p-4 text-white">
+                    <div className="text-2xl font-semibold">{getTotalCommissions()}</div>
+                    <div className="text-sm text-white/80">Total</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+                    <div className="text-2xl font-semibold">{getGeneralCommissions().length}</div>
+                    <div className="text-sm text-white/80">Gerais</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
+                    <div className="text-2xl font-semibold">{getServiceCommissions().length}</div>
+                    <div className="text-sm text-white/80">Específicas</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Detalhamento das Comissões */}
+            {professionalData && (
+              <div className="space-y-6 mb-6">
+                {/* Comissões Gerais */}
+                <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
+                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                    <h2 className="text-white font-semibold text-lg flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-white" />
+                      Suas Comissões Gerais ({getFilteredCommissions(getGeneralCommissions()).length})
+                    </h2>
+                    <p className="text-emerald-100 text-sm mt-1">Aplicam-se a todos os serviços prestados</p>
+                  </div>
+                  
+                  <div className="p-6">
+                    {getFilteredCommissions(getGeneralCommissions()).length > 0 ? (
+                      <div className="space-y-4">
+                        {getFilteredCommissions(getGeneralCommissions()).map((commission) => (
+                          <div key={commission.id} className={`p-4 rounded-xl border-2 transition-all ${
+                            commission.active 
+                              ? 'bg-green-50 border-green-200 shadow-sm'
+                              : 'bg-gray-50 border-gray-200 opacity-75'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  commission.active ? 'bg-green-500' : 'bg-gray-400'
+                                }`}></div>
+                                <span className="font-medium text-gray-900">Comissão Geral</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-gray-900">{formatCommissionValue(commission)}</div>
+                                <div className={`text-xs px-2 py-1 rounded-full ${
+                                  commission.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {commission.active ? 'Ativa' : 'Inativa'}
+                                </div>
+                              </div>
+                            </div>
+                            {commission.notes && (
+                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-sm text-blue-800"><strong>Observações:</strong> {commission.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                          <CheckCircle className="h-8 w-8 text-gray-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Geral</h3>
+                        <p className="text-gray-600">Você não possui comissões gerais {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Comissões por Serviço */}
+                <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                    <h2 className="text-white font-semibold text-lg flex items-center gap-2">
+                      <Settings className="h-5 w-5 text-white" />
+                      Suas Comissões por Serviço ({getFilteredCommissions(getServiceCommissions()).length})
+                    </h2>
+                    <p className="text-blue-100 text-sm mt-1">Comissões específicas para serviços individuais</p>
+                  </div>
+                  
+                  <div className="p-6">
+                    {getFilteredCommissions(getServiceCommissions()).length > 0 ? (
+                      <div className="space-y-4">
+                        {getFilteredCommissions(getServiceCommissions()).map((commission) => (
+                          <div key={commission.id} className={`p-4 rounded-xl border-2 transition-all ${
+                            commission.active 
+                              ? 'bg-blue-50 border-blue-200 shadow-sm'
+                              : 'bg-gray-50 border-gray-200 opacity-75'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  commission.active ? 'bg-blue-500' : 'bg-gray-400'
+                                }`}></div>
+                                <div>
+                                  <span className="font-medium text-gray-900">{commission.service_name}</span>
+                                  <div className="text-sm text-gray-600">Preço: R$ {commission.service_price}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-gray-900">{formatCommissionValue(commission)}</div>
+                                <div className={`text-xs px-2 py-1 rounded-full ${
+                                  commission.active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {commission.active ? 'Ativa' : 'Inativa'}
+                                </div>
+                              </div>
+                            </div>
+                            {commission.notes && (
+                              <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                                <p className="text-sm text-yellow-800"><strong>Observações:</strong> {commission.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                          <Settings className="h-8 w-8 text-gray-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Específica</h3>
+                        <p className="text-gray-600">Você não possui comissões específicas por serviço {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Lista de Transações */}
             <Card className="border-0 shadow-lg">

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   CalendarIcon, 
@@ -20,7 +21,20 @@ import {
   ShoppingBagIcon,
   UmbrellaIcon,
   BellIcon,
-  SmileIcon
+  SmileIcon,
+  TrendingUpIcon,
+  SparklesIcon,
+  ZapIcon,
+  StarIcon,
+  ActivityIcon,
+  BarChart3Icon,
+  CrownIcon,
+  RocketIcon,
+  GemIcon,
+  ShieldIcon,
+  LightbulbIcon,
+  HeartIcon,
+  ThumbsUpIcon
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
@@ -160,20 +174,26 @@ export default function Home() {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 relative overflow-hidden">
+      {/* Subtle Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-100/30 to-teal-100/30 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-emerald-100/20 to-green-100/20 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Modern Header */}
+      <header className="relative z-10 bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-xl shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Avatar className="h-16 w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
                 <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
                 <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg font-bold">
-                  {user?.name.substring(0, 2)}
+                  {user?.name?.substring(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="font-bold text-2xl tracking-wide">Olá, {user?.name}!</h1>
+                <h1 className="font-bold text-2xl tracking-wide text-white">Olá, {user?.name}!</h1>
                 <p className="text-emerald-100 text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>

@@ -14,6 +14,9 @@ import {
   StoreIcon,
   PencilIcon,
   PlusIcon,
+  CalendarOffIcon,
+  CalendarDays,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth";
@@ -35,6 +38,11 @@ export default function AjustesPage() {
   const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [isCreatingService, setIsCreatingService] = useState(false);
+  const [isDayOffDialogOpen, setIsDayOffDialogOpen] = useState(false);
+  const [selectedDayOffDate, setSelectedDayOffDate] = useState("");
+  const [isCreatingDayOff, setIsCreatingDayOff] = useState(false);
+  const [specificDayOffs, setSpecificDayOffs] = useState<string[]>([]);
+  const [loadingDayOffs, setLoadingDayOffs] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [serviceHours, setServiceHours] = useState<any[]>([]);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
@@ -119,19 +127,22 @@ export default function AjustesPage() {
   // Effect para inicializar dados quando componente monta
   useEffect(() => {
     if (user?.id) {
-      // Primeiro, inicializa com dados do contexto de autenticação
-      const initialData = {
+      setCurrentUserData({
         name: user.name || "",
         email: user.email || "",
         phone_number: "",
         position: ""
-      };
-      setEditForm({ ...initialData, password: "" });
-      setCurrentUserData(initialData);
-
-      // Então tenta buscar dados mais detalhados da API
-      fetchUserData();
-      fetchProfilePhoto();
+      });
+      setEditForm({
+        name: user.name || "",
+        email: user.email || "",
+        phone_number: "",
+        position: "",
+        password: ""
+      });
+      
+      // Carregar dias de folga específicos
+      fetchSpecificDayOffs();
       viewDetailsCompany();
     }
   }, [user]);
@@ -371,6 +382,114 @@ export default function AjustesPage() {
       return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
     }
     return `${duration}min`;
+  };
+
+  // Buscar dias de folga específicos
+  const fetchSpecificDayOffs = async () => {
+    if (!user?.id || !user?.company_id) return;
+    
+    setLoadingDayOffs(true);
+    try {
+      const response = await api.get(`/schedules/specific-days/${user.id}`, {
+        headers: {
+          company_id: user.company_id
+        },
+        params: {
+          is_day_off: true
+        }
+      });
+
+      // Extrair as datas dos dias de folga específicos
+      const dayOffs = response.data.map((item: any) => item.date);
+      setSpecificDayOffs(dayOffs);
+    } catch (error) {
+      console.error("Erro ao buscar dias de folga específicos:", error);
+      setSpecificDayOffs([]);
+    } finally {
+      setLoadingDayOffs(false);
+    }
+  };
+
+  // Remover um dia de folga específico
+  const handleRemoveSpecificDayOff = async (date: string) => {
+    if (!user?.id || !user?.company_id) return;
+    
+    try {
+      await api.delete(`/schedules/specific-day-off/${user.id}`, {
+        headers: {
+          company_id: user.company_id
+        },
+        params: {
+          date: date
+        }
+      });
+      
+      // Atualizar a lista de dias de folga
+      setSpecificDayOffs(specificDayOffs.filter(d => d !== date));
+      toast.success("Dia de folga removido com sucesso!");
+      
+      // Recarregar os dias de folga
+      fetchSpecificDayOffs();
+    } catch (error) {
+      console.error("Erro ao remover dia de folga:", error);
+      toast.error("Erro ao remover dia de folga");
+    }
+  };
+
+  // Criar dia de folga
+  const handleCreateDayOff = async () => {
+    if (!user?.id || !user?.company_id) {
+      toast.error("Usuário ou empresa não identificados");
+      return;
+    }
+
+    if (!selectedDayOffDate) {
+      toast.error("Selecione uma data para a folga");
+      return;
+    }
+
+    // Verificar se a data já existe na lista de dias de folga
+    if (specificDayOffs.includes(selectedDayOffDate)) {
+      toast.error("Esta data já está cadastrada como dia de folga!");
+      setSelectedDayOffDate("");
+      return;
+    }
+
+    setIsCreatingDayOff(true);
+    try {
+      // Usar a mesma lógica do LC-FRONT que está funcionando
+      const dayOffData = {
+        professional_id: user.id,
+        date: selectedDayOffDate
+      };
+
+      await api.post('/schedules/day-off', dayOffData, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      // Atualizar a lista de dias de folga
+      setSpecificDayOffs([...specificDayOffs, selectedDayOffDate]);
+      toast.success("Dia de folga adicionado com sucesso!");
+      setIsDayOffDialogOpen(false);
+      setSelectedDayOffDate("");
+      
+      // Recarregar os horários e folgas
+      fetchServiceHours();
+      fetchSpecificDayOffs();
+    } catch (error: any) {
+      console.error('Erro ao criar dia de folga:', error);
+      
+      // Melhor tratamento de erro baseado no LC-FRONT
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error("Erro ao adicionar dia de folga");
+      }
+    } finally {
+      setIsCreatingDayOff(false);
+    }
   };
 
   // Criar novo serviço
@@ -804,11 +923,21 @@ export default function AjustesPage() {
                 <Dialog open={isServiceHoursDialogOpen} onOpenChange={setIsServiceHoursDialogOpen}>
                   <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white">
                     <DialogHeader className="pb-6">
-                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
-                          <ClockIcon className="h-6 w-6 text-white" />
+                      <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                            <ClockIcon className="h-6 w-6 text-white" />
+                          </div>
+                          Horários de Serviço
                         </div>
-                        Horários de Serviço
+                        <Button
+                          onClick={() => setIsDayOffDialogOpen(true)}
+                          size="sm"
+                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                        >
+                          <CalendarOffIcon className="h-4 w-4 mr-1" />
+                          Folga
+                        </Button>
                       </DialogTitle>
                       <DialogDescription className="text-gray-600 text-base">
                         Seus horários de trabalho configurados
@@ -895,12 +1024,106 @@ export default function AjustesPage() {
                       )}
                     </div>
 
+                    {/* Dias de Folga Específicos */}
+                    {!serviceHoursLoading && specificDayOffs.length > 0 && (
+                      <div className="mt-8 pt-6 border-t border-gray-200">
+                        <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[#236F5D]">
+                          <CalendarDays className="w-5 h-5" />
+                          <span>Dias de Folga Específicos</span>
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {specificDayOffs.map((date) => {
+                            // Converter YYYY-MM-DD para DD/MM/YYYY para exibição
+                            const [year, month, day] = date.split('-');
+                            const formattedDate = `${day}/${month}/${year}`;
+                            
+                            return (
+                              <div key={date} className="flex items-center bg-red-50 rounded-full px-3 py-1.5 border border-red-200">
+                                <span className="text-sm font-medium text-red-700 mr-2">{formattedDate}</span>
+                                <button
+                                  onClick={() => handleRemoveSpecificDayOff(date)}
+                                  className="text-red-500 hover:text-red-700 p-0.5 rounded-full hover:bg-red-100 transition-colors"
+                                  title="Remover dia de folga"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <DialogFooter className="pt-6 border-t border-gray-100">
                       <Button
                         onClick={() => setIsServiceHoursDialogOpen(false)}
                         className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
                         Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Day Off Dialog */}
+                <Dialog open={isDayOffDialogOpen} onOpenChange={setIsDayOffDialogOpen}>
+                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
+                          <CalendarOffIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Adicionar Dia de Folga
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Selecione uma data específica para folga
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="day-off-date" className="text-sm font-medium text-gray-700 mb-2 block">
+                          Data da Folga *
+                        </Label>
+                        <Input
+                          id="day-off-date"
+                          type="date"
+                          value={selectedDayOffDate}
+                          onChange={(e) => setSelectedDayOffDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]} // Não permite datas passadas
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsDayOffDialogOpen(false);
+                          setSelectedDayOffDate("");
+                        }}
+                        disabled={isCreatingDayOff}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleCreateDayOff}
+                        disabled={isCreatingDayOff || !selectedDayOffDate}
+                        className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        {isCreatingDayOff ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                            Adicionando...
+                          </>
+                        ) : (
+                          <>
+                            <CalendarOffIcon className="h-4 w-4 mr-2" />
+                            Adicionar Folga
+                          </>
+                        )}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

@@ -254,12 +254,12 @@ export default function FinancePage() {
       const mockDrawer: CashDrawer = {
         id: 1,
         company_id: 1,
-        opened_by_id: user?.id || 1,
+        opened_by_id: Number(user?.id) || 1,
         value_inicial: '100.00',
         status: 'open',
         opened_at: new Date().toISOString(),
         user: {
-          id: user?.id || 1,
+          id: Number(user?.id) || 1,
           name: user?.name || 'Usuário'
         }
       };
@@ -417,7 +417,7 @@ export default function FinancePage() {
         cash_drawer_id: currentDrawer.id,
         ...transactionForm,
         created_at: new Date().toISOString(),
-        user: { id: user?.id || 1, name: user?.name || 'Usuário' }
+        user: { id: Number(user?.id) || 1, name: user?.name || 'Usuário' }
       };
       
       setTransactions(prev => [newTransaction, ...prev]);

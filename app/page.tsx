@@ -3,9 +3,39 @@
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { BellIcon, CalendarIcon, SettingsIcon, UsersIcon, WalletIcon, LightbulbIcon, ShoppingBagIcon, ClockIcon, UmbrellaIcon, CheckIcon, SmileIcon, TrendingUpIcon } from "lucide-react";
+import { 
+  CalendarIcon, 
+  UsersIcon, 
+  WalletIcon, 
+  SettingsIcon, 
+  PlusIcon, 
+  RefreshCwIcon,
+  EyeIcon,
+  CheckIcon,
+  XIcon,
+  ClockIcon,
+  MapPinIcon,
+  ShoppingBagIcon,
+  UmbrellaIcon,
+  BellIcon,
+  SmileIcon,
+  TrendingUpIcon,
+  SparklesIcon,
+  ZapIcon,
+  StarIcon,
+  ActivityIcon,
+  BarChart3Icon,
+  CrownIcon,
+  RocketIcon,
+  GemIcon,
+  ShieldIcon,
+  LightbulbIcon,
+  HeartIcon,
+  ThumbsUpIcon
+} from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
@@ -144,20 +174,26 @@ export default function Home() {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 relative overflow-hidden">
+      {/* Subtle Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-100/30 to-teal-100/30 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-emerald-100/20 to-green-100/20 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Modern Header */}
+      <header className="relative z-10 bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-xl shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Avatar className="h-16 w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
                 <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
                 <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg font-bold">
-                  {user?.name.substring(0, 2)}
+                  {user?.name?.substring(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="font-bold text-2xl tracking-wide">Olá, {user?.name}!</h1>
+                <h1 className="font-bold text-2xl tracking-wide text-white">Olá, {user?.name}!</h1>
                 <p className="text-emerald-100 text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
@@ -210,7 +246,7 @@ export default function Home() {
         </div>
       </header>
       
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
 
         {/* Navigation */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -232,6 +268,15 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Base de clientes</p>
             </div>
           </Link>
+          <Link href="/comandas" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <ShoppingBagIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-orange-600 transition-colors">Comandas</span>
+              <p className="text-xs text-gray-500 mt-1">Gerenciar vendas</p>
+            </div>
+          </Link>
           <Link href="/financas" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
@@ -241,6 +286,10 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Controle financeiro</p>
             </div>
           </Link>
+        </div>
+
+        {/* Segunda linha para Ajustes */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Link href="/ajustes" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">

@@ -13,6 +13,7 @@ import {
   ScissorsIcon,
   StoreIcon,
   PencilIcon,
+  PlusIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth";
@@ -28,10 +29,12 @@ export default function AjustesPage() {
   const [isServiceHoursDialogOpen, setIsServiceHoursDialogOpen] = useState(false);
   const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
   const [isServicesDialogOpen, setIsServicesDialogOpen] = useState(false);
+  const [isCreateServiceDialogOpen, setIsCreateServiceDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serviceHoursLoading, setServiceHoursLoading] = useState(false);
   const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
   const [servicesLoading, setServicesLoading] = useState(false);
+  const [isCreatingService, setIsCreatingService] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [serviceHours, setServiceHours] = useState<any[]>([]);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
@@ -48,6 +51,12 @@ export default function AjustesPage() {
     email: user?.email || "email@dominio.com",
     phone_number: "",
     position: ""
+  });
+  const [newServiceForm, setNewServiceForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    duration: ""
   });
 
   // Dados do barbeiro - agora usando estado local que pode ser atualizado
@@ -364,6 +373,97 @@ export default function AjustesPage() {
     return `${duration}min`;
   };
 
+  // Criar novo serviço
+  const handleCreateService = async () => {
+    if (!user?.company_id) {
+      toast.error("ID da empresa não identificado");
+      return;
+    }
+
+    if (!newServiceForm.name || !newServiceForm.price || !newServiceForm.duration) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setIsCreatingService(true);
+    try {
+      // 1. Criar o serviço
+      const serviceData = {
+        name: newServiceForm.name,
+        description: newServiceForm.description,
+        price: parseFloat(newServiceForm.price),
+        duration: parseInt(newServiceForm.duration)
+      };
+
+      const serviceResponse = await api.post('/service', serviceData, {
+        headers: {
+          company_id: user.company_id
+        }
+      });
+
+      console.log('Serviço criado:', serviceResponse.data);
+
+      // 2. Pegar dados do profissional do localStorage
+      const userDataString = localStorage.getItem('@linkCallendar:user');
+      if (userDataString) {
+        const userData = JSON.parse(userDataString);
+        const professionalId = userData.id;
+
+        console.log('Dados do usuário do localStorage:', userData);
+        console.log('ID do profissional:', professionalId);
+
+        // 3. Vincular o serviço ao profissional
+        if (professionalId && serviceResponse.data?.id) {
+          // Garantir que temos um ID válido do serviço
+          const serviceId = typeof serviceResponse.data.id === 'object' 
+            ? serviceResponse.data.id.id  // Se for um objeto {id: X}, pega o valor de X
+            : serviceResponse.data.id;    // Se for um valor direto, usa ele mesmo
+
+          console.log('Vinculando serviço ao profissional:', {
+            team_id: professionalId,
+            service_id: serviceId
+          });
+
+          try {
+            const teamServiceResponse = await api.post("/team-services", {
+              links: [{
+                team_id: professionalId,
+                service_id: Number(serviceId)
+              }]
+            }, {
+              headers: {
+                company_id: user.company_id
+              }
+            });
+
+            console.log('Serviço vinculado ao profissional:', teamServiceResponse.data);
+            toast.success("Serviço criado e vinculado ao seu perfil com sucesso!");
+          } catch (linkError: any) {
+            console.error('Erro ao vincular serviço ao profissional:', linkError);
+            toast.success("Serviço criado, mas houve erro ao vincular ao seu perfil");
+          }
+        } else {
+          console.warn('ID do profissional ou serviço não encontrado para vinculação');
+          toast.success("Serviço criado com sucesso!");
+        }
+      } else {
+        console.warn('Dados do usuário não encontrados no localStorage');
+        toast.success("Serviço criado com sucesso!");
+      }
+
+      setIsCreateServiceDialogOpen(false);
+      setNewServiceForm({ name: "", description: "", price: "", duration: "" });
+      
+      // Recarregar a lista de serviços
+      fetchServices();
+    } catch (error: any) {
+      console.error('Erro ao criar serviço:', error);
+      toast.error(error.response?.data?.error || "Erro ao criar serviço");
+    } finally {
+      setIsCreatingService(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       {/* Header */}
@@ -505,11 +605,21 @@ export default function AjustesPage() {
                 <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
                   <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white">
                     <DialogHeader className="pb-6">
-                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
-                          <ScissorsIcon className="h-6 w-6 text-white" />
+                      <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                            <ScissorsIcon className="h-6 w-6 text-white" />
+                          </div>
+                          Serviços e Preços
                         </div>
-                        Serviços e Preços
+                        <Button
+                          onClick={() => setIsCreateServiceDialogOpen(true)}
+                          size="sm"
+                          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-1" />
+                          Novo
+                        </Button>
                       </DialogTitle>
                       <DialogDescription className="text-gray-600 text-base">
                         Todos os serviços oferecidos pela sua barbearia
@@ -574,6 +684,117 @@ export default function AjustesPage() {
                         className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
                         Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Create Service Dialog */}
+                <Dialog open={isCreateServiceDialogOpen} onOpenChange={setIsCreateServiceDialogOpen}>
+                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                          <PlusIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Criar Novo Serviço
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Adicione um novo serviço à sua barbearia
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <Label htmlFor="service-name" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Nome do Serviço *
+                          </Label>
+                          <Input
+                            id="service-name"
+                            placeholder="Ex: Corte de Cabelo"
+                            value={newServiceForm.name}
+                            onChange={(e) => setNewServiceForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="service-description" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Descrição
+                          </Label>
+                          <Input
+                            id="service-description"
+                            placeholder="Ex: Corte masculino com máquina e tesoura"
+                            value={newServiceForm.description}
+                            onChange={(e) => setNewServiceForm(prev => ({ ...prev, description: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="service-price" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Preço (R$) *
+                            </Label>
+                            <Input
+                              id="service-price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="30.00"
+                              value={newServiceForm.price}
+                              onChange={(e) => setNewServiceForm(prev => ({ ...prev, price: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="service-duration" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Duração (min) *
+                            </Label>
+                            <Input
+                              id="service-duration"
+                              type="number"
+                              min="1"
+                              placeholder="30"
+                              value={newServiceForm.duration}
+                              onChange={(e) => setNewServiceForm(prev => ({ ...prev, duration: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCreateServiceDialogOpen(false);
+                          setNewServiceForm({ name: "", description: "", price: "", duration: "" });
+                        }}
+                        disabled={isCreatingService}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleCreateService}
+                        disabled={isCreatingService}
+                        className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        {isCreatingService ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                            Criando...
+                          </>
+                        ) : (
+                          <>
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            Criar Serviço
+                          </>
+                        )}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

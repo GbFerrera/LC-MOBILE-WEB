@@ -212,9 +212,11 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-3">
+              <Link href={"/teste-notificacoes"}>
               <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-200">
                 <BellIcon className="h-5 w-5" />
               </Button>
+              </Link>
             </div>
           </div>
 

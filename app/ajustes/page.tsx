@@ -44,6 +44,7 @@ export default function AjustesPage() {
   const [specificDayOffs, setSpecificDayOffs] = useState<string[]>([]);
   const [loadingDayOffs, setLoadingDayOffs] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [serviceHours, setServiceHours] = useState<any[]>([]);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
@@ -87,6 +88,30 @@ export default function AjustesPage() {
       }
     } catch (error) {
       console.log('Foto de perfil não encontrada ou erro:', error);
+    }
+  };
+
+  // Fazer upload de foto de perfil
+  const uploadProfilePhoto = async (base64Image: string) => {
+    if (!user?.id) {
+      toast.error("Usuário não identificado");
+      return;
+    }
+
+    try {
+      const response = await api.post(`/team-photos/${user.id}`, { base64Image }, {
+        headers: {
+          'company_id': user.company_id || '1'
+        }
+      });
+      
+      if (response.data?.photo_url) {
+        setProfilePhoto(response.data.photo_url);
+        toast.success("Foto de perfil atualizada com sucesso!");
+      }
+    } catch (error: any) {
+      console.error('Erro ao fazer upload da foto de perfil:', error);
+      toast.error(error.response?.data?.message || "Erro ao atualizar foto de perfil. Tente novamente.");
     }
   };
 
@@ -140,6 +165,9 @@ export default function AjustesPage() {
         position: "",
         password: ""
       });
+      
+      // Carregar foto de perfil
+      fetchProfilePhoto();
       
       // Carregar dias de folga específicos
       fetchSpecificDayOffs();
@@ -601,31 +629,62 @@ export default function AjustesPage() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Profile Card Redesigned - Tamanho Ajustado */}
-        <Card className="border-none shadow-2xl overflow-hidden mb-8 bg-gradient-to-r from-white to-emerald-50/30 max-w-4xl mx-auto">
+        <Card className="border-none shadow-lg overflow-hidden mb-8 bg-white max-w-3xl mx-auto">
           <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 relative">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 relative">
               {/* Header Profile Info */}
-              <div className="flex items-center mb-8">
-                <Avatar className="h-28 w-28 border-4 border-white/30 shadow-2xl mr-8">
-                  <AvatarImage
-                    src={barberInfo.avatarUrl}
-                    alt={barberInfo.name}
-                    className="object-cover bg-gray-100"
-                  />
-                  <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-3xl font-bold">
-                    {barberInfo.name.substring(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
+              <div className="flex items-center">
+                <div className="relative mr-5">
+                  <Avatar className="h-20 w-20 border-2 border-white/40 shadow-lg">
+                    <AvatarImage
+                      src={barberInfo.avatarUrl}
+                      alt={barberInfo.name}
+                      className="object-cover bg-gray-100"
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-400 text-white text-2xl font-bold">
+                      {barberInfo.name.substring(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <label htmlFor="photo-upload" className="absolute bottom-0 right-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-1.5 cursor-pointer shadow-md transition-all duration-200 hover:scale-105">
+                    <input 
+                      id="photo-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const base64String = reader.result as string;
+                            // Remover o prefixo 'data:image/jpeg;base64,' para enviar apenas os dados
+                            const base64Data = base64String.split(',')[1];
+                            setIsUploadingPhoto(true);
+                            uploadProfilePhoto(base64Data)
+                              .finally(() => setIsUploadingPhoto(false));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      disabled={isUploadingPhoto}
+                    />
+                    {isUploadingPhoto ? (
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <PencilIcon className="h-4 w-4" />
+                    )}
+                  </label>
+                </div>
                 <div className="text-white flex-1">
-                  <h2 className="font-bold text-4xl tracking-wide mb-3">{barberInfo.name}</h2>
-                  <p className="text-emerald-100 text-2xl font-medium mb-2">
+                  <h2 className="font-bold text-2xl tracking-wide mb-1">{barberInfo.name}</h2>
+                  <p className="text-emerald-50 text-lg font-medium">
                     {companyDetails?.name}
                   </p>
-                  <p className="text-emerald-200 text-lg">
+                  <p className="text-emerald-100 text-sm">
                     {barberInfo.email}
                   </p>
                   {barberInfo.phone && (
-                    <p className="text-emerald-300 text-base mt-1">
+                    <p className="text-emerald-100 text-xs">
                       {barberInfo.phone}
                     </p>
                   )}
@@ -633,18 +692,18 @@ export default function AjustesPage() {
               </div>
 
               {/* Action Buttons Row */}
-              <div className="flex gap-4 items-center justify-end">
+              <div className="flex gap-3 items-center justify-end mt-4">
                 {/* Edit Profile Icon Button */}
                 <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
                       size="icon"
-                      className="bg-gradient-to-br from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-xl hover:shadow-2xl hover:scale-110 transition-all duration-300 h-14 w-14 rounded-2xl border-2 border-white/30"
+                      className="bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg transition-all duration-200 h-10 w-10 rounded-lg"
                     >
-                      <PencilIcon className="h-6 w-6" />
+                      <PencilIcon className="h-5 w-5" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
+                  <DialogContent className="sm:max-w-[425px] w-[48vh] rounded-2xl">
                     <DialogHeader>
                       <DialogTitle>Editar Perfil</DialogTitle>
                       <DialogDescription>
@@ -722,7 +781,7 @@ export default function AjustesPage() {
 
                 {/* Services Dialog */}
                 <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white">
+                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
                         <div className="flex items-center gap-3">
@@ -810,7 +869,7 @@ export default function AjustesPage() {
 
                 {/* Create Service Dialog */}
                 <Dialog open={isCreateServiceDialogOpen} onOpenChange={setIsCreateServiceDialogOpen}>
-                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white">
+                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                         <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
@@ -824,8 +883,7 @@ export default function AjustesPage() {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
+                      <div className="grid grid-cols-1 gap-4">                        <div>
                           <Label htmlFor="service-name" className="text-sm font-medium text-gray-700 mb-2 block">
                             Nome do Serviço *
                           </Label>
@@ -921,7 +979,7 @@ export default function AjustesPage() {
 
                 {/* Service Hours Dialog */}
                 <Dialog open={isServiceHoursDialogOpen} onOpenChange={setIsServiceHoursDialogOpen}>
-                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white">
+                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
                         <div className="flex items-center gap-3">
@@ -1131,7 +1189,7 @@ export default function AjustesPage() {
 
                 {/* Company Details Dialog */}
                 <Dialog open={isCompanyDetailsDialogOpen} onOpenChange={setIsCompanyDetailsDialogOpen}>
-                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white">
+                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                         <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
@@ -1224,9 +1282,9 @@ export default function AjustesPage() {
                 {/* Logout Button */}
                 <Button
                   onClick={handleLogout}
-                  className="bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 font-bold flex items-center gap-3 px-8 py-4 rounded-2xl border-none text-lg"
+                  className="bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2 px-4 py-2 rounded-lg text-sm"
                 >
-                  <LogOutIcon className="h-6 w-6" />
+                  <LogOutIcon className="h-4 w-4" />
                   <span>Sair</span>
                 </Button>
               </div>

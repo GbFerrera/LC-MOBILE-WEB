@@ -639,12 +639,28 @@ export default function AgendaPage() {
   // Verifica se um horário está ocupado
   const isTimeSlotBooked = (time: string) => {
     return appointments.some((appt) => {
-      if (!appt.start_time || appt.status === "free") return false;
-      // Formata o horário para garantir o mesmo formato (HH:MM)
-      const apptTime = appt.start_time.includes("T")
+      if (!appt.start_time || !appt.end_time || appt.status === "free") return false;
+      
+      // Formata os horários para garantir o mesmo formato (HH:MM)
+      const startTime = appt.start_time.includes("T")
         ? appt.start_time.split("T")[1].slice(0, 5)
         : appt.start_time.slice(0, 5);
-      return apptTime === time;
+      const endTime = appt.end_time.includes("T")
+        ? appt.end_time.split("T")[1].slice(0, 5)
+        : appt.end_time.slice(0, 5);
+
+      // Converte os horários para minutos para facilitar a comparação
+      const timeToMinutes = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        return hours * 60 + minutes;
+      };
+
+      const currentTimeMinutes = timeToMinutes(time);
+      const startTimeMinutes = timeToMinutes(startTime);
+      const endTimeMinutes = timeToMinutes(endTime);
+
+      // Verifica se o horário atual está dentro do intervalo do agendamento
+      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes;
     });
   };
 
@@ -715,12 +731,85 @@ export default function AgendaPage() {
   // Busca detalhes do agendamento para um horário específico
   const getAppointmentDetails = (time: string) => {
     return appointments.find((appt) => {
-      if (!appt.start_time) return false;
-      const apptTime = appt.start_time.includes("T")
+      if (!appt.start_time || !appt.end_time || appt.status === "free") return false;
+      
+      // Formata os horários para garantir o mesmo formato (HH:MM)
+      const startTime = appt.start_time.includes("T")
         ? appt.start_time.split("T")[1].slice(0, 5)
         : appt.start_time.slice(0, 5);
-      return apptTime === time;
+      const endTime = appt.end_time.includes("T")
+        ? appt.end_time.split("T")[1].slice(0, 5)
+        : appt.end_time.slice(0, 5);
+
+      // Converte os horários para minutos para facilitar a comparação
+      const timeToMinutes = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        return hours * 60 + minutes;
+      };
+
+      const currentTimeMinutes = timeToMinutes(time);
+      const startTimeMinutes = timeToMinutes(startTime);
+      const endTimeMinutes = timeToMinutes(endTime);
+
+      // Verifica se o horário atual está dentro do intervalo do agendamento
+      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes;
     });
+  };
+
+  // Função para obter as classes de estilo baseadas no status do agendamento
+  const getSlotStyles = (slot: string) => {
+    const isBooked = isTimeSlotBooked(slot);
+    const isFree = isFreeInterval(slot);
+    const appointment = getAppointmentDetails(slot);
+
+    if (isBooked && appointment) {
+      // Cores baseadas no status do agendamento
+      switch (appointment.status) {
+        case 'confirmed':
+          return {
+            containerClass: "bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 cursor-pointer shadow-md hover:shadow-lg",
+            timeClass: "text-green-700",
+            textClass: "text-green-600",
+            iconColor: "text-green-500"
+          };
+        case 'pending':
+          return {
+            containerClass: "bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 cursor-pointer shadow-md hover:shadow-lg",
+            timeClass: "text-yellow-700",
+            textClass: "text-yellow-600",
+            iconColor: "text-yellow-500"
+          };
+        case 'completed':
+          return {
+            containerClass: "bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 cursor-pointer shadow-md hover:shadow-lg",
+            timeClass: "text-blue-700",
+            textClass: "text-blue-600",
+            iconColor: "text-blue-500"
+          };
+        default:
+          return {
+            containerClass: "bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 cursor-pointer shadow-md hover:shadow-lg",
+            timeClass: "text-gray-700",
+            textClass: "text-gray-600",
+            iconColor: "text-gray-500"
+          };
+      }
+    } else if (isFree) {
+      return {
+        containerClass: "bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed shadow-md",
+        timeClass: "text-orange-700",
+        textClass: "text-orange-600",
+        iconColor: "text-orange-500"
+      };
+    } else {
+      // Slot disponível (cinza)
+      return {
+        containerClass: "bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 hover:border-gray-400 cursor-pointer shadow-md hover:shadow-lg active:scale-95",
+        timeClass: "text-gray-700 group-hover:text-gray-800",
+        textClass: "text-gray-600 group-hover:text-gray-700",
+        iconColor: "text-gray-500"
+      };
+    }
   };
 
   // Formata a data para exibição (ex: "Terça-feira, 27 de maio de 2025")
@@ -1097,17 +1186,12 @@ export default function AgendaPage() {
                       const isFree = isFreeInterval(slot);
                       const appointment = getAppointmentDetails(slot);
                       const freeInterval = getFreeIntervalDetails(slot);
+                      const styles = getSlotStyles(slot);
 
                       return (
                         <div
                           key={slot}
-                          className={`group relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${
-                            isBooked
-                              ? "bg-gradient-to-br from-red-50 to-pink-50 border-2 border-red-200 cursor-pointer shadow-md hover:shadow-lg"
-                              : isFree
-                              ? "bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed shadow-md"
-                              : "bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 hover:border-emerald-400 cursor-pointer shadow-md hover:shadow-lg active:scale-95"
-                          }`}
+                          className={`group relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${styles.containerClass}`}
                           onClick={
                             isBooked
                               ? () => {
@@ -1132,29 +1216,23 @@ export default function AgendaPage() {
                           }
                         >
                           <div
-                            className={`font-bold text-lg mb-1 ${
-                              isBooked
-                                ? "text-red-700"
-                                : isFree
-                                ? "text-orange-700"
-                                : "text-emerald-700 group-hover:text-emerald-800"
-                            }`}
+                            className={`font-bold text-lg mb-1 ${styles.timeClass}`}
                           >
                             {slot}
                           </div>
 
                           {isBooked && appointment ? (
                             <>
-                              <div className="text-xs text-red-600 font-medium truncate mb-1">
+                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
                                 {appointment.client?.name || "Cliente"}
                               </div>
-                              <div className="text-xs text-red-500 truncate mb-1">
+                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
                                 {appointment.services && appointment.services.length > 1 
                                   ? `${appointment.services.length} serviços`
                                   : appointment.services?.[0]?.service_name || "Serviço"
                                 }
                               </div>
-                              <div className="flex items-center text-xs text-red-500">
+                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
                                 <svg
                                   className="w-3 h-3 mr-1"
                                   fill="currentColor"
@@ -1171,19 +1249,19 @@ export default function AgendaPage() {
                             </>
                           ) : isFree && freeInterval ? (
                             <>
-                              <div className="text-xs text-orange-600 font-medium truncate mb-1">
+                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
                                 Intervalo Livre
                               </div>
-                              <div className="text-xs text-orange-500 truncate mb-1">
+                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
                                 {freeInterval.notes || "Intervalo"}
                               </div>
-                              <div className="flex items-center text-xs text-orange-500">
+                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
                                 <CircleX className="mr-1" size={16} />
                                 Bloqueado
                               </div>
                             </>
                           ) : !isBooked && !isFree ? (
-                            <div className="flex items-center text-xs text-emerald-600 group-hover:text-emerald-700 font-medium">
+                            <div className={`flex items-center text-xs font-medium ${styles.textClass}`}>
                               <svg
                                 className="w-3 h-3 mr-1"
                                 fill="none"
@@ -1663,6 +1741,8 @@ export default function AgendaPage() {
                           ? "bg-green-100 text-green-700"
                           : selectedAppointment.status === "pending"
                           ? "bg-yellow-100 text-yellow-700"
+                          : selectedAppointment.status === "completed"
+                          ? "bg-blue-100 text-blue-700"
                           : "bg-red-100 text-red-700"
                       }`}
                     >
@@ -1670,6 +1750,8 @@ export default function AgendaPage() {
                         ? "Confirmado"
                         : selectedAppointment.status === "pending"
                         ? "Pendente"
+                        : selectedAppointment.status === "completed"
+                        ? "Concluído"
                         : "Cancelado"}
                     </span>
                   </div>

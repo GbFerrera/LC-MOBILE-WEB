@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   ArrowLeft, 
   DollarSign, 
@@ -30,69 +33,44 @@ import {
   Settings,
   TrendingUp,
   TrendingDown,
-  Calendar
+  Calendar,
+  Clock,
+  Building,
+  Users,
+  Download,
+  Filter,
+  Search,
+  MoreVertical,
+  Info,
+  PlayCircle,
+  StopCircle,
+  PieChart,
+  BarChart3,
+  Activity
 } from "lucide-react";
 import { useAuth } from "@/hooks/auth";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/services/api";
+import { api } from '@/services/api';
+import { cashDrawerService, type CashDrawer as ServiceCashDrawer, type CreateCashDrawerData, type CloseCashDrawerData } from '@/services/cashDrawerService';
+import { financialTransactionsService, type CreateTransactionData } from '@/services/financialTransactionsService';
 
 // Interfaces
-interface Commission {
-  id: number;
-  company_id: number;
-  professional_id: number;
-  service_id: number | null;
-  type: 'fixed' | 'percentage';
-  value: string;
-  active: boolean;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-  service_name?: string;
-  service_price?: string;
-  service_duration?: number;
-}
-
-interface ProfessionalData {
-  professional_id: number;
-  name: string;
-  position: string;
-  email: string;
-  phone: string;
-  commissions_general: Commission[];
-  commissions_services: Commission[];
-}
-
-interface EarningsReport {
-  professional: {
-    id: number;
-    name: string;
-    position: string;
-  };
-  period: {
-    start_date: string;
-    end_date: string;
-  };
-  summary: {
-    total_appointments: number;
-    total_services: number;
-    total_value: number;
-    total_commission: number;
-  };
-  services: any[];
-  appointments_detail: any[];
-}
 
 interface CashDrawer {
-  id: number;
+  id?: number;
   company_id: number;
   opened_by_id: number;
   closed_by_id?: number;
   value_inicial: string;
   value_final?: string;
   status: 'open' | 'closed';
-  opened_at: string;
+  date_open: string;
+  date_close?: string;
+  opened_at?: string;
   closed_at?: string;
+  notes?: string;
+  opener_name?: string;
+  closer_name?: string;
   user?: {
     id: number;
     name: string;
@@ -102,11 +80,13 @@ interface CashDrawer {
 interface Transaction {
   id: number;
   cash_drawer_id: number;
-  type: 'entrada' | 'saida' | 'sangria';
+  type: 'income' | 'expense' | 'cash_out';
   category: string;
   amount: string;
   description: string;
   created_at: string;
+  transaction_date?: string;
+  command_id?: number; // Adicionado para suporte a comandas
   user?: {
     id: number;
     name: string;
@@ -125,40 +105,130 @@ interface CashBalance {
   closer_name?: string;
 }
 
-// Categorias de transações
+interface CashDrawerDetails {
+  id: number;
+  company_id: number;
+  opened_by_id: number;
+  closed_by_id?: number;
+  value_inicial: string;
+  value_final?: string;
+  status: 'open' | 'closed';
+  date_open: string;
+  date_close?: string;
+  notes?: string;
+  opener_name: string;
+  closer_name?: string;
+  transactions: Transaction[];
+  payments: Payment[];
+}
+
+interface Payment {
+  id: number;
+  company_id: number;
+  client_id: number;
+  command_id?: number;
+  total_amount: string;
+  paid_at: string;
+  client_name: string;
+  payment_methods: PaymentMethod[];
+}
+
+interface PaymentMethod {
+  method: 'cash' | 'credit' | 'debit' | 'pix';
+  amount: number;
+}
+
+interface CashBalancePeriod {
+  period: {
+    start_date: string;
+    end_date: string;
+  };
+  summary: {
+    total_income: number;
+    total_expense: number;
+    total_cash_out: number;
+    net_balance: number;
+    drawers_count: number;
+  };
+  drawers: CashDrawer[];
+}
+
+// Interfaces baseadas no Link-Front
+interface CommandItem {
+  id: number;
+  command_id: number;
+  item_type: 'product' | 'service';
+  product_id?: number;
+  service_id?: number;
+  name: string;
+  description: string;
+  price: string;
+  quantity: number;
+  duration?: number;
+}
+
+interface CommandDetails {
+  id: number;
+  company_id: number;
+  client_id: number;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  created_at: string;
+  updated_at: string;
+  items: CommandItem[];
+  total: number;
+}
+
+// Categorias de transações (idênticas ao mobile)
+const INCOME_CATEGORIES = [
+  'Vendas',
+  'Serviços',
+  'Comissões',
+  'Juros Recebidos',
+  'Outros Recebimentos'
+];
+
+const EXPENSE_CATEGORIES = [
+  'Fornecedores',
+  'Salários',
+  'Aluguel',
+  'Energia Elétrica',
+  'Água',
+  'Internet/Telefone',
+  'Combustível',
+  'Manutenção',
+  'Material de Escritório',
+  'Impostos',
+  'Outros Gastos'
+];
+
+const WITHDRAWAL_CATEGORIES = [
+  'Depósito Banco do Brasil',
+  'Depósito Itaú',
+  'Depósito Bradesco',
+  'Depósito Santander',
+  'Depósito Caixa Econômica',
+  'Depósito Nubank',
+  'Depósito Banco Inter',
+  'Depósito Sicoob',
+  'Depósito Sicredi',
+  'Depósito Outros Bancos'
+];
+
 const TRANSACTION_CATEGORIES = {
-  entrada: [
-    'Venda de Serviços',
-    'Produtos',
-    'Gorjetas',
-    'Outros Recebimentos'
-  ],
-  saida: [
-    'Fornecedores',
-    'Salários',
-    'Aluguel',
-    'Energia',
-    'Internet',
-    'Marketing',
-    'Manutenção',
-    'Outros Gastos'
-  ],
-  sangria: [
-    'Retirada do Caixa',
-    'Troco',
-    'Despesas Urgentes'
-  ]
+  entrada: INCOME_CATEGORIES,
+  saida: EXPENSE_CATEGORIES,
+  sangria: WITHDRAWAL_CATEGORIES
 };
 
 export default function FinancePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
   // Estados principais
   const [currentDrawer, setCurrentDrawer] = useState<CashDrawer | null>(null);
-  const [professionalData, setProfessionalData] = useState<ProfessionalData | null>(null);
-  const [earningsReport, setEarningsReport] = useState<EarningsReport | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [startDate, setStartDate] = useState<string>(() => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -186,10 +256,15 @@ export default function FinancePage() {
   const [openDrawerDialog, setOpenDrawerDialog] = useState(false);
   const [closeDrawerDialog, setCloseDrawerDialog] = useState(false);
   const [transactionDialog, setTransactionDialog] = useState(false);
+  const [drawerDetailsDialog, setDrawerDetailsDialog] = useState(false);
+  // Estados para tooltip de detalhes da comanda (baseado no Link-Front)
+  const [hoveredPayment, setHoveredPayment] = useState<number | null>(null);
+  const [commandDetails, setCommandDetails] = useState<CommandDetails | null>(null);
   
   // Estados de formulários
   const [openValue, setOpenValue] = useState('');
   const [closeValue, setCloseValue] = useState('');
+  const [drawerNotes, setDrawerNotes] = useState('');
   const [transactionForm, setTransactionForm] = useState({
     type: 'entrada' as 'entrada' | 'saida' | 'sangria',
     category: '',
@@ -197,75 +272,44 @@ export default function FinancePage() {
     description: ''
   });
   
-  // Função para buscar dados das comissões do profissional logado
-  const fetchCommissions = async () => {
-    if (!user?.id) return;
-    
-    setLoading(true);
-    
-    try {
-      const params = new URLSearchParams();
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      
-      // Buscar comissões do profissional
-      const commissionsResponse = await api.get(`/commissions/team/${user.id}?${params.toString()}`, {
-        headers: {
-          'company_id': user.company_id,
-          'user_id': user.id
-        }
-      });
-      
-      console.log('Dados das comissões retornados:', commissionsResponse.data);
-      setProfessionalData(commissionsResponse.data);
-      
-      // Sempre buscar relatório de ganhos (com datas padrão ou selecionadas)
-      const earningsResponse = await api.get(`/commissions/professional/${user.id}/report?start_date=${startDate}&end_date=${endDate}`, {
-        headers: {
-          'company_id': user.company_id,
-          'user_id': user.id
-        }
-      });
-      
-      console.log('Dados do relatório de ganhos:', earningsResponse.data);
-      setEarningsReport(earningsResponse.data);
-      
-    } catch (error: any) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: error.response?.data?.message || 'Erro ao carregar dados das comissões',
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Estados adicionais da tela mobile
+  const [cashDrawers, setCashDrawers] = useState<CashDrawer[]>([]);
+  const [openCashDrawers, setOpenCashDrawers] = useState<CashDrawer[]>([]);
+  const [drawerDetails, setDrawerDetails] = useState<CashDrawerDetails | null>(null);
+  // Estados de comandas removidos
+  const [periodBalance, setPeriodBalance] = useState<CashBalancePeriod | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'custom'>('week');
+  // Filtro de comandas não necessário na nova implementação
+  const [hasDrawerOpenedToday, setHasDrawerOpenedToday] = useState(false);
+  const [todayClosedDrawer, setTodayClosedDrawer] = useState<CashDrawer | null>(null);
+  
+  // Estados de loading específicos
+  const [isLoadingDrawers, setIsLoadingDrawers] = useState(false);
+  const [isLoadingOpenDrawers, setIsLoadingOpenDrawers] = useState(false);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [isLoadingPeriodBalance, setIsLoadingPeriodBalance] = useState(false);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [loadingDrawerDetails, setLoadingDrawerDetails] = useState(false);
+  // Loading de comandas não necessário
+  const [openingDrawer, setOpeningDrawer] = useState(false);
+  const [isClosingDrawer, setIsClosingDrawer] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  
 
-  // Funções da API (simuladas)
+  // Funções da API usando cashDrawerService
   const fetchCurrentDrawer = async () => {
+    if (!user?.company_id) return;
+    
     try {
       setLoading(true);
-      // Simular API call
-      // const response = await api.get('/cash-drawers/current');
-      // setCurrentDrawer(response.data);
+      const drawer = await cashDrawerService.getCurrentDrawer(user.company_id);
       
-      // Dados simulados
-      const mockDrawer: CashDrawer = {
-        id: 1,
-        company_id: 1,
-        opened_by_id: Number(user?.id) || 1,
-        value_inicial: '100.00',
-        status: 'open',
-        opened_at: new Date().toISOString(),
-        user: {
-          id: Number(user?.id) || 1,
-          name: user?.name || 'Usuário'
-        }
-      };
-      setCurrentDrawer(mockDrawer);
-    } catch (error) {
+      console.log('Gaveta atual:', drawer);
+      setCurrentDrawer(drawer);
+    } catch (error: any) {
       console.error('Erro ao buscar gaveta atual:', error);
+      setCurrentDrawer(null);
+      
       toast({
         title: "Erro",
         description: "Erro ao buscar gaveta de caixa",
@@ -275,82 +319,386 @@ export default function FinancePage() {
       setLoading(false);
     }
   };
-  
-  const fetchTransactions = async () => {
-    if (!currentDrawer) return;
+
+  // Função para buscar gavetas de caixa usando cashDrawerService
+  const fetchCashDrawers = async () => {
+    if (!user?.company_id) return;
     
     try {
-      setLoading(true);
-      // Simular API call
-      // const response = await api.get(`/transactions?cash_drawer_id=${currentDrawer.id}`);
-      // setTransactions(response.data);
+      setIsLoadingDrawers(true);
       
-      // Dados simulados
-      const mockTransactions: Transaction[] = [
-        {
-          id: 1,
-          cash_drawer_id: currentDrawer.id,
-          type: 'entrada',
-          category: 'Venda de Serviços',
-          amount: '50.00',
-          description: 'Corte de cabelo',
-          created_at: new Date().toISOString(),
-          user: { id: 1, name: 'João' }
-        },
-        {
-          id: 2,
-          cash_drawer_id: currentDrawer.id,
-          type: 'saida',
-          category: 'Fornecedores',
-          amount: '20.00',
-          description: 'Compra de produtos',
-          created_at: new Date().toISOString(),
-          user: { id: 1, name: 'João' }
+      let allDrawers: CashDrawer[] = [];
+      
+      // 1. SEMPRE buscar gavetas abertas dos últimos 5 dias por padrão
+      const today = new Date();
+      const fiveDaysAgo = new Date(today);
+      fiveDaysAgo.setDate(today.getDate() - 5);
+      
+      const fiveDaysAgoStr = fiveDaysAgo.toISOString().split('T')[0];
+      const todayStr = today.toISOString().split('T')[0];
+      
+      try {
+        // Buscar gavetas abertas dos últimos 5 dias
+        const openDrawers = await cashDrawerService.getCashDrawers(user.company_id, fiveDaysAgoStr, todayStr, 'open');
+        allDrawers = [...openDrawers];
+      } catch (error) {
+        console.warn('Erro ao buscar gavetas abertas:', error);
+      }
+      
+      // 2. Se há filtro de data, buscar TAMBÉM gavetas fechadas do período
+      if (selectedPeriod !== 'week' || startDate || endDate) {
+        const { start, end } = getDateRange();
+        const startDateStr = start.toISOString().split('T')[0];
+        const endDateStr = end.toISOString().split('T')[0];
+        
+        try {
+          const filteredDrawers = await cashDrawerService.getCashDrawers(user.company_id, startDateStr, endDateStr);
+          
+          // Adicionar gavetas fechadas que não estão já na lista
+          const closedDrawers = filteredDrawers.filter((drawer: CashDrawer) => 
+            drawer.status === 'closed' && 
+            !allDrawers.some(existing => existing.id === drawer.id)
+          );
+          
+          allDrawers = [...allDrawers, ...closedDrawers];
+        } catch (error) {
+          console.warn('Erro ao buscar gavetas do período:', error);
         }
-      ];
-      setTransactions(mockTransactions);
+      }
+      
+      // Ordenar por data de abertura (mais recente primeiro)
+      allDrawers.sort((a, b) => new Date(b.date_open).getTime() - new Date(a.date_open).getTime());
+      
+      setCashDrawers(allDrawers);
     } catch (error) {
-      console.error('Erro ao buscar transações:', error);
+      console.error('Erro ao buscar gavetas de caixa:', error);
+      setCashDrawers([]);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as gavetas de caixa",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoadingDrawers(false);
     }
   };
-  
-  const calculateBalance = () => {
-    if (!currentDrawer || !transactions.length) return;
+
+  // Função para buscar gavetas abertas (igual ao mobile)
+  const fetchOpenCashDrawers = async () => {
+    if (!user?.company_id) return;
     
-    const income = transactions
-      .filter(t => t.type === 'entrada')
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    try {
+      setIsLoadingOpenDrawers(true);
       
-    const expense = transactions
-      .filter(t => t.type === 'saida')
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      // Calcular data 5 dias atrás
+      const today = new Date();
+      const fiveDaysAgo = new Date();
+      fiveDaysAgo.setDate(today.getDate() - 5);
       
-    const cashOut = transactions
-      .filter(t => t.type === 'sangria')
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const startDate = fiveDaysAgo.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
+      
+      // Buscar gavetas abertas no período
+      const response = await api.get(`/cash-drawers?start_date=${startDate}&end_date=${endDate}&status=open`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      setOpenCashDrawers(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar gavetas abertas:', error);
+      setOpenCashDrawers([]);
+    } finally {
+      setIsLoadingOpenDrawers(false);
+    }
+  };
+
+  // Função para verificar se já foi aberta uma gaveta hoje (igual ao mobile)
+  const checkIfDrawerOpenedToday = async () => {
+    if (!user?.company_id) return false;
     
-    const initialValue = parseFloat(currentDrawer.value_inicial);
-    const finalBalance = initialValue + income - expense - cashOut;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await api.get(`/cash-drawers?start_date=${today}&end_date=${today}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      const drawers = response.data;
+      const hasOpenedToday = drawers.length > 0;
+      setHasDrawerOpenedToday(hasOpenedToday);
+      
+      // Se há gaveta de hoje, verificar se está fechada
+      if (hasOpenedToday) {
+        const closedDrawer = drawers.find((drawer: CashDrawer) => drawer.status === 'closed');
+        if (closedDrawer) {
+          setTodayClosedDrawer(closedDrawer);
+        } else {
+          setTodayClosedDrawer(null);
+        }
+      } else {
+        setTodayClosedDrawer(null);
+      }
+      
+      return hasOpenedToday;
+    } catch (error) {
+      console.error('Erro ao verificar gavetas do dia:', error);
+      return false;
+    }
+  };
+
+  // Função para buscar saldo por período (igual ao mobile)
+  const fetchCashBalanceByPeriod = async () => {
+    if (!user?.company_id || !selectedPeriod) return;
     
-    setBalance({
-      balance: finalBalance,
-      total_income: income,
-      total_expense: expense,
-      total_cash_out: cashOut,
-      date_open: currentDrawer.opened_at,
-      date_close: currentDrawer.closed_at,
-      opener_name: currentDrawer.user?.name || '',
-      closer_name: ''
-    });
+    try {
+      setIsLoadingPeriodBalance(true);
+      
+      const { start, end } = getDateRange();
+      const startDate = start.toISOString().split('T')[0];
+      const endDate = end.toISOString().split('T')[0];
+      
+      const response = await api.get(`/financial/balance/period?start_date=${startDate}&end_date=${endDate}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      setPeriodBalance(response.data);
+      
+      // Atualizar também a lista de gavetas abertas quando buscar saldo por período
+      fetchOpenCashDrawers();
+      
+    } catch (error) {
+      console.error('Erro ao buscar saldo por período:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar o saldo do período",
+        variant: "destructive"
+      });
+      setPeriodBalance(null);
+    } finally {
+      setIsLoadingPeriodBalance(false);
+    }
+  };
+
+  // Função para calcular datas baseadas no período selecionado
+  const getDateRange = () => {
+    const now = new Date();
+    let start: Date;
+    let end: Date = now;
+    
+    switch (selectedPeriod) {
+      case 'today':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        start = new Date(now);
+        start.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        start = new Date(now);
+        start.setDate(now.getDate() - 30);
+        break;
+      case 'custom':
+        if (startDate && endDate) {
+          start = new Date(startDate);
+          end = new Date(endDate);
+        } else {
+          // Fallback para última semana se datas customizadas não estão definidas
+          start = new Date(now);
+          start.setDate(now.getDate() - 7);
+        }
+        break;
+      default:
+        start = new Date(now);
+        start.setDate(now.getDate() - 7);
+    }
+    
+    return { start, end };
   };
   
+  // Função para buscar transações usando cashDrawerService
+  const fetchTransactions = async () => {
+    if (!currentDrawer || !user?.company_id) return;
+    
+    try {
+      setIsLoadingTransactions(true);
+      const details = await cashDrawerService.getCashDrawer(user.company_id, currentDrawer.id);
+      
+      console.log('Detalhes da gaveta para transações:', details);
+      
+      // Pegar as transações mais recentes
+      const allTransactions = [...(details.transactions || []), ...(details.payments || [])];
+      
+      const sortedTransactions = allTransactions.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      // Formatar transações para a UI e calcular resumo
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      
+      const formattedTransactions = sortedTransactions.map(tx => {
+        // Verificar se é transação ou pagamento
+        const isTransaction = 'type' in tx;
+        const isPayment = 'total_amount' in tx;
+        
+        let type: string;
+        let description: string;
+        let amount: number;
+        let category: string;
+        
+        if (isTransaction) {
+          // É uma CashDrawerTransaction
+          const transaction = tx as any;
+          type = transaction.type;
+          description = transaction.description || 'Transação';
+          amount = Math.abs(parseFloat(transaction.amount) || 0);
+          category = transaction.category || 'Geral';
+        } else if (isPayment) {
+          // É um CashDrawerPayment
+          const payment = tx as any;
+          type = 'income'; // Pagamentos são sempre receita
+          description = `Pagamento - ${payment.client_name || 'Cliente'}`;
+          amount = Math.abs(parseFloat(payment.total_amount) || 0);
+          category = payment.payment_methods?.[0]?.method || 'Pagamento';
+          // Adicionar command_id se disponível
+          (tx as any).command_id = payment.command_id;
+        } else {
+          // Fallback
+          type = 'expense';
+          description = 'Transação';
+          amount = 0;
+          category = 'Geral';
+        }
+        
+        // Somar para o resumo
+        if (type === 'income') {
+          totalIncome += amount;
+        } else {
+          totalExpenses += amount;
+        }
+        
+        return {
+          id: tx.id,
+          cash_drawer_id: currentDrawer.id!,
+          type: type as 'income' | 'expense' | 'cash_out',
+          description,
+          amount: amount.toString(),
+          created_at: tx.created_at,
+          category
+        };
+      });
+      
+      // Calcular saldo atual - usar o valor inicial dos detalhes da gaveta
+      const initialValue = parseFloat(details.value_inicial || currentDrawer.value_inicial || '0');
+      const currentBalance = initialValue + totalIncome - totalExpenses;
+      
+      // Atualizar resumo da gaveta
+      setBalance({
+        balance: currentBalance,
+        total_income: totalIncome,
+        total_expense: totalExpenses,
+        total_cash_out: 0,
+        date_open: currentDrawer.date_open,
+        date_close: currentDrawer.date_close,
+        opener_name: currentDrawer.opener_name || '',
+        closer_name: currentDrawer.closer_name || ''
+      });
+      
+      setTransactions(formattedTransactions);
+    } catch (error: any) {
+      console.error('Erro ao buscar transações recentes:', error);
+      setTransactions([]);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // Função para buscar detalhes da gaveta
+  const fetchDrawerDetails = async (drawerId: number) => {
+    try {
+      if (!user?.company_id) return;
+      
+      setLoadingDrawerDetails(true);
+      
+      const response = await api.get(`/cash-drawers/${drawerId}/details`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      setDrawerDetails(response.data);
+      setDrawerDetailsDialog(true);
+      
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da gaveta:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os detalhes da gaveta",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDrawerDetails(false);
+    }
+  };
+
+  // Service para comandas baseado no Link-Front
+  const commandService = {
+    getHeaders(companyId: number) {
+      return {
+        'company_id': companyId.toString()
+      };
+    },
+
+    // Buscar detalhes de uma comanda específica
+    async getCommandDetails(companyId: number, commandId: number): Promise<CommandDetails> {
+      const response = await api.get(`/commands/${commandId}`, {
+        headers: this.getHeaders(companyId)
+      });
+      return response.data;
+    }
+  };
+
+  // Função para buscar detalhes da comanda quando hover no pagamento (baseado no Link-Front)
+  const handlePaymentHover = async (paymentId: number, commandId: number) => {
+    if (!user?.company_id) return;
+    
+    try {
+      setHoveredPayment(paymentId);
+      const details = await commandService.getCommandDetails(user.company_id, commandId);
+      setCommandDetails(details);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da comanda:', error);
+      setCommandDetails(null);
+    }
+  };
+
+  // Função para limpar hover
+  const handlePaymentLeave = () => {
+    setHoveredPayment(null);
+    setCommandDetails(null);
+  };
+
+  // Função para abrir gaveta de caixa usando cashDrawerService
   const openCashDrawer = async () => {
+    if (!user?.company_id || !openValue) return;
+    
     try {
       setLoading(true);
-      // Simular API call
-      // await api.post('/cash-drawers', { value_inicial: openValue });
+      const drawerData: CreateCashDrawerData = {
+        opened_by_id: parseInt(user.id),
+        value_inicial: parseFloat(openValue)
+      };
+      
+      await cashDrawerService.createCashDrawer(user.company_id, drawerData);
       
       toast({
         title: "Sucesso",
@@ -360,7 +708,7 @@ export default function FinancePage() {
       setOpenDrawerDialog(false);
       setOpenValue('');
       await fetchCurrentDrawer();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao abrir gaveta:', error);
       toast({
         title: "Erro",
@@ -371,14 +719,19 @@ export default function FinancePage() {
       setLoading(false);
     }
   };
-  
+
+  // Função para fechar gaveta de caixa usando cashDrawerService
   const closeCashDrawer = async () => {
-    if (!currentDrawer) return;
+    if (!currentDrawer || !user?.company_id || !closeValue) return;
     
     try {
       setLoading(true);
-      // Simular API call
-      // await api.put(`/cash-drawers/${currentDrawer.id}/close`, { value_final: closeValue });
+      const closeData: CloseCashDrawerData = {
+        closed_by_id: parseInt(user.id),
+        value_final: parseFloat(closeValue)
+      };
+      
+      await cashDrawerService.closeCashDrawer(user.company_id, currentDrawer.id, closeData);
       
       toast({
         title: "Sucesso",
@@ -389,7 +742,17 @@ export default function FinancePage() {
       setCloseValue('');
       setCurrentDrawer(null);
       setTransactions([]);
-    } catch (error) {
+      setBalance({
+        balance: 0,
+        total_income: 0,
+        total_expense: 0,
+        total_cash_out: 0,
+        date_open: '',
+        date_close: undefined,
+        opener_name: '',
+        closer_name: ''
+      });
+    } catch (error: any) {
       console.error('Erro ao fechar gaveta:', error);
       toast({
         title: "Erro",
@@ -400,27 +763,142 @@ export default function FinancePage() {
       setLoading(false);
     }
   };
-  
+
+  // Função para exportar relatório em PDF
+  const exportToPDF = async (period: { start: Date; end: Date }) => {
+    try {
+      if (!user?.company_id) return;
+      
+      setLoading(true);
+      
+      const startDate = period.start.toISOString().split('T')[0];
+      const endDate = period.end.toISOString().split('T')[0];
+      
+      const response = await api.get(`/reports/financial-pdf?start_date=${startDate}&end_date=${endDate}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        },
+        responseType: 'blob'
+      });
+      
+      // Criar URL do blob e fazer download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio-financeiro-${startDate}-${endDate}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Sucesso",
+        description: "Relatório exportado com sucesso"
+      });
+      
+    } catch (error: any) {
+      console.error('Erro ao exportar relatório:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Erro ao exportar relatório",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para gerar relatório de vendas
+  const generateSalesReport = async (period: { start: Date; end: Date }) => {
+    try {
+      if (!user?.company_id) return;
+      
+      setLoading(true);
+      
+      const startDate = period.start.toISOString().split('T')[0];
+      const endDate = period.end.toISOString().split('T')[0];
+      
+      const response = await api.get(`/reports/sales?start_date=${startDate}&end_date=${endDate}`, {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      console.log('Relatório de vendas:', response.data);
+      
+      return response.data;
+      
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório de vendas:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Erro ao gerar relatório de vendas",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateBalance = () => {
+    if (!currentDrawer || !transactions.length) return;
+    
+    const income = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+    const expenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+    const cashOut = transactions
+      .filter(t => t.type === 'cash_out')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+    const initialValue = parseFloat(currentDrawer.value_inicial || '0');
+    const currentBalance = initialValue + income - expenses - cashOut;
+    
+    setBalance({
+      balance: currentBalance,
+      total_income: income,
+      total_expense: expenses,
+      total_cash_out: cashOut,
+      date_open: currentDrawer.date_open,
+      date_close: currentDrawer.date_close,
+      opener_name: currentDrawer.opener_name || '',
+      closer_name: currentDrawer.closer_name || ''
+    });
+  };
+
+  // Função para criar transação usando financialTransactionsService
   const createTransaction = async () => {
-    if (!currentDrawer) return;
+    if (!currentDrawer || !user?.company_id || !transactionForm.category || !transactionForm.amount) return;
     
     try {
       setLoading(true);
-      // Simular API call
-      // await api.post('/transactions', {
-      //   cash_drawer_id: currentDrawer.id,
-      //   ...transactionForm
-      // });
       
-      const newTransaction: Transaction = {
-        id: Date.now(),
-        cash_drawer_id: currentDrawer.id,
-        ...transactionForm,
-        created_at: new Date().toISOString(),
-        user: { id: Number(user?.id) || 1, name: user?.name || 'Usuário' }
+      // Mapear tipos para o formato esperado pelo backend
+      const typeMapping: { [key: string]: 'income' | 'expense' | 'cash_out' } = {
+        'entrada': 'income',
+        'saida': 'expense', 
+        'sangria': 'cash_out'
       };
       
-      setTransactions(prev => [newTransaction, ...prev]);
+      const transactionData: CreateTransactionData = {
+        cash_drawer_id: currentDrawer.id,
+        type: typeMapping[transactionForm.type],
+        category: transactionForm.category,
+        amount: parseFloat(transactionForm.amount),
+        description: transactionForm.description
+      };
+      
+      const result = await financialTransactionsService.createTransaction(user.company_id, transactionData);
+      
+      console.log('Transação criada:', result);
       
       toast({
         title: "Sucesso",
@@ -434,11 +912,16 @@ export default function FinancePage() {
         amount: '',
         description: ''
       });
-    } catch (error) {
+      
+      // Atualizar transações
+      if (currentDrawer) {
+        await fetchTransactions();
+      }
+    } catch (error: any) {
       console.error('Erro ao criar transação:', error);
       toast({
         title: "Erro",
-        description: "Erro ao registrar transação",
+        description: error.response?.data?.message || "Erro ao registrar transação",
         variant: "destructive"
       });
     } finally {
@@ -446,50 +929,17 @@ export default function FinancePage() {
     }
   };
   
-  // Função para formatar o valor da comissão
-  const formatCommissionValue = (commission: Commission) => {
-    if (commission.type === 'percentage') {
-      return `${commission.value}%`;
-    } else {
-      return `R$ ${parseFloat(commission.value).toFixed(2)}`;
-    }
-  };
 
-  // Função para calcular total de comissões (todas)
-  const getTotalCommissions = () => {
-    if (!professionalData) return 0;
-    const allCommissions = [
-      ...(professionalData.commissions_general || []),
-      ...(professionalData.commissions_services || [])
-    ];
-    return allCommissions.length;
-  };
-
-  // Função para obter comissões gerais
-  const getGeneralCommissions = () => {
-    return professionalData?.commissions_general || [];
-  };
-
-  // Função para obter comissões por serviço
-  const getServiceCommissions = () => {
-    return professionalData?.commissions_services || [];
-  };
-
-  // Filtrar comissões baseado no filtro selecionado
-  const getFilteredCommissions = (commissionsArray: Commission[]) => {
-    if (filter === 'all') return commissionsArray;
-    return commissionsArray.filter(c => filter === 'active' ? c.active : !c.active);
-  };
+  // Função de status removida
 
   // Effects
   useEffect(() => {
-    fetchCurrentDrawer();
-    fetchCommissions();
-  }, []);
+    if (user?.company_id) {
+      fetchCurrentDrawer();
+      // Funções de inicialização removidas
+    }
+  }, [user?.company_id]);
 
-  useEffect(() => {
-    fetchCommissions();
-  }, [user?.id, startDate, endDate]);
   
   useEffect(() => {
     if (currentDrawer) {
@@ -500,6 +950,8 @@ export default function FinancePage() {
   useEffect(() => {
     calculateBalance();
   }, [transactions, currentDrawer]);
+
+  // useEffect de comandas removido
   
   // Formatação
   const formatCurrency = (value: number) => {
@@ -515,17 +967,18 @@ export default function FinancePage() {
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit'
     });
   };
   
   const getTransactionIcon = (type: string) => {
     switch (type) {
-      case 'entrada':
+      case 'income':
         return <ArrowDownCircle className="h-4 w-4 text-green-600" />;
-      case 'saida':
+      case 'expense':
         return <ArrowUpCircle className="h-4 w-4 text-red-600" />;
-      case 'sangria':
+      case 'cash_out':
         return <Minus className="h-4 w-4 text-orange-600" />;
       default:
         return <DollarSign className="h-4 w-4" />;
@@ -534,11 +987,11 @@ export default function FinancePage() {
   
   const getTransactionColor = (type: string) => {
     switch (type) {
-      case 'entrada':
+      case 'income':
         return 'text-green-600';
-      case 'saida':
+      case 'expense':
         return 'text-red-600';
-      case 'sangria':
+      case 'cash_out':
         return 'text-orange-600';
       default:
         return 'text-gray-600';
@@ -546,61 +999,61 @@ export default function FinancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header com Gradiente */}
-      <div className="relative">
-        <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] px-4 pt-12 pb-8">
-          <div className="flex items-center justify-between mb-6">
-            <Link href="/" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                fetchCurrentDrawer();
-                if (currentDrawer) {
-                  fetchTransactions();
-                }
-              }}
-              disabled={loading}
-              className="text-white hover:bg-white/10"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-          
-          {/* Profile Section */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                onClick={() => router.push('/')}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
+                  <Wallet className="h-6 w-6" />
+                  Finanças
+                </h1>
+                <p className="text-emerald-100 text-sm mt-1">
+                  Gerencie gavetas e transações
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-white mb-1">Finanças</h1>
-              <p className="text-white/80 text-sm">
-                {new Date().toLocaleDateString('pt-BR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long'
-                })}
-              </p>
-              <p className="text-white/70 text-xs mt-1">
-                {currentDrawer 
-                  ? `Gaveta #${currentDrawer.id} - ${currentDrawer.status === 'open' ? '🟢 Aberta' : '🔴 Fechada'}` 
-                  : '⚪ Nenhuma gaveta ativa'
-                }
-              </p>
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                onClick={async () => {
+                  fetchCurrentDrawer();
+                  if (currentDrawer) {
+                    await fetchTransactions();
+                  }
+                }}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              {currentDrawer && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  onClick={() => setTransactionDialog(true)}
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
-        
-        {/* Decorative Elements */}
-        <div className="absolute top-4 right-4 opacity-10">
-          <Wallet className="h-24 w-24 text-white" />
-        </div>
-      </div>
+      </header>
 
-      <div className="px-4 -mt-4 space-y-6">
+      <div className="px-4 py-6 space-y-6">
         {/* Status da Gaveta */}
         {!currentDrawer ? (
           <Card className="border-0 shadow-lg">
@@ -747,243 +1200,6 @@ export default function FinancePage() {
               </Button>
             </div>
 
-            {/* Filtros de Data para Ganhos */}
-            <Card className="border-0 shadow-lg mb-6">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-lg">
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
-                    <Calendar className="h-4 w-4 text-white" />
-                  </div>
-                  Filtros de Período
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <button
-                    onClick={() => setFilter('active')}
-                    className={`px-3 py-1 rounded text-sm ${
-                      filter === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Ativas
-                  </button>
-                  <button
-                    onClick={() => setFilter('inactive')}
-                    className={`px-3 py-1 rounded text-sm ${
-                      filter === 'inactive' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Inativas
-                  </button>
-                  <button
-                    onClick={() => setFilter('all')}
-                    className={`px-3 py-1 rounded text-sm ${
-                      filter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Todas
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="px-2 py-1 border rounded text-sm flex-1"
-                    placeholder="De"
-                  />
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="px-2 py-1 border rounded text-sm flex-1"
-                    placeholder="Até"
-                  />
-                  {(startDate || endDate) && (
-                    <button
-                      onClick={() => { setStartDate(''); setEndDate(''); }}
-                      className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200"
-                    >
-                      Limpar
-                    </button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Ganhos do Período */}
-            {earningsReport && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200 p-6 mb-6 shadow-lg">
-                <h2 className="text-lg font-semibold text-green-800 mb-3 flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-700" /> Seus Ganhos no Período
-                </h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center bg-white/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-green-700">{earningsReport.summary.total_appointments}</div>
-                    <div className="text-sm text-green-600">Agendamentos</div>
-                  </div>
-                  <div className="text-center bg-white/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-green-700">{earningsReport.summary.total_services}</div>
-                    <div className="text-sm text-green-600">Serviços</div>
-                  </div>
-                  <div className="text-center bg-white/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-green-700">
-                      R$ {earningsReport.summary.total_value.toFixed(2).replace('.', ',')}
-                    </div>
-                    <div className="text-sm text-green-600">Faturamento</div>
-                  </div>
-                  <div className="text-center bg-white/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-green-700">
-                      R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}
-                    </div>
-                    <div className="text-sm text-green-600">Comissão</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Resumo de Comissões */}
-            {professionalData && (
-              <div className="bg-white rounded-2xl border shadow-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-[#236F5D]" />
-                  Resumo das Suas Comissões
-                </h3>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-xl p-4 text-white">
-                    <div className="text-2xl font-semibold">{getTotalCommissions()}</div>
-                    <div className="text-sm text-white/80">Total</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
-                    <div className="text-2xl font-semibold">{getGeneralCommissions().length}</div>
-                    <div className="text-sm text-white/80">Gerais</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
-                    <div className="text-2xl font-semibold">{getServiceCommissions().length}</div>
-                    <div className="text-sm text-white/80">Específicas</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Detalhamento das Comissões */}
-            {professionalData && (
-              <div className="space-y-6 mb-6">
-                {/* Comissões Gerais */}
-                <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
-                    <h2 className="text-white font-semibold text-lg flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-white" />
-                      Suas Comissões Gerais ({getFilteredCommissions(getGeneralCommissions()).length})
-                    </h2>
-                    <p className="text-emerald-100 text-sm mt-1">Aplicam-se a todos os serviços prestados</p>
-                  </div>
-                  
-                  <div className="p-6">
-                    {getFilteredCommissions(getGeneralCommissions()).length > 0 ? (
-                      <div className="space-y-4">
-                        {getFilteredCommissions(getGeneralCommissions()).map((commission) => (
-                          <div key={commission.id} className={`p-4 rounded-xl border-2 transition-all ${
-                            commission.active 
-                              ? 'bg-green-50 border-green-200 shadow-sm'
-                              : 'bg-gray-50 border-gray-200 opacity-75'
-                          }`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${
-                                  commission.active ? 'bg-green-500' : 'bg-gray-400'
-                                }`}></div>
-                                <span className="font-medium text-gray-900">Comissão Geral</span>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-gray-900">{formatCommissionValue(commission)}</div>
-                                <div className={`text-xs px-2 py-1 rounded-full ${
-                                  commission.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {commission.active ? 'Ativa' : 'Inativa'}
-                                </div>
-                              </div>
-                            </div>
-                            {commission.notes && (
-                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                <p className="text-sm text-blue-800"><strong>Observações:</strong> {commission.notes}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <CheckCircle className="h-8 w-8 text-gray-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Geral</h3>
-                        <p className="text-gray-600">Você não possui comissões gerais {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Comissões por Serviço */}
-                <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-                    <h2 className="text-white font-semibold text-lg flex items-center gap-2">
-                      <Settings className="h-5 w-5 text-white" />
-                      Suas Comissões por Serviço ({getFilteredCommissions(getServiceCommissions()).length})
-                    </h2>
-                    <p className="text-blue-100 text-sm mt-1">Comissões específicas para serviços individuais</p>
-                  </div>
-                  
-                  <div className="p-6">
-                    {getFilteredCommissions(getServiceCommissions()).length > 0 ? (
-                      <div className="space-y-4">
-                        {getFilteredCommissions(getServiceCommissions()).map((commission) => (
-                          <div key={commission.id} className={`p-4 rounded-xl border-2 transition-all ${
-                            commission.active 
-                              ? 'bg-blue-50 border-blue-200 shadow-sm'
-                              : 'bg-gray-50 border-gray-200 opacity-75'
-                          }`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${
-                                  commission.active ? 'bg-blue-500' : 'bg-gray-400'
-                                }`}></div>
-                                <div>
-                                  <span className="font-medium text-gray-900">{commission.service_name}</span>
-                                  <div className="text-sm text-gray-600">Preço: R$ {commission.service_price}</div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-gray-900">{formatCommissionValue(commission)}</div>
-                                <div className={`text-xs px-2 py-1 rounded-full ${
-                                  commission.active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {commission.active ? 'Ativa' : 'Inativa'}
-                                </div>
-                              </div>
-                            </div>
-                            {commission.notes && (
-                              <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
-                                <p className="text-sm text-yellow-800"><strong>Observações:</strong> {commission.notes}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <Settings className="h-8 w-8 text-gray-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão Específica</h3>
-                        <p className="text-gray-600">Você não possui comissões específicas por serviço {filter === 'active' ? 'ativas' : filter === 'inactive' ? 'inativas' : 'cadastradas'}.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Lista de Transações */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
@@ -1006,49 +1222,112 @@ export default function FinancePage() {
                 ) : (
                   <div className="space-y-1">
                     {transactions.map((transaction, index) => (
-                      <div key={transaction.id} className={`p-4 hover:bg-gray-50 transition-colors ${index !== transactions.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              transaction.type === 'entrada' ? 'bg-green-100' :
-                              transaction.type === 'saida' ? 'bg-red-100' : 'bg-orange-100'
-                            }`}>
-                              {getTransactionIcon(transaction.type)}
+                      <div key={transaction.id} className="relative">
+                        <div 
+                          className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${index !== transactions.length - 1 ? 'border-b border-gray-100' : ''}`}
+                          onMouseEnter={() => {
+                            // Se for um pagamento de comanda, buscar detalhes
+                            if (transaction.type === 'income' && transaction.description.includes('Pagamento') && transaction.command_id) {
+                              handlePaymentHover(transaction.id, transaction.command_id);
+                            }
+                          }}
+                          onMouseLeave={handlePaymentLeave}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                transaction.type === 'income' ? 'bg-green-100' :
+                                transaction.type === 'expense' ? 'bg-red-100' : 'bg-orange-100'
+                              }`}>
+                                {getTransactionIcon(transaction.type)}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900 mb-1">
+                                  {transaction.category}
+                                </p>
+                                <p className="text-sm text-gray-600 mb-1">
+                                  {transaction.description}
+                                  {transaction.command_id && (
+                                    <span className="text-blue-600 ml-1">
+                                      • Comanda #{transaction.command_id}
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs text-gray-400">
+                                    {formatDate(transaction.created_at)}
+                                  </p>
+                                  <span className="text-gray-300">•</span>
+                                  <p className="text-xs text-gray-400">
+                                    {transaction.user?.name}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900 mb-1">
-                                {transaction.category}
+                            <div className="text-right">
+                              <p className={`font-bold text-lg mb-1 ${getTransactionColor(transaction.type)}`}>
+                                {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
                               </p>
-                              <p className="text-sm text-gray-600 mb-1">
-                                {transaction.description}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs text-gray-400">
-                                  {formatDate(transaction.created_at)}
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs font-medium ${
+                                  transaction.type === 'income' ? 'border-green-200 text-green-700 bg-green-50' :
+                                  transaction.type === 'expense' ? 'border-red-200 text-red-700 bg-red-50' :
+                                  'border-orange-200 text-orange-700 bg-orange-50'
+                                }`}
+                              >
+                                {transaction.type === 'income' ? 'Entrada' : 
+                                 transaction.type === 'expense' ? 'Saída' : 'Sangria'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Tooltip com detalhes da comanda (baseado no Link-Front) */}
+                        {hoveredPayment === transaction.id && commandDetails && (
+                          <div className="absolute z-50 left-0 top-full mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
+                            <div className="space-y-3">
+                              <div className="border-b pb-2">
+                                <h5 className="font-semibold text-sm flex items-center gap-2">
+                                  <Receipt className="h-4 w-4" />
+                                  Detalhes da Comanda #{commandDetails.id}
+                                </h5>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Cliente: {commandDetails.client_name}
                                 </p>
-                                <span className="text-gray-300">•</span>
-                                <p className="text-xs text-gray-400">
-                                  {transaction.user?.name}
+                                <p className="text-xs text-gray-500">
+                                  Data: {formatDate(commandDetails.created_at)}
                                 </p>
+                              </div>
+                              
+                              <div>
+                                <h6 className="font-medium text-xs text-gray-700 mb-2">Itens:</h6>
+                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                  {commandDetails.items.map((item) => (
+                                    <div key={item.id} className="flex justify-between items-center text-xs">
+                                      <div className="flex-1">
+                                        <span className="font-medium">{item.name}</span>
+                                        <span className="text-gray-500 ml-1">x{item.quantity}</span>
+                                      </div>
+                                      <span className="font-medium">
+                                        {formatCurrency(parseFloat(item.price) * item.quantity)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div className="border-t pt-2">
+                                <div className="flex justify-between items-center font-semibold text-sm">
+                                  <span>Total:</span>
+                                  <span className="text-green-600">
+                                    {formatCurrency(commandDetails.total)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className={`font-bold text-lg mb-1 ${getTransactionColor(transaction.type)}`}>
-                              {transaction.type === 'entrada' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
-                            </p>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs font-medium ${
-                                transaction.type === 'entrada' ? 'border-green-200 text-green-700 bg-green-50' :
-                                transaction.type === 'saida' ? 'border-red-200 text-red-700 bg-red-50' :
-                                'border-orange-200 text-orange-700 bg-orange-50'
-                              }`}
-                            >
-                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                            </Badge>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>

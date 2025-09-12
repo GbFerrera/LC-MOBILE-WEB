@@ -11,6 +11,7 @@ import {
   UsersIcon, 
   WalletIcon, 
   SettingsIcon, 
+  HandCoinsIcon,
   PlusIcon, 
   RefreshCwIcon,
   EyeIcon,
@@ -183,62 +184,62 @@ export default function Home() {
 
       {/* Modern Header */}
       <header className="relative z-10 bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-xl shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Avatar className="h-16 w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
+            <div className="flex items-center gap-3 sm:gap-6">
+              <Avatar className="h-12 w-12 sm:h-16 sm:w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
                 <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
-                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg font-bold">
+                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-sm sm:text-lg font-bold">
                   {user?.name?.substring(0, 2)}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <h1 className="font-bold text-2xl tracking-wide text-white">Olá, {user?.name}!</h1>
-                <p className="text-emerald-100 text-sm mt-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="font-bold text-lg sm:text-2xl tracking-wide text-white truncate">Olá, {user?.name}!</h1>
+                <p className="text-emerald-100 text-xs sm:text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 {!isLoading && schedule && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="bg-white/20 px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-2">
+                    <span className="bg-white/20 px-2 py-1 rounded-full text-xs flex items-center gap-1 text-white">
                       {schedule.is_day_off 
-                        ? <><UmbrellaIcon className="h-3 w-3" /> Dia de folga</> 
-                        : <><ClockIcon className="h-3 w-3" /> {schedule.start_time} - {schedule.end_time}</>}
+                        ? <><UmbrellaIcon className="h-3 w-3" /> <span className="hidden xs:inline">Dia de folga</span><span className="xs:hidden">Folga</span></> 
+                        : <><ClockIcon className="h-3 w-3" /> <span className="xs:inline">{schedule.start_time} - {schedule.end_time}</span></>}
                     </span>
-                    <span className="bg-white/20 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" /> {appointments.length} {appointments.length === 1 ? 'agendamento' : 'agendamentos'}
+                    <span className="bg-white/20 px-2 py-1 rounded-full text-xs flex items-center gap-1 text-white">
+                      <CalendarIcon className="h-3 w-3" /> <span className="hidden xs:inline">{appointments.length} {appointments.length === 1 ? 'agendamento' : 'agendamentos'}</span><span className="xs:hidden">{appointments.length}</span>
                     </span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <Link href={"/teste-notificacoes"}>
-              <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-200">
-                <BellIcon className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-200 h-8 w-8 sm:h-10 sm:w-10">
+                <BellIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </Button>
               </Link>
             </div>
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-              <div className="text-emerald-100 text-sm font-medium">Agendamentos Hoje</div>
-              <div className="text-3xl font-bold text-white mt-1">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+              <div className="text-emerald-100 text-xs sm:text-sm font-medium">Agendamentos Hoje</div>
+              <div className="text-2xl sm:text-3xl font-bold text-white mt-1">
                 {isLoading ? (
-                  <div className="animate-pulse bg-white/20 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-white/20 h-6 sm:h-8 w-8 sm:w-12 rounded"></div>
                 ) : appointments.length}
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-              <div className="text-emerald-100 text-sm font-medium">Status do Dia</div>
-              <div className="text-lg font-bold text-white mt-1">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20">
+              <div className="text-emerald-100 text-xs sm:text-sm font-medium">Status do Dia</div>
+              <div className="text-base sm:text-lg font-bold text-white mt-1">
                 {isLoading || !schedule ? (
-                  <div className="animate-pulse bg-white/20 h-6 w-20 rounded"></div>
+                  <div className="animate-pulse bg-white/20 h-5 sm:h-6 w-16 sm:w-20 rounded"></div>
                 ) : schedule.is_day_off ? (
-                  <span className="text-yellow-200 flex items-center gap-1"><UmbrellaIcon className="h-4 w-4" /> Folga</span>
+                  <span className="text-yellow-200 flex items-center gap-1"><UmbrellaIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Folga</span>
                 ) : (
-                  <span className="text-green-200 flex items-center gap-1"><CheckIcon className="h-4 w-4" /> Ativo</span>
+                  <span className="text-green-200 flex items-center gap-1"><CheckIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Ativo</span>
                 )}
               </div>
             </div>
@@ -286,13 +287,20 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Controle financeiro</p>
             </div>
           </Link>
-        </div>
 
-        {/* Segunda linha para Ajustes */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Link href="/ajustes" className="group">
+          <Link href="/commitions" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-800 to-emerald-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <HandCoinsIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-green-500 transition-colors">Comissões</span>
+              <p className="text-xs text-gray-500 mt-1">Controle de comissões</p>
+            </div>
+          </Link>
+
+           <Link href="/ajustes" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-800 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
                 <SettingsIcon className="h-6 w-6 text-white" />
               </div>
               <span className="font-semibold text-gray-800 group-hover:text-purple-600 transition-colors">Ajustes</span>
@@ -300,6 +308,7 @@ export default function Home() {
             </div>
           </Link>
         </div>
+
 
         {/* Upcoming Appointments */}
         <div className="mb-8">

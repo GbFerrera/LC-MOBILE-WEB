@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
-import { ArrowLeft, Calendar, CheckCircle, DollarSign, Filter, RotateCcw, Settings, TrendingUp, Wallet } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Calendar, CheckCircle, DollarSign, Filter, RotateCcw, Settings, TrendingUp, Wallet, RefreshCw, HandCoins } from "lucide-react";
 
 // Interfaces para tipagem
 interface CommissionConfig {
@@ -64,8 +67,10 @@ interface EarningsReport {
   appointments_detail: AppointmentDetail[];
 }
 
-export default function FinancasPage() {
+export default function CommissionsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
 
   const [earningsReport, setEarningsReport] = useState<EarningsReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,17 +127,48 @@ export default function FinancasPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-200 rounded w-48"></div>
-            <div className="h-4 bg-gray-200 rounded w-32"></div>
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-gray-200 rounded"></div>
-              ))}
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
+          <div className="max-w-6xl mx-auto px-4 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  onClick={() => router.push('/')}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
+                    <HandCoins className="h-6 w-6" />
+                    Comissões
+                  </h1>
+                  <p className="text-emerald-100 text-sm mt-1">
+                    Acompanhe seus ganhos e comissões
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
+        </header>
+        
+        <div className="px-4 py-6">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8">
+              <div className="animate-pulse space-y-4">
+                <div className="h-6 bg-gray-200 rounded w-48"></div>
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -142,209 +178,341 @@ export default function FinancasPage() {
     const isNoCommissionError = error.includes('ainda não possui comissões');
     
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Comissões</h1>
-            <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm flex items-center flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-            </Link>
-          </div>
-          
-          <div className={`${isNoCommissionError ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'} border rounded-lg p-6 text-center`}>
-            <div className="mb-4">
-              {isNoCommissionError ? (
-                <Settings className="h-12 w-12 text-blue-500 mx-auto mb-3" />
-              ) : (
-                <RotateCcw className="h-12 w-12 text-red-500 mx-auto mb-3" />
-              )}
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
+          <div className="max-w-6xl mx-auto px-4 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  onClick={() => router.push('/')}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
+                    <HandCoins className="h-6 w-6" />
+                    Comissões
+                  </h1>
+                  <p className="text-emerald-100 text-sm mt-1">
+                    Acompanhe seus ganhos e comissões
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  onClick={fetchCommissions}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
-            
-            <h3 className={`text-lg font-semibold mb-2 ${isNoCommissionError ? 'text-blue-800' : 'text-red-800'}`}>
-              {isNoCommissionError ? 'Comissões não configuradas' : 'Erro ao carregar dados'}
-            </h3>
-            
-            <p className={`mb-4 ${isNoCommissionError ? 'text-blue-700' : 'text-red-700'}`}>
-              {error}
-            </p>
-            
-            {!isNoCommissionError && (
-              <Button onClick={fetchCommissions} variant="outline" size="sm">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Tentar Novamente
-              </Button>
-            )}
           </div>
+        </header>
+        
+        <div className="px-4 py-6">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-6">
+                {isNoCommissionError ? (
+                  <Settings className="h-10 w-10 text-white" />
+                ) : (
+                  <RotateCcw className="h-10 w-10 text-white" />
+                )}
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-900 mb-3">
+                {isNoCommissionError ? 'Comissões não configuradas' : 'Erro ao carregar dados'}
+              </h3>
+              
+              <p className="text-gray-600 mb-6 max-w-sm mx-auto">
+                {error}
+              </p>
+              
+              {!isNoCommissionError && (
+                <Button 
+                  onClick={fetchCommissions}
+                  className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
+                >
+                  <RotateCcw className="h-5 w-5 mr-2" />
+                  Tentar Novamente
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Comissões</h1>
-          <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm flex items-center flex-shrink-0">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-          </Link>
-        </div>
-        {/* Filtros de Data */}
-        <div className="bg-white rounded border p-3 sm:p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="flex-1 px-2 py-1 border rounded text-sm min-w-0"
-              placeholder="De"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="flex-1 px-2 py-1 border rounded text-sm min-w-0"
-              placeholder="Até"
-            />
-            {(startDate || endDate) && (
-              <button
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200 flex-shrink-0"
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                onClick={() => router.push('/')}
               >
-                Limpar
-              </button>
-            )}
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
+                  <HandCoins className="h-6 w-6" />
+                  Comissões
+                </h1>
+                <p className="text-emerald-100 text-sm mt-1">
+                  Acompanhe seus ganhos e comissões
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                onClick={fetchCommissions}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </div>
+      </header>
+
+      <div className="px-4 py-6 space-y-6">
+        {/* Filtros de Data */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-lg">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                <Calendar className="h-4 w-4 text-white" />
+              </div>
+              Filtros de Período
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Data Inicial</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Data Final</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                    className="px-4 py-2 text-sm border-2 rounded-lg hover:bg-gray-50"
+                  >
+                    Limpar Filtros
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {!earningsReport && (
-          <div className="text-center py-12 bg-gray-50 rounded-lg mb-6">
-            <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Calendar className="h-8 w-8 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Selecione um Período</h3>
-            <p className="text-gray-600">Escolha as datas inicial e final para visualizar seu relatório de comissões.</p>
-          </div>
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Calendar className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Selecione um Período</h3>
+              <p className="text-gray-600 max-w-sm mx-auto">Escolha as datas inicial e final para visualizar seu relatório de comissões.</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Ganhos do Período */}
         {earningsReport && (
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded border border-green-200 p-3 sm:p-4 mb-6">
-            <h2 className="text-base sm:text-lg font-semibold text-green-800 mb-3 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-700 flex-shrink-0" /> 
-              <span className="truncate">Seus Ganhos no Período</span>
-            </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl font-bold text-green-700">{earningsReport.summary.total_appointments}</div>
-                <div className="text-xs sm:text-sm text-green-600">Agendamentos</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl font-bold text-green-700">{earningsReport.summary.total_services}</div>
-                <div className="text-xs sm:text-sm text-green-600">Serviços</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl font-bold text-green-700">
-                  R$ {earningsReport.summary.total_value.toFixed(2).replace('.', ',')}
+          <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <DollarSign className="h-5 w-5" />
                 </div>
-                <div className="text-xs sm:text-sm text-green-600">Faturamento</div>
+                <span className="text-white/80 text-sm font-medium">Seus Ganhos no Período</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-white/60 text-xs">Ativo</span>
+              </div>
+            </div>
+            <div className="mb-6">
+              <p className="text-3xl font-bold mb-1">
+                R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}
+              </p>
+              <p className="text-white/70 text-sm">
+                Total de comissões no período selecionado
+              </p>
+            </div>
+            
+            {/* Mini Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-white/60 text-xs mb-1">Agendamentos</p>
+                <p className="text-white font-bold text-sm">{earningsReport.summary.total_appointments}</p>
               </div>
               <div className="text-center">
-                <div className="text-xl sm:text-2xl font-bold text-green-700">
-                  R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}
-                </div>
-                <div className="text-xs sm:text-sm text-green-600">Comissão</div>
+                <p className="text-white/60 text-xs mb-1">Serviços</p>
+                <p className="text-white font-bold text-sm">{earningsReport.summary.total_services}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-white/60 text-xs mb-1">Faturamento</p>
+                <p className="text-white font-bold text-sm">R$ {earningsReport.summary.total_value.toFixed(2).replace('.', ',')}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-white/60 text-xs mb-1">Comissão</p>
+                <p className="text-white font-bold text-sm">R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Resumo das Comissões */}
+        {/* Cards de Estatísticas Detalhadas */}
         {earningsReport && earningsReport.services && (
-          <div className="bg-white rounded border p-3 sm:p-4 mb-6">
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
-              <div>
-                <div className="text-xl sm:text-2xl font-semibold text-green-600">{earningsReport.services.length}</div>
-                <div className="text-xs sm:text-sm text-gray-600">Total</div>
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-br from-green-500 to-green-600 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <Settings className="h-6 w-6 text-white/70" />
+                </div>
+                <p className="text-white/80 text-xs font-medium mb-1">TOTAL</p>
+                <p className="text-white text-xl font-bold">
+                  {earningsReport.services.length}
+                </p>
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-semibold text-blue-600">{earningsReport.services.filter(s => s.commission_config?.scope === 'general').length}</div>
-                <div className="text-xs sm:text-sm text-gray-600">Gerais</div>
+            </Card>
+            
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <Settings className="h-6 w-6 text-white/70" />
+                </div>
+                <p className="text-white/80 text-xs font-medium mb-1">GERAIS</p>
+                <p className="text-white text-xl font-bold">
+                  {earningsReport.services.filter(s => s.commission_config?.scope === 'general').length}
+                </p>
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-semibold text-purple-600">{earningsReport.services.filter(s => s.commission_config?.scope === 'specific').length}</div>
-                <div className="text-xs sm:text-sm text-gray-600">Específicas</div>
+            </Card>
+            
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Wallet className="h-5 w-5 text-white" />
+                  </div>
+                  <Settings className="h-6 w-6 text-white/70" />
+                </div>
+                <p className="text-white/80 text-xs font-medium mb-1">ESPECÍFICAS</p>
+                <p className="text-white text-xl font-bold">
+                  {earningsReport.services.filter(s => s.commission_config?.scope === 'specific').length}
+                </p>
               </div>
-            </div>
+            </Card>
           </div>
         )}
 
-        {/* Detalhamento das Comissões por Serviço */}
+        {/* Lista de Comissões */}
         {earningsReport && earningsReport.services && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 sm:px-6 py-4">
-                <h2 className="text-white font-semibold text-base sm:text-lg flex items-center gap-2">
-                  <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-white flex-shrink-0" />
-                  <span className="truncate">Suas Comissões por Serviço ({earningsReport.services.length})</span>
-                </h2>
-                <p className="text-blue-100 text-xs sm:text-sm mt-1">Comissões específicas para serviços individuais</p>
-              </div>
-              
-              <div className="p-4 sm:p-6">
-                {earningsReport.services.length > 0 ? (
-                  <div className="space-y-4">
-                    {earningsReport.services.map((service, index) => (
-                      <div key={`${service.service_id}-${index}`} className="p-3 sm:p-4 rounded-xl border-2 bg-blue-50 border-blue-200 shadow-sm transition-all">
-                        <div className="flex items-start sm:items-center justify-between mb-2 gap-3">
-                          <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1 sm:mt-0 bg-blue-500"></div>
-                            <div className="min-w-0 flex-1">
-                              <span className="font-medium text-gray-900 text-sm sm:text-base block truncate">{service.service_name}</span>
-                              <div className="text-xs sm:text-sm text-gray-600">Preço: R$ {parseFloat(service.service_price).toFixed(2).replace('.', ',')}</div>
-                              <div className="text-xs sm:text-sm text-gray-600">Quantidade: {service.total_quantity}</div>
-                            </div>
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                  <HandCoins className="h-4 w-4 text-white" />
+                </div>
+                Suas Comissões por Serviço ({earningsReport.services.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {earningsReport.services.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <HandCoins className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 font-medium mb-2">Nenhuma comissão registrada</p>
+                  <p className="text-gray-400 text-sm">Você não possui comissões no período selecionado</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {earningsReport.services.map((service, index) => (
+                    <div key={`${service.service_id}-${index}`} className={`p-4 hover:bg-gray-50 transition-colors ${index !== earningsReport.services.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] flex items-center justify-center">
+                            <HandCoins className="h-6 w-6 text-white" />
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-lg sm:text-2xl font-bold text-gray-900">
-                              {service.commission_config?.type === 'percentage' 
-                                ? `${service.commission_config.value}%` 
-                                : `R$ ${parseFloat(service.commission_config?.value || '0').toFixed(2).replace('.', ',')}`
-                              }
-                            </div>
-                            <div className="text-xs px-2 py-1 rounded-full mt-1 bg-blue-100 text-blue-700">
-                              {service.commission_config?.scope === 'general' ? 'Geral' : 'Específica'}
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900 mb-1">
+                              {service.service_name}
+                            </p>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span>Preço: R$ {parseFloat(service.service_price).toFixed(2).replace('.', ',')}</span>
+                              <span>•</span>
+                              <span>Qtd: {service.total_quantity}</span>
+                              <span>•</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                service.commission_config?.scope === 'general' 
+                                  ? 'bg-blue-100 text-blue-700' 
+                                  : 'bg-purple-100 text-purple-700'
+                              }`}>
+                                {service.commission_config?.scope === 'general' ? 'Geral' : 'Específica'}
+                              </span>
                             </div>
                           </div>
                         </div>
-                        
-                        <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">Total Faturado:</span>
-                              <div className="font-semibold text-green-700">R$ {service.total_value.toFixed(2).replace('.', ',')}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Total Comissão:</span>
-                              <div className="font-semibold text-green-700">R$ {service.total_commission.toFixed(2).replace('.', ',')}</div>
-                            </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-[#236F5D] mb-1">
+                            {service.commission_config?.type === 'percentage' 
+                              ? `${service.commission_config.value}%` 
+                              : `R$ ${parseFloat(service.commission_config?.value || '0').toFixed(2).replace('.', ',')}`
+                            }
+                          </p>
+                          <div className="text-sm text-gray-600">
+                            <div>Faturado: R$ {service.total_value.toFixed(2).replace('.', ',')}</div>
+                            <div className="font-semibold text-green-600">Comissão: R$ {service.total_commission.toFixed(2).replace('.', ',')}</div>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <Settings className="h-8 w-8 text-gray-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma Comissão no Período</h3>
-                    <p className="text-gray-600">Você não possui comissões no período selecionado.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
 

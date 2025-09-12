@@ -261,6 +261,11 @@ export default function FinancePage() {
   const [hoveredPayment, setHoveredPayment] = useState<number | null>(null);
   const [commandDetails, setCommandDetails] = useState<CommandDetails | null>(null);
   
+  // Estados para dialog de detalhes da gaveta
+  const [drawerDetailsOpen, setDrawerDetailsOpen] = useState(false);
+  const [selectedDrawerForDetails, setSelectedDrawerForDetails] = useState<any>(null);
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>('all');
+  
   // Estados de formulários
   const [openValue, setOpenValue] = useState('');
   const [closeValue, setCloseValue] = useState('');
@@ -289,6 +294,7 @@ export default function FinancePage() {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isLoadingPeriodBalance, setIsLoadingPeriodBalance] = useState(false);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [loadingDrawerDetails, setLoadingDrawerDetails] = useState(false);
   // Loading de comandas não necessário
   const [openingDrawer, setOpeningDrawer] = useState(false);
@@ -685,6 +691,81 @@ export default function FinancePage() {
   const handlePaymentLeave = () => {
     setHoveredPayment(null);
     setCommandDetails(null);
+  };
+
+  // Função para abrir dialog de detalhes da gaveta
+  const openDrawerDetails = async (drawer: CashDrawer) => {
+    if (!user?.company_id || !drawer.id) return;
+    
+    try {
+      setIsLoadingDetails(true);
+      const details = await cashDrawerService.getCashDrawer(user.company_id, drawer.id);
+      setSelectedDrawerForDetails(details);
+      setDrawerDetailsOpen(true);
+      setPaymentTypeFilter('all'); // Reset filter
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da gaveta:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar detalhes da gaveta",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  // Função para filtrar pagamentos por tipo
+  const getFilteredPayments = () => {
+    if (!selectedDrawerForDetails?.payments || !Array.isArray(selectedDrawerForDetails.payments)) {
+      return [];
+    }
+    
+    if (paymentTypeFilter === 'all') {
+      return selectedDrawerForDetails.payments;
+    }
+    
+    return selectedDrawerForDetails.payments.filter(payment => {
+      if (!payment.payment_methods || !Array.isArray(payment.payment_methods)) {
+        return false;
+      }
+      return payment.payment_methods.some(method => 
+        method && method.method === paymentTypeFilter
+      );
+    });
+  };
+
+  // Função para calcular totais por tipo de pagamento
+  const getPaymentTypeTotals = () => {
+    if (!selectedDrawerForDetails?.payments) {
+      return {
+        cash: 0,
+        pix: 0,
+        credit: 0,
+        debit: 0
+      };
+    }
+    
+    const totals = {
+      cash: 0,
+      pix: 0,
+      credit: 0,
+      debit: 0
+    };
+    
+    selectedDrawerForDetails.payments.forEach(payment => {
+      if (payment.payment_methods && Array.isArray(payment.payment_methods)) {
+        payment.payment_methods.forEach(method => {
+          if (method && method.method && typeof method.amount === 'number') {
+            if (totals.hasOwnProperty(method.method)) {
+              totals[method.method] += method.amount;
+            }
+          }
+        });
+      }
+    });
+    
+    return totals;
   };
 
   // Função para abrir gaveta de caixa usando cashDrawerService
@@ -1203,12 +1284,25 @@ export default function FinancePage() {
             {/* Lista de Transações */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-lg">
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
-                    <Receipt className="h-4 w-4 text-white" />
-                  </div>
-                  Transações Recentes
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                      <Receipt className="h-4 w-4 text-white" />
+                    </div>
+                    Transações Recentes
+                  </CardTitle>
+                  {currentDrawer && (
+                    <Button 
+                      onClick={() => openDrawerDetails(currentDrawer)}
+                      variant="outline"
+                      size="sm"
+                      className="border-2 border-[#236F5D] text-[#236F5D] hover:bg-[#236F5D] hover:text-white font-semibold"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Ver Detalhes
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {transactions.length === 0 ? (
@@ -1573,6 +1667,210 @@ export default function FinancePage() {
                   </div>
                 )}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog - Detalhes da Gaveta */}
+      <Dialog open={drawerDetailsOpen} onOpenChange={setDrawerDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] bg-white flex flex-col">
+          <DialogHeader className="border-b pb-4 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                  <Eye className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-gray-900">
+                    Gaveta de {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleDateString('pt-BR') : ''} às {selectedDrawerForDetails?.opened_at ? new Date(selectedDrawerForDetails.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </DialogTitle>
+                  <p className="text-sm text-gray-600">
+                    Visualização completa de todas as transações e pagamentos da gaveta.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Exportar PDF
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-6 py-4 min-h-0">
+            {/* Informações Gerais */}
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Informações Gerais</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <Badge className={selectedDrawerForDetails?.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                      {selectedDrawerForDetails?.status === 'open' ? 'Aberta' : 'Fechada'}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Aberta por:</span>
+                    <span className="font-medium">{selectedDrawerForDetails?.opener_name || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Data de abertura:</span>
+                    <span className="font-medium">
+                      {selectedDrawerForDetails?.opened_at ? new Date(selectedDrawerForDetails.opened_at).toLocaleDateString('pt-BR') + ' às ' + new Date(selectedDrawerForDetails.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Valores</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Valor inicial:</span>
+                    <span className="font-medium text-green-600">
+                      R$ {parseFloat(selectedDrawerForDetails?.value_inicial || '0').toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  {selectedDrawerForDetails?.value_final && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor final:</span>
+                      <span className="font-medium text-blue-600">
+                        R$ {parseFloat(selectedDrawerForDetails.value_final).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Transações */}
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Transações ({selectedDrawerForDetails?.transactions?.length || 0})
+              </h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {selectedDrawerForDetails?.transactions?.map((transaction: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        transaction.type === 'income' ? 'bg-green-500' : 
+                        transaction.type === 'expense' ? 'bg-red-500' : 'bg-orange-500'
+                      }`}></div>
+                      <div>
+                        <p className="font-medium text-sm">{transaction.category}</p>
+                        <p className="text-xs text-gray-500">
+                          {transaction.description} • {new Date(transaction.created_at).toLocaleDateString('pt-BR')} às {new Date(transaction.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`font-bold text-sm ${
+                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : '-'}R$ {Math.abs(parseFloat(transaction.amount)).toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Filtrar Pagamentos por Tipo */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtrar Pagamentos por Tipo
+                </h3>
+                {paymentTypeFilter !== 'all' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPaymentTypeFilter('all')}
+                    className="text-xs flex items-center gap-1"
+                  >
+                    <span>✕</span>
+                    Limpar Filtro
+                  </Button>
+                )}
+              </div>
+
+              {/* Filtros de Tipo de Pagamento */}
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {[
+                  { key: 'cash', label: 'Dinheiro', icon: '💵', total: getPaymentTypeTotals().cash },
+                  { key: 'pix', label: 'PIX', icon: '📱', total: getPaymentTypeTotals().pix },
+                  { key: 'debit', label: 'Cartão Débito', icon: '💳', total: getPaymentTypeTotals().debit },
+                  { key: 'credit', label: 'Cartão Crédito', icon: '💳', total: getPaymentTypeTotals().credit }
+                ].map((type) => (
+                  <button
+                    key={type.key}
+                    onClick={() => setPaymentTypeFilter(paymentTypeFilter === type.key ? 'all' : type.key)}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${
+                      paymentTypeFilter === type.key
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-lg mb-1">{type.icon}</div>
+                    <div className="text-xs font-medium text-gray-700">{type.label}</div>
+                    <div className="text-xs font-bold text-gray-900">
+                      R$ {(type.total || 0).toFixed(2).replace('.', ',')}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pagamentos Filtrados */}
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Pagamentos ({getFilteredPayments().length}) - {paymentTypeFilter === 'all' ? 'Todos os tipos' : 
+                  paymentTypeFilter === 'cash' ? 'Dinheiro' :
+                  paymentTypeFilter === 'pix' ? 'PIX' :
+                  paymentTypeFilter === 'debit' ? 'Cartão Débito' : 'Cartão Crédito'}
+              </h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {getFilteredPayments().map((payment: any, index: number) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-sm">{payment.client_name}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(payment.paid_at).toLocaleDateString('pt-BR')} às {new Date(payment.paid_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <span className="font-bold text-green-600">
+                        R$ {parseFloat(payment.total_amount).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {payment.payment_methods?.map((method: any, methodIndex: number) => (
+                        <Badge
+                          key={methodIndex}
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          {method.method === 'cash' ? '💵 Dinheiro' :
+                           method.method === 'pix' ? '📱 PIX' :
+                           method.method === 'debit' ? '💳 Débito' :
+                           method.method === 'credit' ? '💳 Crédito' : method.method}: R$ {Number(method.amount || 0).toFixed(2).replace('.', ',')}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {getFilteredPayments().length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>Nenhum pagamento encontrado para este filtro</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>

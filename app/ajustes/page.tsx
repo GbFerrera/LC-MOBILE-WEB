@@ -18,6 +18,7 @@ import {
   CalendarDays,
   X,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation";
@@ -26,7 +27,7 @@ import { api } from "@/services/api";
 import { toast } from "sonner";
 
 export default function AjustesPage() {
-  const { user, signOut } = useAuth();
+  const { user, updateUser, signOut } = useAuth();
   const router = useRouter();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isServiceHoursDialogOpen, setIsServiceHoursDialogOpen] = useState(false);
@@ -46,6 +47,7 @@ export default function AjustesPage() {
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [serviceHours, setServiceHours] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
   const [editForm, setEditForm] = useState({
@@ -67,6 +69,17 @@ export default function AjustesPage() {
     price: "",
     duration: ""
   });
+
+  // Horários padrão da semana (similar ao LC-FRONT)
+  const defaultSchedules = [
+    { day_of_week: 'Monday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Tuesday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Wednesday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Thursday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Friday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Saturday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: false },
+    { day_of_week: 'Sunday', start_time: "09:00", end_time: "18:00", lunch_start_time: "12:00", lunch_end_time: "13:00", is_day_off: true }
+  ];
 
   // Dados do barbeiro - agora usando estado local que pode ser atualizado
   const barberInfo = {
@@ -155,14 +168,14 @@ export default function AjustesPage() {
       setCurrentUserData({
         name: user.name || "",
         email: user.email || "",
-        phone_number: "",
-        position: ""
+        phone_number: user.phone_number || "",
+        position: user.position || ""
       });
       setEditForm({
         name: user.name || "",
         email: user.email || "",
-        phone_number: "",
-        position: "",
+        phone_number: user.phone_number || "",
+        position: user.position || "",
         password: ""
       });
       
@@ -207,14 +220,19 @@ export default function AjustesPage() {
       toast.success("Perfil atualizado com sucesso!");
       setIsEditDialogOpen(false);
 
-      // Atualizar dados localmente imediatamente
-      const updatedData = {
+      // Atualizar dados no contexto de autenticação
+      const updatedUserData = {
         name: editForm.name,
         email: editForm.email,
         phone_number: editForm.phone_number,
         position: editForm.position
       };
-      setCurrentUserData(updatedData);
+      
+      // Atualiza o contexto global (localStorage + state)
+      updateUser(updatedUserData);
+      
+      // Atualizar dados locais também
+      setCurrentUserData(updatedUserData);
 
       // Atualizar foto se vier na resposta
       if (response.data?.user?.photo_url) {
@@ -243,24 +261,24 @@ export default function AjustesPage() {
       title: "Serviços e Preços",
       description: "Gerencie sua tabela de serviços",
       icon: ScissorsIcon,
-      gradient: "from-amber-500 to-orange-600",
-      bgGradient: "from-amber-50 to-orange-50",
+      iconColor: "text-orange-600",
+      bgColor: "bg-white",
     },
     {
       id: "schedule",
       title: "Horário de Funcionamento",
       description: "Defina seus horários de trabalho",
       icon: ClockIcon,
-      gradient: "from-indigo-500 to-blue-600",
-      bgGradient: "from-indigo-50 to-blue-50",
+      iconColor: "text-blue-600",
+      bgColor: "bg-white",
     },
     {
       id: "business",
       title: "Dados da Barbearia",
       description: "Configure informações do negócio",
       icon: StoreIcon,
-      gradient: "from-emerald-500 to-teal-600",
-      bgGradient: "from-emerald-50 to-teal-50",
+      iconColor: "text-emerald-600",
+      bgColor: "bg-white",
     },
   ];
 
@@ -283,10 +301,35 @@ export default function AjustesPage() {
           company_id: user?.company_id
         }
       });
-      setServiceHours(response.data?.schedules || []);
+      
+      if (!response.data.hasSchedule) {
+        setServiceHours([]);
+      } else {
+        // Organizar os horários por dia da semana (similar ao LC-FRONT)
+        const schedules = [...defaultSchedules];
+        response.data.schedules.forEach((schedule: any) => {
+          const index = schedules.findIndex(s => s.day_of_week === schedule.day_of_week);
+          if (index !== -1) {
+            schedules[index] = {
+              ...schedule,
+              // Se for dia de folga, mantém os horários como null
+              start_time: schedule.is_day_off ? null : (schedule.start_time || "09:00"),
+              end_time: schedule.is_day_off ? null : (schedule.end_time || "18:00"),
+              // Preservar os valores nulos para os horários de almoço
+              lunch_start_time: schedule.is_day_off ? null : schedule.lunch_start_time,
+              lunch_end_time: schedule.is_day_off ? null : schedule.lunch_end_time
+            };
+          }
+        });
+        setServiceHours(schedules);
+      }
     } catch (error: any) {
-      console.error('Erro ao buscar horários:', error);
-      toast.error("Erro ao carregar horários de serviço");
+      if (error.response?.status === 404) {
+        setServiceHours([]);
+      } else {
+        console.error('Erro ao buscar horários:', error);
+        toast.error("Erro ao carregar horários de serviço");
+      }
     } finally {
       setServiceHoursLoading(false);
     }
@@ -520,6 +563,131 @@ export default function AjustesPage() {
     }
   };
 
+  // Função para atualizar horários semanais (similar ao LC-FRONT)
+  const handleScheduleUpdate = async (schedules: any[]) => {
+    if (!user?.id) return;
+    
+    setSaving(true);
+    try {
+      const schedulesToSend = schedules.map(schedule => {
+        // Se for dia de folga, todos os horários são null
+        if (schedule.is_day_off) {
+          return {
+            ...schedule,
+            start_time: null,
+            end_time: null,
+            lunch_start_time: null,
+            lunch_end_time: null
+          };
+        }
+        
+        // Se não for dia de folga, mas não tiver horário de almoço
+        if (!schedule.lunch_start_time && !schedule.lunch_end_time) {
+          return {
+            ...schedule,
+            start_time: schedule.start_time || "09:00",
+            end_time: schedule.end_time || "18:00",
+            lunch_start_time: null,
+            lunch_end_time: null
+          };
+        }
+        
+        // Caso normal: tem horário de trabalho e almoço
+        return {
+          ...schedule,
+          start_time: schedule.start_time || "09:00",
+          end_time: schedule.end_time || "18:00",
+          lunch_start_time: schedule.lunch_start_time || "12:00",
+          lunch_end_time: schedule.lunch_end_time || "13:00"
+        };
+      });
+
+      await api.post(`/schedules`, {
+        professional_id: user.id,
+        schedules: schedulesToSend
+      }, {
+        headers: {
+          company_id: user?.company_id,
+        },
+      });
+      toast.success("Cronograma atualizado com sucesso!");
+      
+      // Recarregar os horários após atualização
+      fetchServiceHours();
+    } catch (error) {
+      console.error("Erro ao atualizar cronograma:", error);
+      toast.error("Erro ao atualizar cronograma");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Função para toggle de dias de folga semanais (similar ao LC-FRONT)
+  const handleDayOffToggle = async (day: string, checked: boolean) => {
+    if (!serviceHours || serviceHours.length === 0) {
+      // Se não há horários, criar com os padrões
+      const newSchedules = defaultSchedules.map((schedule: any) => {
+        if (schedule.day_of_week === day) {
+          return {
+            ...schedule,
+            is_day_off: checked,
+            start_time: checked ? null : "09:00",
+            end_time: checked ? null : "18:00",
+            lunch_start_time: checked ? null : "12:00",
+            lunch_end_time: checked ? null : "13:00"
+          };
+        }
+        return schedule;
+      });
+      
+      setServiceHours(newSchedules);
+      handleScheduleUpdate(newSchedules);
+      return;
+    }
+
+    const newSchedules = serviceHours.map((schedule: any) => {
+      if (schedule.day_of_week === day) {
+        return {
+          ...schedule,
+          is_day_off: checked,
+          start_time: checked ? null : "09:00",
+          end_time: checked ? null : "18:00",
+          lunch_start_time: checked ? null : "12:00",
+          lunch_end_time: checked ? null : "13:00"
+        };
+      }
+      return schedule;
+    });
+
+    setServiceHours(newSchedules);
+    handleScheduleUpdate(newSchedules);
+  };
+
+  // Função para criar cronograma inicial se não existir
+  const handleCreateSchedule = async () => {
+    if (!user?.id) return;
+    
+    setSaving(true);
+    try {
+      await api.post(`/schedules`, {
+        professional_id: user.id,
+        schedules: defaultSchedules
+      }, {
+        headers: {
+          company_id: user?.company_id,
+        },
+      });
+      
+      setServiceHours(defaultSchedules);
+      toast.success("Cronograma criado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao criar cronograma:", error);
+      toast.error("Erro ao criar cronograma");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Criar novo serviço
   const handleCreateService = async () => {
     if (!user?.company_id) {
@@ -612,7 +780,7 @@ export default function AjustesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 py-6">
@@ -626,83 +794,22 @@ export default function AjustesPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Profile Card Redesigned - Tamanho Ajustado */}
-        <Card className="border-none shadow-lg overflow-hidden mb-8 bg-white max-w-3xl mx-auto">
-          <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 relative">
-              {/* Header Profile Info */}
-              <div className="flex items-center">
-                <div className="relative mr-5">
-                  <Avatar className="h-20 w-20 border-2 border-white/40 shadow-lg">
-                    <AvatarImage
-                      src={barberInfo.avatarUrl}
-                      alt={barberInfo.name}
-                      className="object-cover bg-gray-100"
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-400 text-white text-2xl font-bold">
-                      {barberInfo.name.substring(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <label htmlFor="photo-upload" className="absolute bottom-0 right-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-1.5 cursor-pointer shadow-md transition-all duration-200 hover:scale-105">
-                    <input 
-                      id="photo-upload" 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            const base64String = reader.result as string;
-                            // Remover o prefixo 'data:image/jpeg;base64,' para enviar apenas os dados
-                            const base64Data = base64String.split(',')[1];
-                            setIsUploadingPhoto(true);
-                            uploadProfilePhoto(base64Data)
-                              .finally(() => setIsUploadingPhoto(false));
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      disabled={isUploadingPhoto}
-                    />
-                    {isUploadingPhoto ? (
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <PencilIcon className="h-4 w-4" />
-                    )}
-                  </label>
-                </div>
-                <div className="text-white flex-1">
-                  <h2 className="font-bold text-2xl tracking-wide mb-1">{barberInfo.name}</h2>
-                  <p className="text-emerald-50 text-lg font-medium">
-                    {companyDetails?.name}
-                  </p>
-                  <p className="text-emerald-100 text-sm">
-                    {barberInfo.email}
-                  </p>
-                  {barberInfo.phone && (
-                    <p className="text-emerald-100 text-xs">
-                      {barberInfo.phone}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons Row */}
-              <div className="flex gap-3 items-center justify-end mt-4">
-                {/* Edit Profile Icon Button */}
-                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      className="bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg transition-all duration-200 h-10 w-10 rounded-lg"
-                    >
-                      <PencilIcon className="h-5 w-5" />
-                    </Button>
-                  </DialogTrigger>
+      {/* Full Width Profile Header */}
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 relative pb-20">
+        <div className="max-w-6xl mx-auto px-4 pt-3">
+          <div className="flex items-start justify-end mb-4">
+            <div className="flex gap-2">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 bg-transparent"
+                  >
+                    <PencilIcon className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+                </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px] w-[48vh] rounded-2xl">
                     <DialogHeader>
                       <DialogTitle>Editar Perfil</DialogTitle>
@@ -781,60 +888,66 @@ export default function AjustesPage() {
 
                 {/* Services Dialog */}
                 <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
-                    <DialogHeader className="pb-6">
-                      <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
-                            <ScissorsIcon className="h-6 w-6 text-white" />
+                  <DialogContent className="sm:max-w-3xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm w-[90vw] rounded-3xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader className="pb-6 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-orange-100 rounded-2xl">
+                            <ScissorsIcon className="h-6 w-6 text-orange-600" />
                           </div>
-                          Serviços e Preços
+                          <div>
+                            <DialogTitle className="text-2xl font-bold text-gray-900">
+                              Serviços e Preços
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-600 mt-1">
+                              Gerencie seus serviços oferecidos
+                            </DialogDescription>
+                          </div>
                         </div>
                         <Button
                           onClick={() => setIsCreateServiceDialogOpen(true)}
                           size="sm"
-                          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
                         >
-                          <PlusIcon className="h-4 w-4 mr-1" />
-                          Novo
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Novo Serviço
                         </Button>
-                      </DialogTitle>
-                      <DialogDescription className="text-gray-600 text-base">
-                        Todos os serviços oferecidos pela sua barbearia
-                      </DialogDescription>
+                      </div>
                     </DialogHeader>
 
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto py-6">
                       {servicesLoading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200 border-t-amber-600 mb-4"></div>
-                          <p className="text-gray-500 font-medium">Carregando serviços...</p>
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin mb-4"></div>
+                          <p className="text-gray-600">Carregando serviços...</p>
                         </div>
                       ) : services.length > 0 ? (
-                        <div className="grid gap-4">
+                        <div className="space-y-4">
                           {services.map((service, index) => (
                             <div key={service.id || index} className="group">
-                              <div className="p-5 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-4 h-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-lg"></div>
-                                    <div className="flex-1">
-                                       <h3 className="font-bold text-lg text-gray-800 mb-1">
-                                         {service.service_name}
-                                       </h3>
-                                       {service.service_description && (
-                                         <p className="text-sm text-gray-600 mb-3">
-                                           {service.service_description}
-                                         </p>
-                                       )}
-                                       <div className="flex items-center gap-4">
-                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
-                                           💰 {formatPrice(service.base_price)}
-                                         </span>
-                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                                           ⏱️ {formatDuration(service.base_duration)}
-                                         </span>
-                                       </div>
+                              <div className="bg-white border border-gray-100 rounded-2xl p-6 hover:shadow-md transition-all duration-300 hover:border-orange-200">
+                                <div className="flex items-start gap-4">
+                                  <div className="w-3 h-3 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                                      {service.service_name}
+                                    </h3>
+                                    {service.service_description && (
+                                      <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                                        {service.service_description}
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-3">
+                                      <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg">
+                                        <span className="text-emerald-600 font-medium text-sm">
+                                          {formatPrice(service.base_price)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
+                                        <span className="text-blue-600 font-medium text-sm">
+                                          {formatDuration(service.base_duration)}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -843,15 +956,19 @@ export default function AjustesPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center py-12">
-                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                            <ScissorsIcon className="h-10 w-10 text-gray-400" />
+                        <div className="text-center py-16">
+                          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <ScissorsIcon className="h-8 w-8 text-gray-400" />
                           </div>
-                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum serviço cadastrado</h3>
-                          <p className="text-gray-500 mb-4">Cadastre seus serviços para começar a receber agendamentos</p>
-                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium">
-                            💡 Dica: Use o sistema administrativo para cadastrar serviços
-                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum serviço cadastrado</h3>
+                          <p className="text-gray-600 mb-6 max-w-sm mx-auto">Adicione seus serviços para começar a gerenciar agendamentos</p>
+                          <Button
+                            onClick={() => setIsCreateServiceDialogOpen(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
+                          >
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            Criar Primeiro Serviço
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -859,7 +976,8 @@ export default function AjustesPage() {
                     <DialogFooter className="pt-6 border-t border-gray-100">
                       <Button
                         onClick={() => setIsServicesDialogOpen(false)}
-                        className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        variant="outline"
+                        className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                       >
                         Fechar
                       </Button>
@@ -979,135 +1097,163 @@ export default function AjustesPage() {
 
                 {/* Service Hours Dialog */}
                 <Dialog open={isServiceHoursDialogOpen} onOpenChange={setIsServiceHoursDialogOpen}>
-                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
-                    <DialogHeader className="pb-6">
-                      <DialogTitle className="flex items-center justify-between text-xl font-bold text-gray-800">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
-                            <ClockIcon className="h-6 w-6 text-white" />
+                  <DialogContent className="sm:max-w-4xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm w-[90vw] rounded-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-6 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-blue-100 rounded-2xl">
+                            <ClockIcon className="h-6 w-6 text-blue-600" />
                           </div>
-                          Horários de Serviço
+                          <div>
+                            <DialogTitle className="text-2xl font-bold text-gray-900">
+                              Horários de Trabalho
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-600 mt-1">
+                              Configure seus dias e horários de funcionamento
+                            </DialogDescription>
+                          </div>
                         </div>
                         <Button
                           onClick={() => setIsDayOffDialogOpen(true)}
                           size="sm"
-                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                          className="bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl px-4 py-2"
                         >
-                          <CalendarOffIcon className="h-4 w-4 mr-1" />
-                          Folga
+                          <CalendarOffIcon className="h-4 w-4 mr-2" />
+                          Nova Folga
                         </Button>
-                      </DialogTitle>
-                      <DialogDescription className="text-gray-600 text-base">
-                        Seus horários de trabalho configurados
-                      </DialogDescription>
+                      </div>
                     </DialogHeader>
 
-                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <div className="flex-1 overflow-y-auto py-6">
                       {serviceHoursLoading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600 mb-4"></div>
-                          <p className="text-gray-500 font-medium">Carregando horários...</p>
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                          <p className="text-gray-600">Carregando horários...</p>
                         </div>
                       ) : serviceHours.length > 0 ? (
-                        <div className="space-y-4">
-                          {sortSchedulesByDay(serviceHours).map((schedule, index) => (
-                            <div key={index} className="relative group">
-                              <div className={`p-4 rounded-2xl shadow-lg transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02] ${schedule.is_day_off
-                                  ? 'bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-100'
-                                  : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-100'
-                                }`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`w-4 h-4 rounded-full shadow-lg ${schedule.is_day_off ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'
-                                      }`}></div>
-                                    <div className="flex-1">
-                                      <h3 className="font-bold text-lg text-gray-800 mb-1">
-                                        {schedule.day_of_week
-                                          ? formatDayOfWeek(schedule.day_of_week)
-                                          : schedule.date
-                                            ? new Date(schedule.date).toLocaleDateString('pt-BR')
-                                            : 'Data específica'
-                                        }
-                                      </h3>
-                                      {schedule.is_day_off ? (
-                                        <div className="flex items-center gap-2">
-                                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                            🏖️ Dia de folga
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          <div className="flex items-center gap-2">
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
-                                              🕐 {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
+                        <div className="space-y-6">
+                          {/* Horários Semanais */}
+                          <div>
+                            <div className="flex items-center gap-3 mb-6">
+                              <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                              <h3 className="text-xl font-semibold text-gray-900">Dias da Semana</h3>
+                            </div>
+                            <div className="grid gap-4">
+                              {sortSchedulesByDay(serviceHours.filter(s => s.day_of_week)).map((schedule, index) => (
+                                <div key={index} className="group">
+                                  <div className={`bg-white border rounded-2xl p-6 transition-all duration-300 hover:shadow-md ${
+                                    schedule.is_day_off
+                                      ? 'border-red-200 hover:border-red-300'
+                                      : 'border-emerald-200 hover:border-emerald-300'
+                                    }`}>
+                                    <div className="flex items-center justify-between mb-4">
+                                      <div className="flex items-center gap-4">
+                                        <div className={`w-3 h-3 rounded-full ${
+                                          schedule.is_day_off ? 'bg-red-500' : 'bg-emerald-500'
+                                        }`}></div>
+                                        <h4 className="text-lg font-semibold text-gray-900">
+                                          {formatDayOfWeek(schedule.day_of_week)}
+                                        </h4>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-600">Dia de folga</span>
+                                        <Switch
+                                          checked={schedule.is_day_off || false}
+                                          onCheckedChange={(checked) => handleDayOffToggle(schedule.day_of_week, checked)}
+                                          disabled={saving}
+                                        />
+                                      </div>
+                                    </div>
+                                    {schedule.is_day_off ? (
+                                      <div className="bg-red-50 rounded-xl p-4">
+                                        <p className="text-red-700 font-medium text-center">
+                                          🏖️ Dia de descanso
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        <div className="bg-emerald-50 rounded-xl p-4">
+                                          <div className="flex items-center justify-center gap-2">
+                                            <span className="text-emerald-700 font-medium">
+                                              {formatTime(schedule.start_time)} → {formatTime(schedule.end_time)}
                                             </span>
                                           </div>
-                                          {schedule.lunch_start_time && schedule.lunch_end_time && (
-                                            <div className="flex items-center gap-2">
-                                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        </div>
+                                        {schedule.lunch_start_time && schedule.lunch_end_time && (
+                                          <div className="bg-amber-50 rounded-xl p-3">
+                                            <div className="flex items-center justify-center gap-2">
+                                              <span className="text-amber-700 text-sm">
                                                 🍽️ Almoço: {formatTime(schedule.lunch_start_time)} - {formatTime(schedule.lunch_end_time)}
                                               </span>
                                             </div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  {!schedule.is_day_off && (
-                                    <div className="text-right">
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${schedule.date
-                                          ? 'bg-blue-100 text-blue-800'
-                                          : 'bg-gray-100 text-gray-700'
-                                        }`}>
-                                        {schedule.date ? '📅 Específico' : '🔄 Semanal'}
-                                      </span>
-                                    </div>
-                                  )}
                                 </div>
-                              </div>
+                              ))}
                             </div>
-                          ))}
+                          </div>
                         </div>
                       ) : (
-                        <div className="text-center py-12">
-                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-                            <ClockIcon className="h-10 w-10 text-gray-400" />
+                        <div className="text-center py-16">
+                          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <ClockIcon className="h-8 w-8 text-gray-400" />
                           </div>
-                          <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum horário configurado</h3>
-                          <p className="text-gray-500 mb-4">Configure seus horários de trabalho para começar</p>
-                          <div className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium">
-                            💡 Dica: Use a seção "Horário de Funcionamento" para configurar
-                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum horário configurado</h3>
+                          <p className="text-gray-600 mb-6 max-w-sm mx-auto">Crie seu cronograma de trabalho para definir quando você estará disponível</p>
+                          <Button
+                            onClick={handleCreateSchedule}
+                            disabled={saving}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl"
+                          >
+                            {saving ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                                Criando...
+                              </>
+                            ) : (
+                              <>
+                                <PlusIcon className="h-4 w-4 mr-2" />
+                                Criar Cronograma
+                              </>
+                            )}
+                          </Button>
                         </div>
                       )}
                     </div>
 
                     {/* Dias de Folga Específicos */}
                     {!serviceHoursLoading && specificDayOffs.length > 0 && (
-                      <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[#236F5D]">
-                          <CalendarDays className="w-5 h-5" />
-                          <span>Dias de Folga Específicos</span>
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {specificDayOffs.map((date) => {
-                            // Converter YYYY-MM-DD para DD/MM/YYYY para exibição
-                            const [year, month, day] = date.split('-');
-                            const formattedDate = `${day}/${month}/${year}`;
-                            
-                            return (
-                              <div key={date} className="flex items-center bg-red-50 rounded-full px-3 py-1.5 border border-red-200">
-                                <span className="text-sm font-medium text-red-700 mr-2">{formattedDate}</span>
-                                <button
-                                  onClick={() => handleRemoveSpecificDayOff(date)}
-                                  className="text-red-500 hover:text-red-700 p-0.5 rounded-full hover:bg-red-100 transition-colors"
-                                  title="Remover dia de folga"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            );
-                          })}
+                      <div className="border-t border-gray-100 pt-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-1 h-6 bg-orange-500 rounded-full"></div>
+                          <h3 className="text-xl font-semibold text-gray-900">Folgas Específicas</h3>
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl p-6">
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {specificDayOffs.map((date) => {
+                              const [year, month, day] = date.split('-');
+                              const formattedDate = `${day}/${month}/${year}`;
+                              
+                              return (
+                                <div key={date} className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 hover:border-red-300 transition-colors group">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                    <span className="font-medium text-gray-900">{formattedDate}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveSpecificDayOff(date)}
+                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded-lg transition-all"
+                                    title="Remover folga"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1115,7 +1261,8 @@ export default function AjustesPage() {
                     <DialogFooter className="pt-6 border-t border-gray-100">
                       <Button
                         onClick={() => setIsServiceHoursDialogOpen(false)}
-                        className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        variant="outline"
+                        className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                       >
                         Fechar
                       </Button>
@@ -1279,37 +1426,98 @@ export default function AjustesPage() {
 
 
 
-                {/* Logout Button */}
-                <Button
-                  onClick={handleLogout}
-                  className="bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2 px-4 py-2 rounded-lg text-sm"
-                >
-                  <LogOutIcon className="h-4 w-4" />
-                  <span>Sair</span>
-                </Button>
-              </div>
+              <Button
+                onClick={handleLogout}
+                size="sm"
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 bg-transparent"
+              >
+                <LogOutIcon className="h-4 w-4 mr-1" />
+                Sair
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        
+        {/* Centered Overlapping Avatar */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 bottom-0 translate-y-1/2 z-20">
+          <div className="relative">
+            <Avatar className="h-24 w-24 ring-4 ring-white shadow-2xl">
+              <AvatarImage
+                src={barberInfo.avatarUrl}
+                alt={barberInfo.name}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-emerald-600 text-white text-2xl font-semibold">
+                {barberInfo.name.substring(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <label htmlFor="photo-upload" className="absolute -bottom-1 -right-1 bg-white hover:bg-gray-50 text-emerald-600 rounded-full p-2 cursor-pointer shadow-lg border-2 border-white transition-all duration-200 hover:scale-105">
+              <input 
+                id="photo-upload" 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64String = reader.result as string;
+                      const base64Data = base64String.split(',')[1];
+                      setIsUploadingPhoto(true);
+                      uploadProfilePhoto(base64Data)
+                        .finally(() => setIsUploadingPhoto(false));
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                disabled={isUploadingPhoto}
+              />
+              {isUploadingPhoto ? (
+                <div className="h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <PencilIcon className="h-4 w-4" />
+              )}
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="bg-gray-50 min-h-screen pt-16">
+        <div className="max-w-6xl mx-auto px-4">
+          {/* Profile Info Section */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{barberInfo.name}</h1>
+            <p className="text-emerald-600 font-medium mb-4">{companyDetails?.name}</p>
+            <div className="space-y-1">
+              <p className="text-sm text-gray-600">{barberInfo.email}</p>
+              {barberInfo.phone && (
+                <p className="text-sm text-gray-600">{barberInfo.phone}</p>
+              )}
+            </div>
+          </div>
 
-        {/* Settings Buttons - Vertical Stack */}
-        <div className="flex flex-col gap-4 w-full max-w-lg mx-auto mt-6 px-4 sm:px-0 pb-24">
+          {/* Settings Buttons - Vertical Stack */}
+          <div className="flex flex-col gap-4 w-full max-w-lg mx-auto mt-6 px-4 sm:px-0 pb-24">
           {settingButtons.map((setting, index) => (
             <Card
               key={setting.id}
-              className="border-none shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer overflow-hidden hover:shadow-emerald-200"
+              className="border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer overflow-hidden bg-white/70 backdrop-blur-sm"
             >
               <CardContent className="p-0">
-                <div className={`bg-gradient-to-br ${setting.bgGradient} p-4 sm:p-6 h-full`}>
+                <div className={`${setting.bgColor} p-4 sm:p-6 h-full`}>
                   <div className="flex items-center gap-4">
-                    <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-br ${setting.gradient} shadow-lg flex-shrink-0`}>
-                      <setting.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                    {/* Glass effect icon container */}
+                    <div className="inline-flex p-3 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 shadow-lg flex-shrink-0 hover:bg-white/30 transition-all duration-300">
+                      <setting.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${setting.iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-lg sm:text-xl mb-1 text-gray-800">
+                      <h3 className="font-semibold text-lg sm:text-xl mb-1 text-gray-800">
                         {setting.title}
                       </h3>
-                      <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                      <p className="text-sm sm:text-base text-gray-500 leading-relaxed">
                         {setting.description}
                       </p>
                     </div>
@@ -1324,7 +1532,7 @@ export default function AjustesPage() {
                               ? handleCompanyDetailsClick
                               : undefined
                       }
-                      className={`bg-gradient-to-r ${setting.gradient} hover:shadow-lg transition-all duration-300 text-white font-semibold px-4 py-2 rounded-xl text-sm flex-shrink-0`}
+                      className="bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg transition-all duration-300 text-white font-medium px-4 py-2 rounded-xl text-sm flex-shrink-0"
                     >
                       {setting.id === 'services'
                         ? 'Ver Serviços'
@@ -1340,15 +1548,16 @@ export default function AjustesPage() {
               </CardContent>
             </Card>
           ))}
+          </div>
         </div>
+      </div>
 
-        {/* App Version */}
-        <div className="fixed bottom-0 left-0 w-full z-[999] bg-gradient-to-r from-emerald-600 to-teal-600 text-center py-2 mt-5 shadow-[0_-2px_8px_rgba(0,0,0,0.03)]">
-          <p className="text-sm text-white font-medium">{companyDetails?.name || 'Barbearia Link'}</p>
-          <p className="text-sm text-white mt-2">
-            © 2025 Todos os direitos reservados
-          </p>
-        </div>
+      {/* App Version */}
+      <div className="fixed bottom-0 left-0 w-full z-[999] bg-gradient-to-r from-emerald-600 to-teal-600 text-center py-2 mt-5 shadow-[0_-2px_8px_rgba(0,0,0,0.03)]">
+        <p className="text-sm text-white font-medium">{companyDetails?.name || 'Barbearia Link'}</p>
+        <p className="text-sm text-white mt-2">
+          © 2025 Todos os direitos reservados
+        </p>
       </div>
     </div>
   );

@@ -13,12 +13,14 @@ interface User {
   email: string;
   company_id: number;
   position?: string;
+  phone_number?: string;
 }
 
 interface AuthContextData {
   user: User | null;
   signIn: (credentials: SignInCredentials) => Promise<void>;
   signOut: () => void;
+  updateUser: (userData: Partial<User>) => void;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -175,7 +177,8 @@ function AuthProvider({ children }: AuthProviderProps) {
         name: userData.name || '',
         email: userData.email || '',
         company_id: userData.company_id || 1,
-        position: userData.position || ''
+        position: userData.position || '',
+        phone_number: userData.phone_number || ''
       };
 
       // Salva os dados no localStorage (apenas no cliente)
@@ -212,6 +215,21 @@ function AuthProvider({ children }: AuthProviderProps) {
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateUser = (userData: Partial<User>) => {
+    if (!data.user) return;
+    
+    // Atualiza o usuário com os novos dados
+    const updatedUser = { ...data.user, ...userData };
+    
+    // Atualiza o estado
+    setData({ ...data, user: updatedUser });
+    
+    // Atualiza o localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("@linkCallendar:user", JSON.stringify(updatedUser));
     }
   };
 
@@ -264,6 +282,7 @@ function AuthProvider({ children }: AuthProviderProps) {
   const contextValue = {
     signIn,
     signOut,
+    updateUser,
     user: data.user,
     isAuthenticated: !!data.user,
     loading

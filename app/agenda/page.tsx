@@ -696,6 +696,40 @@ export default function AgendaPage() {
     });
   };
 
+  // Verifica se um slot deve ser exibido (não está no meio de um agendamento)
+  const shouldShowSlot = (time: string) => {
+    // Converte horário para minutos
+    const timeToMinutes = (timeStr: string) => {
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const currentTimeMinutes = timeToMinutes(time);
+
+    // Verifica se este slot está no meio de algum agendamento
+    for (const appt of appointments) {
+      if (!appt.start_time || !appt.end_time || appt.status === "free") continue;
+
+      // Formata os horários para garantir o mesmo formato (HH:MM)
+      const startTime = appt.start_time.includes("T")
+        ? appt.start_time.split("T")[1].slice(0, 5)
+        : appt.start_time.slice(0, 5);
+      const endTime = appt.end_time.includes("T")
+        ? appt.end_time.split("T")[1].slice(0, 5)
+        : appt.end_time.slice(0, 5);
+
+      const startTimeMinutes = timeToMinutes(startTime);
+      const endTimeMinutes = timeToMinutes(endTime);
+
+      // Se o slot atual está dentro do agendamento mas não é o slot inicial
+      if (currentTimeMinutes > startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
+        return false; // Não mostrar este slot
+      }
+    }
+
+    return true; // Mostrar o slot
+  };
+
   // Busca detalhes do intervalo livre para um horário específico
   const getFreeIntervalDetails = (time: string) => {
     return appointments.find((appt) => {
@@ -1181,12 +1215,14 @@ export default function AgendaPage() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                     {/* Renderizar slots disponíveis */}
-                    {availableSlots.map((slot) => {
-                      const isBooked = isTimeSlotBooked(slot);
-                      const isFree = isFreeInterval(slot);
-                      const appointment = getAppointmentDetails(slot);
-                      const freeInterval = getFreeIntervalDetails(slot);
-                      const styles = getSlotStyles(slot);
+                    {availableSlots
+                      .filter(slot => shouldShowSlot(slot))
+                      .map((slot) => {
+                        const isBooked = isTimeSlotBooked(slot);
+                        const isFree = isFreeInterval(slot);
+                        const appointment = getAppointmentDetails(slot);
+                        const freeInterval = getFreeIntervalDetails(slot);
+                        const styles = getSlotStyles(slot);
 
                       return (
                         <div
@@ -1825,7 +1861,7 @@ export default function AgendaPage() {
         open={isIntervalDrawerOpen}
         onOpenChange={setIsIntervalDrawerOpen}
       >
-        <DrawerContent className="max-h-[90vh] bg-gradient-to-br from-emerald-50 to-teal-50">
+        <DrawerContent className="max-h-[90vh] bg-white">
           <div className="flex-1 overflow-y-auto max-h-[70vh]">
             <form
               onSubmit={handleIntervalSubmit}

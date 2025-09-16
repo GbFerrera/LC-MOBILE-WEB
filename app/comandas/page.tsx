@@ -12,11 +12,15 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAuth } from "@/hooks/auth";
 import { api } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { parseISO } from "date-fns";
+import { parseISO, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { 
   PlusIcon, 
   CreditCardIcon, 
@@ -32,7 +36,9 @@ import {
   MinusCircleIcon,
   ArrowLeftIcon,
   FilterIcon,
-  SearchIcon
+  SearchIcon,
+  CalendarIcon,
+  XIcon as X
 } from "lucide-react";
 
 // Interfaces
@@ -179,13 +185,14 @@ export default function CommandsPage() {
   // Estados para filtros
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [clientNameFilter, setClientNameFilter] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     if (user?.company_id) {
       fetchCommands();
     }
-  }, [user?.company_id]);
+  }, [user?.company_id, selectedDate, statusFilter]);
 
   // Funções para buscar dados
   const fetchCommands = async () => {
@@ -193,15 +200,25 @@ export default function CommandsPage() {
 
     try {
       setLoading(true);
-      // Corrigir formatação da data para padrão brasileiro
-      const today = new Date();
-      const todayISO = today.getFullYear() + '-' + 
-        String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(today.getDate()).padStart(2, '0');
-      const response = await api.get(`/commands/company/${user.company_id}?date=${todayISO}`, {
+      
+      // Preparar parâmetros de filtro
+      const params: Record<string, string> = {};
+      
+      // Se nenhuma data for selecionada, usar hoje por padrão
+      const dateToFilter = selectedDate || new Date().toISOString().split('T')[0];
+      params.date = dateToFilter;
+      
+      // Adicionar filtro por status se estiver selecionado
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      
+      const response = await api.get(`/commands/company/${user.company_id}`, {
         headers: {
+          company_id: user.company_id,
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        params: params
       });
       setCommands(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
@@ -742,13 +759,60 @@ export default function CommandsPage() {
     const nameMatch = clientNameFilter === '' || 
       command.client_name.toLowerCase().includes(clientNameFilter.toLowerCase());
     
-    return statusMatch && nameMatch;
+    // Filtro por data
+    let dateMatch = true;
+    if (selectedDate) {
+      const dateFilter = new Date(selectedDate).toISOString().split('T')[0];
+      
+      // Verificar se created_at existe
+      if (command.created_at) {
+        // Extrair a data do formato DD/MM/YYYY HH:mm:ss ou ISO
+        if (typeof command.created_at === 'string' && command.created_at.includes('/')) {
+          const parts = command.created_at.split(' ')[0].split('/');
+          if (parts.length === 3) {
+            // Converter para YYYY-MM-DD para comparação
+            const cmdDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            dateMatch = cmdDate === dateFilter;
+          }
+        } else {
+          // Se não for no formato brasileiro, tentar formato padrão
+          try {
+            const date = new Date(command.created_at);
+            if (!isNaN(date.getTime())) {
+              const cmdDate = date.toISOString().split('T')[0];
+              dateMatch = cmdDate === dateFilter;
+            }
+          } catch (error) {
+            dateMatch = false;
+          }
+        }
+      } else {
+        dateMatch = false;
+      }
+    }
+    
+    return statusMatch && nameMatch && dateMatch;
   });
 
   // Função para limpar filtros
   const clearFilters = () => {
     setStatusFilter('all');
     setClientNameFilter('');
+    setSelectedDate('');
+  };
+
+  // Função para lidar com mudança de data
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date.toISOString().split('T')[0]);
+    } else {
+      setSelectedDate('');
+    }
+  };
+
+  // Função para converter string de data para objeto Date
+  const parseDate = (dateString: string): Date => {
+    return new Date(dateString + 'T00:00:00');
   };
 
   return (
@@ -830,37 +894,82 @@ export default function CommandsPage() {
             <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <label className="text-emerald-100 text-sm font-medium whitespace-nowrap">
-                    Status:
-                  </label>
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Status:</Label>
                   <Select value={statusFilter} onValueChange={(value: 'all' | 'open' | 'closed') => setStatusFilter(value)}>
-                    <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white">
-                      <SelectValue placeholder="Status" />
+                    <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white placeholder:text-white/70">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="open">Abertas</SelectItem>
                       <SelectItem value="closed">Fechadas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                  <label className="text-emerald-100 text-sm font-medium whitespace-nowrap">
-                    Cliente:
-                  </label>
-                  <div className="relative flex-1">
-                    <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
-                    <Input
-                      placeholder="Buscar por nome do cliente..."
-                      value={clientNameFilter}
-                      onChange={(e) => setClientNameFilter(e.target.value)}
-                      className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Cliente:</Label>
+                  <Input
+                    placeholder="Nome do cliente"
+                    value={clientNameFilter}
+                    onChange={(e) => setClientNameFilter(e.target.value)}
+                    className="w-40 bg-white/20 border-white/30 text-white placeholder:text-white/70"
+                  />
                 </div>
-                
-                {(statusFilter !== 'all' || clientNameFilter !== '') && (
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Data:</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-48 justify-start text-left font-normal bg-white/20 border-white/30 text-white hover:bg-white/30",
+                          !selectedDate && "text-white/70"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(parseDate(selectedDate), "dd/MM/yyyy", { locale: ptBR }) : "Selecione uma data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedDate ? parseDate(selectedDate) : undefined}
+                        onSelect={handleDateChange}
+                        initialFocus
+                      />
+                      <div className="p-3 pt-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-sm"
+                          onClick={() => setSelectedDate('')}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Limpar filtro de data
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-4 justify-between mt-6">
+            <div className="relative flex-1 max-w-md">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70 h-4 w-4" />
+              <Input
+                placeholder="Buscar por nome do cliente..."
+                value={clientNameFilter}
+                onChange={(e) => setClientNameFilter(e.target.value)}
+                className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {(statusFilter !== 'all' || clientNameFilter !== '' || selectedDate !== '') && (
                   <Button
                     variant="ghost"
                     onClick={clearFilters}
@@ -871,15 +980,14 @@ export default function CommandsPage() {
                     Limpar
                   </Button>
                 )}
-              </div>
-              
-              {filteredCommands.length !== commands.length && (
-                <div className="mt-3 text-emerald-100 text-sm">
-                  Mostrando {filteredCommands.length} de {commands.length} comandas
-                </div>
-              )}
             </div>
-          )}
+            
+            {filteredCommands.length !== commands.length && (
+              <div className="mt-3 text-emerald-100 text-sm">
+                Mostrando {filteredCommands.length} de {commands.length} comandas
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

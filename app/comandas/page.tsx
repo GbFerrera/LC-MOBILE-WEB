@@ -733,10 +733,10 @@ export default function CommandsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
       <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="w-full mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button

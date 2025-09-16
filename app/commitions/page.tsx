@@ -127,7 +127,7 @@ export default function CommissionsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
         <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
           <div className="max-w-6xl mx-auto px-4 py-6">
@@ -253,7 +253,7 @@ export default function CommissionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 overflow-x-hidden">
       {/* Header */}
       <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 py-6">
@@ -292,7 +292,7 @@ export default function CommissionsPage() {
         </div>
       </header>
 
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-4 py-6 space-y-6 overflow-x-hidden w-full">
         {/* Filtros de Data */}
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-4">
@@ -366,8 +366,8 @@ export default function CommissionsPage() {
               </div>
             </div>
             <div className="mb-6">
-              <p className="text-3xl font-bold mb-1">
-                R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}
+              <p className="text-3xl font-bold mb-1 break-words">
+                R$ {(earningsReport.summary?.total_commission || 0).toFixed(2).replace('.', ',')}
               </p>
               <p className="text-white/70 text-sm">
                 Total de comissões no período selecionado
@@ -375,22 +375,22 @@ export default function CommissionsPage() {
             </div>
             
             {/* Mini Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <p className="text-white/60 text-xs mb-1">Agendamentos</p>
-                <p className="text-white font-bold text-sm">{earningsReport.summary.total_appointments}</p>
+                <p className="text-white font-bold text-sm">{earningsReport.summary?.total_appointments || 0}</p>
               </div>
               <div className="text-center">
                 <p className="text-white/60 text-xs mb-1">Serviços</p>
-                <p className="text-white font-bold text-sm">{earningsReport.summary.total_services}</p>
+                <p className="text-white font-bold text-sm">{earningsReport.summary?.total_services || 0}</p>
               </div>
               <div className="text-center">
                 <p className="text-white/60 text-xs mb-1">Faturamento</p>
-                <p className="text-white font-bold text-sm">R$ {earningsReport.summary.total_value.toFixed(2).replace('.', ',')}</p>
+                <p className="text-white font-bold text-sm">R$ {(earningsReport.summary?.total_value || 0).toFixed(2).replace('.', ',')}</p>
               </div>
               <div className="text-center">
                 <p className="text-white/60 text-xs mb-1">Comissão</p>
-                <p className="text-white font-bold text-sm">R$ {earningsReport.summary.total_commission.toFixed(2).replace('.', ',')}</p>
+                <p className="text-white font-bold text-sm">R$ {(earningsReport.summary?.total_commission || 0).toFixed(2).replace('.', ',')}</p>
               </div>
             </div>
           </div>
@@ -398,7 +398,7 @@ export default function CommissionsPage() {
 
         {/* Cards de Estatísticas Detalhadas */}
         {earningsReport && earningsReport.services && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Card className="border-0 shadow-lg overflow-hidden">
               <div className="bg-gradient-to-br from-green-500 to-green-600 p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -429,7 +429,7 @@ export default function CommissionsPage() {
               </div>
             </Card>
             
-            <Card className="border-0 shadow-lg overflow-hidden">
+            <Card className="border-0 shadow-lg overflow-hidden sm:col-span-2 md:col-span-1">
               <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -470,20 +470,20 @@ export default function CommissionsPage() {
                 <div className="space-y-1">
                   {earningsReport.services.map((service, index) => (
                     <div key={`${service.service_id}-${index}`} className={`p-4 hover:bg-gray-50 transition-colors ${index !== earningsReport.services.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] flex items-center justify-center flex-shrink-0">
                             <HandCoins className="h-6 w-6 text-white" />
                           </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-900 mb-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 mb-1 truncate">
                               {service.service_name}
                             </p>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                               <span>Preço: R$ {parseFloat(service.service_price).toFixed(2).replace('.', ',')}</span>
-                              <span>•</span>
+                              <span className="hidden sm:inline">•</span>
                               <span>Qtd: {service.total_quantity}</span>
-                              <span>•</span>
+                              <span className="hidden sm:inline">•</span>
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                 service.commission_config?.scope === 'general' 
                                   ? 'bg-blue-100 text-blue-700' 
@@ -494,7 +494,7 @@ export default function CommissionsPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left md:text-right flex-shrink-0">
                           <p className="font-bold text-lg text-[#236F5D] mb-1">
                             {service.commission_config?.type === 'percentage' 
                               ? `${service.commission_config.value}%` 

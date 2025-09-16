@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,7 @@ export default function CommandsPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [cashDrawerAlertOpen, setCashDrawerAlertOpen] = useState(false);
 
   // Estados para dados
   const [clients, setClients] = useState<Client[]>([]);
@@ -564,13 +566,30 @@ export default function CommandsPage() {
       
       // Refresh commands
       await fetchCommands();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao processar pagamento:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao processar pagamento",
-        variant: "destructive",
-      });
+      
+      // Verificar se o erro é relacionado à gaveta de caixa não aberta
+      if (error?.response?.status === 400 || 
+          error?.toString().includes("400") || 
+          error.response?.status === 400) {
+        
+        // Exibir a mensagem específica sobre a gaveta de caixa
+        toast({
+          title: "Erro",
+          description: "Não é possível criar um pagamento sem uma gaveta de caixa aberta para hoje. Abra uma gaveta primeiro.",
+          variant: "destructive",
+        });
+        
+        // Exibir um alerta personalizado para garantir que o usuário veja a mensagem
+        setCashDrawerAlertOpen(true);
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao processar pagamento",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsProcessingPayment(false);
     }
@@ -1799,6 +1818,34 @@ export default function CommandsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Alert Dialog para gaveta de caixa */}
+      <AlertDialog open={cashDrawerAlertOpen} onOpenChange={setCashDrawerAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
+                <span className="text-amber-600 font-bold text-sm">!</span>
+              </div>
+              Atenção
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Não é possível criar um pagamento sem uma gaveta de caixa aberta para hoje. Você será redirecionado para a página de Finanças ao clicar em 'Entendi'.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction 
+              onClick={() => {
+                setCashDrawerAlertOpen(false);
+                router.push("/financas");
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Entendi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

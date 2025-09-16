@@ -62,10 +62,11 @@ interface Client {
 }
 
 interface Service {
-  id: number;
-  name: string;
-  duration: number;
-  price: number;
+  service_id: number;
+  service_name: string;
+  service_description: string;
+  service_price: string;
+  service_duration: number;
 }
 
 interface Schedule {
@@ -364,11 +365,11 @@ export default function AgendaPage() {
               .map(service => {
                 // Normalizar a estrutura do serviço
                 const normalizedService = {
-                  id: service.id || service.service_id,
-                  name: service.name || service.service_name || service.title || `Serviço ${service.id || service.service_id}`,
-                  duration: service.duration || service.time || service.duration_minutes || 30,
-                  price: service.price || service.value || service.cost || 0,
-                  description: service.description || service.desc || '',
+                  service_id: service.service_id || service.id,
+                  service_name: service.service_name || service.service_name || service.title || `Serviço ${service.service_id || service.id}`,
+                  service_duration: service.service_duration || service.duration || service.time || service.duration_minutes || 30,
+                  service_price: service.service_price || service.price || service.value || service.cost || "0.00",
+                  service_description: service.service_description || service.description || service.desc || '',
                   // Manter dados originais para debug
                   _original: service
                 };
@@ -451,15 +452,15 @@ export default function AgendaPage() {
   // Calcular preço total dos serviços selecionados
   const getTotalPrice = () => {
     return services
-      .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
-      .reduce((total, service) => total + (service.price || 0), 0);
+      .filter(service => formData.service_ids.includes(service.service_id?.toString() || service.service_id?.toString() || ""))
+      .reduce((total, service) => total + (parseFloat(service.service_price) || 0), 0);
   };
 
   // Calcular duração total dos serviços selecionados
   const getTotalDuration = () => {
     return services
-      .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
-      .reduce((total, service) => total + (service.duration || 0), 0);
+      .filter(service => formData.service_ids.includes(service.service_id?.toString() || service.service_id?.toString() || ""))
+      .reduce((total, service) => total + (service.service_duration || 0), 0);
   };
 
   const resetForm = () => {
@@ -512,14 +513,14 @@ export default function AgendaPage() {
 
       // Encontrar os serviços selecionados e calcular duração total
       const selectedServices = services.filter(
-        (s) => s.id && formData.service_ids.includes(s.id.toString())
+        (s) => s.service_id && formData.service_ids.includes(s.service_id.toString())
       );
       if (selectedServices.length === 0) {
         throw new Error("Serviços não encontrados");
       }
 
       // Calcular duração total de todos os serviços
-      const totalDuration = selectedServices.reduce((total, service) => total + service.duration, 0);
+      const totalDuration = selectedServices.reduce((total, service) => total + (service.service_duration || 0), 0);
 
       // Calcular end_time baseado na duração total
       const endTime = new Date(date);
@@ -539,7 +540,7 @@ export default function AgendaPage() {
         status: status, // Usando o status 'confirmed' definido anteriormente
         notes: formData.notes || "",
         services: selectedServices.map(service => ({
-          service_id: parseInt(service.id.toString()),
+          service_id: parseInt(service.service_id?.toString() || service.service_id?.toString() || "0"),
           professional_id: user.id,
           quantity: quantity, // Adicionando a quantidade fixa como 1
         })),
@@ -1533,7 +1534,7 @@ export default function AgendaPage() {
                       {formData.service_ids.length === 0 
                         ? "Selecione os serviços" 
                         : formData.service_ids.length === 1
-                        ? `${services.find(s => s.id?.toString() === formData.service_ids[0])?.name || 'Serviço'}`
+                        ? `${services.find(s => s.service_id?.toString() === formData.service_ids[0])?.service_name || 'Serviço'}`
                         : `${formData.service_ids.length} serviços selecionados`
                       }
                     </span>
@@ -1562,7 +1563,7 @@ export default function AgendaPage() {
                                 {getTotalDuration()} min
                               </span>
                               <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full font-semibold">
-                                R$ {getTotalPrice().toFixed(2)}
+                                R$ {getTotalPrice().toFixed(2)} 
                               </span>
                             </div>
                           </div>
@@ -1573,14 +1574,14 @@ export default function AgendaPage() {
                       <div className="max-h-64 overflow-y-auto">
                         {services.length > 0 ? (
                           services.map((service) => {
-                            const isSelected = formData.service_ids.includes(service.id?.toString() || "");
+                            const isSelected = formData.service_ids.includes(service.service_id?.toString() || "");
                             return (
                               <div
-                                key={service.id}
+                                key={service.service_id}
                                 className={`flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
                                   isSelected ? 'bg-emerald-50' : ''
                                 }`}
-                                onClick={() => handleServiceToggle(service.id?.toString() || "")}
+                                onClick={() => handleServiceToggle(service.service_id?.toString() || "")}
                               >
                                 {/* Checkbox */}
                                 <div className={`w-4 h-4 rounded border-2 flex items-center justify-center mr-3 transition-all duration-200 ${
@@ -1601,14 +1602,14 @@ export default function AgendaPage() {
                                     <span className={`text-sm font-medium ${
                                       isSelected ? 'text-emerald-800' : 'text-gray-800'
                                     }`}>
-                                      {service.name}
+                                      {service.service_name || 'Serviço'}
                                     </span>
                                     <div className="flex items-center space-x-2 ml-2">
                                       <span className="text-xs text-gray-500">
-                                        {service.duration}min
+                                        {service.service_duration}min
                                       </span>
                                       <span className="text-xs text-gray-600 font-medium">
-                                        R$ {(service.price || 0).toFixed(2)}
+                                        R$ {service.service_price}
                                       </span>
                                     </div>
                                   </div>
@@ -1632,8 +1633,8 @@ export default function AgendaPage() {
                     <div className="text-xs text-emerald-700">
                       <span className="font-medium">Selecionados: </span>
                       {services
-                        .filter(service => formData.service_ids.includes(service.id?.toString() || ""))
-                        .map(service => service.name)
+                        .filter(service => formData.service_ids.includes(service.service_id?.toString() || ""))
+                        .map(service => service.service_name)
                         .join(", ")}
                     </div>
                   </div>

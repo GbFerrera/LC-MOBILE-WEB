@@ -9,8 +9,8 @@ import { useEffect, useState } from "react";
 
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -54,6 +54,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Alert } from "@chakra-ui/react"
 
 interface Client {
   id: number;
@@ -896,6 +897,8 @@ export default function AgendaPage() {
   const formattedDate = formatDate(date);
 
   const freeInterval = async () => {
+
+
     try {
       const response = await api.post(
         "/schedules/free-interval",
@@ -938,22 +941,37 @@ export default function AgendaPage() {
 
   const handleIntervalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoadingButton(true);
 
     try {
       if (!formIntervals.start_time || !formIntervals.end_time) {
         toast.error("Por favor, preencha os horários de início e fim");
+        setIsLoadingButton(false);
         return;
       }
+
+      // Fazendo a requisição diretamente em vez de chamar freeInterval()
+      const response = await api.post(
+        "/schedules/free-interval",
+        formIntervals,
+        {
+          headers: {
+            company_id: user?.company_id,
+          },
+        }
+      );
+
       toast.success("Intervalo liberado com sucesso");
-      await freeInterval();
       closeIntervalDrawer();
 
       if (user) {
         fetchAppointments(user.id, date);
       }
     } catch (error) {
-      console.error("Erro ao configurar intervalo:", error);
-      toast.error(error?.response?.data?.message || "Erro ao configurar intervalo");
+      console.log("Erro ao configurar intervalo:", error);
+      alert(error.response.data.message)
+    } finally {
+      setIsLoadingButton(false);
     }
   };
 

@@ -126,7 +126,12 @@ export default function Home() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setScheduleData(response.data);
+        // Filtra os agendamentos para remover registros com status "free"
+        const filteredData = {
+          ...response.data,
+          appointments: response.data.appointments.filter(appointment => appointment.status !== 'free')
+        };
+        setScheduleData(filteredData);
         setError(null); // Limpa erro anterior se sucesso
       } catch (err) {
         console.error('Erro ao buscar agendamentos:', err);

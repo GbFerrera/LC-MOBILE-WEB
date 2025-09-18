@@ -1,12 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { DayPicker } from "react-day-picker";
 import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation"
@@ -18,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Drawer,
@@ -28,7 +24,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,21 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { CircleX, Search } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Alert } from "@chakra-ui/react"
 
 interface Client {
   id: number;
@@ -211,6 +192,8 @@ export default function AgendaPage() {
   // Estado do drawer de detalhes do agendamento
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Estado do drawer de seleção de intervalo
   const [isIntervalDrawerOpen, setIsIntervalDrawerOpen] = useState(false);
@@ -896,6 +879,112 @@ export default function AgendaPage() {
 
   const formattedDate = formatDate(date);
 
+  // Função para atualizar status do agendamento
+  const updateAppointmentStatus = async (appointmentId: number, newStatus: string) => {
+    if (!user) {
+      toast.error("Usuário não autenticado");
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+
+    try {
+      const response = await api.patch(
+        `/appointments/${appointmentId}/status`,
+        { status: newStatus },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user.company_id?.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (response.data) {
+        // Se for cancelamento, fechar o drawer e recarregar
+        if (newStatus === 'canceled') {
+          setIsDrawerOpen(false);
+          setSelectedAppointment(null);
+          toast.success("Agendamento cancelado! Slot liberado para novo agendamento.");
+        } else {
+          // Atualizar o agendamento selecionado para outros status
+          setSelectedAppointment((prev: any) => ({
+            ...prev,
+            status: newStatus,
+          }));
+          toast.success("Status atualizado com sucesso!");
+        }
+        
+        // Recarregar agendamentos
+        fetchAppointments(user.id, date);
+        setIsStatusMenuOpen(false);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status do agendamento");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Função para obter o texto do status em português
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "Pendente";
+      case "confirmed":
+        return "Confirmado";
+      case "completed":
+        return "Concluído";
+      case "canceled":
+        return "Cancelado";
+      default:
+        return status;
+    }
+  };
+
+  // Função para obter as cores do status (baseado nas imagens fornecidas)
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-orange-200 text-gray-700";
+      case "confirmed":
+        return "bg-green-200 text-gray-700";
+      case "completed":
+        return "bg-blue-200 text-gray-700";
+      case "canceled":
+        return "bg-red-200 text-gray-700";
+      default:
+        return "bg-gray-200 text-gray-700";
+    }
+  };
+
+  // Função para abrir WhatsApp do cliente
+  const openWhatsApp = (phoneNumber: string, clientName: string) => {
+    if (!phoneNumber) {
+      toast.error("Número de telefone não disponível");
+      return;
+    }
+
+    // Limpar o número: remover espaços, parênteses, hífens e adicionar código do país se necessário
+    let cleanNumber = phoneNumber.replace(/[\s\(\)\-]/g, '');
+    
+    // Se não começar com 55 (Brasil), adicionar
+    if (!cleanNumber.startsWith('55')) {
+      cleanNumber = '55' + cleanNumber;
+    }
+
+    // Mensagem padrão personalizada
+    const message = `Olá ${clientName}! Queremos conversar sobre o seu agendamento.`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    // Abrir WhatsApp Web ou aplicativo
+    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const freeInterval = async () => {
 
 
@@ -1232,7 +1321,7 @@ export default function AgendaPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                  <div className="space-y-3">
                     {/* Renderizar slots disponíveis */}
                     {availableSlots
                       .filter(slot => shouldShowSlot(slot))
@@ -1241,27 +1330,36 @@ export default function AgendaPage() {
                         const isFree = isFreeInterval(slot);
                         const appointment = getAppointmentDetails(slot);
                         const freeInterval = getFreeIntervalDetails(slot);
-                        const styles = getSlotStyles(slot);
 
                       return (
                         <div
                           key={slot}
-                          className={`group relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${styles.containerClass}`}
+                          className={`flex items-center justify-between w-full p-4 rounded-xl transition-all duration-200 ${
+                            isBooked && appointment && appointment.status !== 'canceled'
+                              ? appointment.status === 'confirmed'
+                                ? "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : appointment.status === 'pending'
+                                ? "bg-orange-200 border-2 border-orange-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : appointment.status === 'completed'
+                                ? "bg-blue-200 border-2 border-blue-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
+                              : isFree
+                              ? "bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed"
+                              : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
+                          }`}
                           onClick={
-                            isBooked
+                            isBooked && appointment && appointment.status !== 'canceled'
                               ? () => {
                                   // Mostrar detalhes do agendamento no drawer
-                                  if (appointment) {
-                                    setSelectedAppointment(appointment);
-                                    setIsDrawerOpen(true);
-                                  }
+                                  setSelectedAppointment(appointment);
+                                  setIsDrawerOpen(true);
                                 }
                               : isFree
                               ? undefined // Intervalo livre não é clicável
                               : () => handleSlotClick(slot)
                           }
                           title={
-                            isBooked
+                            isBooked && appointment && appointment.status !== 'canceled'
                               ? `Clique para ver detalhes - ${
                                   appointment?.client?.name || "Cliente"
                                 }`
@@ -1270,55 +1368,23 @@ export default function AgendaPage() {
                               : "Clique para agendar"
                           }
                         >
-                          <div
-                            className={`font-bold text-lg mb-1 ${styles.timeClass}`}
-                          >
-                            {slot}
-                          </div>
-
-                          {isBooked && appointment ? (
-                            <>
-                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
-                                {appointment.client?.name || "Cliente"}
-                              </div>
-                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
-                                {appointment.services && appointment.services.length > 1 
-                                  ? `${appointment.services.length} serviços`
-                                  : appointment.services?.[0]?.service_name || "Serviço"
-                                }
-                              </div>
-                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
-                                <svg
-                                  className="w-3 h-3 mr-1"
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                                R$ {appointment.services?.[0]?.price || "0.00"}
-                              </div>
-                            </>
-                          ) : isFree && freeInterval ? (
-                            <>
-                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
-                                Intervalo Livre
-                              </div>
-                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
-                                {freeInterval.notes || "Intervalo"}
-                              </div>
-                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
-                                <CircleX className="mr-1" size={16} />
-                                Bloqueado
-                              </div>
-                            </>
-                          ) : !isBooked && !isFree ? (
-                            <div className={`flex items-center text-xs font-medium ${styles.textClass}`}>
+                          {/* Lado esquerdo - Horário e ícone */}
+                          <div className="flex items-center space-x-3">
+                            <div className={`p-2 rounded-full ${
+                              isBooked && appointment && appointment.status !== 'canceled'
+                                ? "bg-white/60"
+                                : isFree
+                                ? "bg-orange-100"
+                                : "bg-green-100"
+                            }`}>
                               <svg
-                                className="w-3 h-3 mr-1"
+                                className={`w-5 h-5 ${
+                                  isBooked && appointment && appointment.status !== 'canceled'
+                                    ? "text-gray-600"
+                                    : isFree
+                                    ? "text-orange-600"
+                                    : "text-green-600"
+                                }`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1327,20 +1393,81 @@ export default function AgendaPage() {
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
+                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                               </svg>
-                              Disponível
                             </div>
-                          ) : null}
+                            <div>
+                              <div className={`font-bold text-lg ${
+                                isBooked && appointment && appointment.status !== 'canceled'
+                                  ? "text-gray-700"
+                                  : isFree
+                                  ? "text-orange-700"
+                                  : "text-gray-700"
+                              }`}>
+                                {slot}
+                              </div>
+                              <div className={`text-sm ${
+                                isBooked && appointment && appointment.status !== 'canceled'
+                                  ? "text-gray-600"
+                                  : isFree
+                                  ? "text-orange-600"
+                                  : "text-green-600"
+                              }`}>
+                                {isBooked && appointment && appointment.status !== 'canceled'
+                                  ? `${appointment.client?.name || "Cliente"}`
+                                  : isFree && freeInterval
+                                  ? "Intervalo Livre"
+                                  : "Clique para agendar"
+                                }
+                              </div>
+                              {isBooked && appointment && appointment.status !== 'canceled' && appointment.services?.[0] && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {appointment.services.length > 1 
+                                    ? `${appointment.services.length} serviços`
+                                    : appointment.services[0].service_name || "Serviço"
+                                  }
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                          {/* Hover effect indicator */}
-                          {!isBooked && !isFree && (
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                          )}
-                          {isFree && (
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                          )}
+                          {/* Lado direito - Botão ou informações */}
+                          <div className="flex items-center">
+                            {isBooked && appointment && appointment.status !== 'canceled' ? (
+                              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                appointment.status === 'confirmed'
+                                  ? "bg-green-600 text-white"
+                                  : appointment.status === 'pending'
+                                  ? "bg-white text-gray-700 border border-gray-300"
+                                  : appointment.status === 'completed'
+                                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}>
+                                {getStatusText(appointment.status)}
+                              </div>
+                            ) : isFree ? (
+                              <div className="text-orange-600">
+                                <CircleX size={20} />
+                              </div>
+                            ) : (
+                              <div className="text-green-600">
+                                <svg
+                                  className="w-6 h-6"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 4v16m8-8H4"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -1790,25 +1917,189 @@ export default function AgendaPage() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Status</span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        selectedAppointment.status === "confirmed"
-                          ? "bg-green-100 text-green-700"
-                          : selectedAppointment.status === "pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : selectedAppointment.status === "completed"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {selectedAppointment.status === "confirmed"
-                        ? "Confirmado"
-                        : selectedAppointment.status === "pending"
-                        ? "Pendente"
-                        : selectedAppointment.status === "completed"
-                        ? "Concluído"
-                        : "Cancelado"}
-                    </span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
+                        disabled={isUpdatingStatus}
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-all duration-200 hover:shadow-md ${getStatusColor(selectedAppointment.status)} ${
+                          isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
+                        }`}
+                      >
+                        <span>{getStatusText(selectedAppointment.status)}</span>
+                        {isUpdatingStatus ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Menu de Status - Responsivo para Mobile */}
+                      {isStatusMenuOpen && !isUpdatingStatus && (
+                        <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl border-t-2 border-gray-100 z-50 transform transition-transform duration-300 ease-out">
+                          {/* Handle bar */}
+                          <div className="flex justify-center pt-4 pb-3">
+                            <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                          </div>
+                          
+                          {/* Header */}
+                          <div className="px-6 pb-6 border-b border-gray-200">
+                            <h3 className="text-xl font-bold text-gray-800 text-center">Alterar Status</h3>
+                            <p className="text-base text-gray-600 text-center mt-2 font-medium">
+                              {selectedAppointment.client?.name || "Cliente"}
+                            </p>
+                          </div>
+
+                          {/* Options */}
+                          <div className="px-6 py-4 space-y-3 max-h-80 overflow-y-auto">
+                            {/* Opção Pendente */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'pending')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'pending'
+                                  ? 'bg-orange-200 border-orange-300 shadow-md'
+                                  : 'bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-white border border-gray-300 text-gray-700 rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  P
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Pendente</span>
+                              </div>
+                              {selectedAppointment.status === 'pending' && (
+                                <div className="w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Confirmado */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmed')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'confirmed'
+                                  ? 'bg-green-200 border-green-300 shadow-md'
+                                  : 'bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-green-600 text-white rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✓
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Confirmado</span>
+                              </div>
+                              {selectedAppointment.status === 'confirmed' && (
+                                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Concluído */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'completed')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'completed'
+                                  ? 'bg-blue-200 border-blue-300 shadow-md'
+                                  : 'bg-blue-50 border-blue-200 hover:bg-blue-100 hover:border-blue-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-blue-100 border border-blue-300 text-blue-700 rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✓
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Concluído</span>
+                              </div>
+                              {selectedAppointment.status === 'completed' && (
+                                <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Cancelado */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'canceled')}
+                              className="w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 bg-red-50 border-red-200 hover:bg-red-100 hover:border-red-300 hover:shadow-md"
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-red-500 text-white rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✗
+                                </div>
+                                <span className="font-bold text-red-600 text-left text-lg">Cancelar Agendamento</span>
+                              </div>
+                              <div className="w-8 h-8 bg-red-100 border border-red-300 text-red-600 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </div>
+                            </button>
+                          </div>
+
+                          {/* Footer com botão fechar */}
+                          <div className="px-6 py-6 border-t border-gray-200 bg-gray-50 rounded-b-3xl">
+                            <button
+                              onClick={() => setIsStatusMenuOpen(false)}
+                              className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overlay para fechar o menu */}
+                      {isStatusMenuOpen && (
+                        <div
+                          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+                          onClick={() => setIsStatusMenuOpen(false)}
+                        ></div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Lista de Serviços */}
@@ -1847,7 +2138,29 @@ export default function AgendaPage() {
             )}
           </div>
 
-          <DrawerFooter className="pt-4 border-t border-gray-100">
+          <DrawerFooter className="pt-4 border-t border-gray-100 space-y-3">
+            {/* Botão WhatsApp */}
+            {selectedAppointment?.client?.phone_number && (
+              <Button
+                onClick={() => openWhatsApp(
+                  selectedAppointment.client.phone_number,
+                  selectedAppointment.client.name || "Cliente"
+                )}
+                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
+              >
+                <span className="flex items-center justify-center space-x-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.106"/>
+                  </svg>
+                  <span>Enviar WhatsApp</span>
+                </span>
+              </Button>
+            )}
+            
             <DrawerClose asChild>
               <Button
                 variant="outline"

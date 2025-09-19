@@ -15,6 +15,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
 import { 
   ChevronLeftIcon, 
   PlusIcon, 
@@ -27,12 +28,14 @@ import {
   PhoneIcon,
   MailIcon,
   CalendarIcon,
-  EyeIcon
+  EyeIcon,
+  ClockIcon
 } from 'lucide-react';
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, setupAPIInterceptors } from "@/services/api"
 import { useAuth } from "@/hooks/auth";
+import { parseISO } from "date-fns";
 
 interface Client {
   id: number;
@@ -53,11 +56,14 @@ interface Client {
 export default function ClientesPage() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'ativo' | 'ocioso' | 'inativo'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedClientAppointments, setSelectedClientAppointments] = useState<any[]>([]);
+  const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(false);
 
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
@@ -74,18 +80,29 @@ export default function ClientesPage() {
         // Configurar o interceptor para adicionar o company_id
         setupAPIInterceptors(user?.company_id ?? 0);
         
-        const response = await api.get('/clients');
-        const data = response.data;
+        const [clientsResponse, appointmentsResponse] = await Promise.all([
+          api.get('/clients'),
+          api.get('/appointments')
+        ]);
         
-        if (!Array.isArray(data)) {
-          throw new Error('Formato de dados inválido');
+        const clientsData = clientsResponse.data;
+        const appointmentsData = appointmentsResponse.data;
+        
+        if (!Array.isArray(clientsData)) {
+          throw new Error('Formato de dados de clientes inválido');
         }
         
-        setClients(data);
+        if (!Array.isArray(appointmentsData)) {
+          throw new Error('Formato de dados de agendamentos inválido');
+        }
+        
+        setClients(clientsData);
+        setAppointments(appointmentsData);
       } catch (error) {
-        console.error('Erro ao buscar clientes:', error);
-        setError('Não foi possível carregar os clientes');
+        console.error('Erro ao buscar dados:', error);
+        setError('Não foi possível carregar os dados');
         setClients([]);
+        setAppointments([]);
       } finally {
         setLoading(false);
       }
@@ -366,11 +383,111 @@ export default function ClientesPage() {
           ) : (
             <div className="space-y-3">
               {filteredClients.map((client) => (
-                <ClientCard key={client.id} client={client} getClientStatus={getClientStatus} />
+                <ClientCard 
+                  key={client.id} 
+                  client={client} 
+                  getClientStatus={getClientStatus}
+                  appointments={appointments}
+                  onShowAppointments={(clientAppointments) => {
+                    setSelectedClientAppointments(clientAppointments);
+                    setIsAppointmentDrawerOpen(true);
+                  }}
+                />
               ))}
             </div>
           )}
         </div>
+
+        {/* Drawer de Detalhes dos Agendamentos */}
+        <Drawer open={isAppointmentDrawerOpen} onOpenChange={setIsAppointmentDrawerOpen}>
+          <DrawerContent>
+            <div className="mx-auto w-full max-w-sm">
+              <DrawerHeader className="text-center pb-4">
+                <DrawerTitle className="text-xl font-bold text-gray-900">
+                  Agendamentos dos Últimos 30 Dias
+                </DrawerTitle>
+                <DrawerDescription className="text-gray-600">
+                  Histórico de agendamentos do cliente
+                </DrawerDescription>
+              </DrawerHeader>
+              
+              <div className="px-4 space-y-3 max-h-96 overflow-y-auto">
+                {selectedClientAppointments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CalendarIcon className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">Nenhum agendamento encontrado</p>
+                  </div>
+                ) : (
+                  selectedClientAppointments.map((appointment: any, index: number) => (
+                    <div key={appointment.id || index} className="bg-gray-50 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={appointment.status === 'confirmed' ? 'default' : 
+                                    appointment.status === 'completed' ? 'secondary' : 
+                                    appointment.status === 'cancelled' ? 'destructive' : 'outline'}
+                            className={
+                              appointment.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
+                              appointment.status === 'completed' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                              appointment.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-200' :
+                              'bg-gray-100 text-gray-800 border-gray-200'
+                            }
+                          >
+                            {appointment.status === 'confirmed' ? 'Confirmado' :
+                             appointment.status === 'completed' ? 'Concluído' :
+                             appointment.status === 'cancelled' ? 'Cancelado' :
+                             appointment.status || 'Pendente'}
+                          </Badge>
+                          {appointment.professional_name && (
+                            <span className="text-sm font-medium text-emerald-600">
+                              {appointment.professional_name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                          <ClockIcon className="h-3 w-3" />
+                          {appointment.start_time} - {appointment.end_time}
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600">
+                        <strong>Data:</strong> {parseISO(appointment.appointment_date).toLocaleDateString('pt-BR')}
+                      </div>
+                      
+                      {appointment.services && appointment.services.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">Serviços:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {appointment.services.map((service: any, serviceIndex: number) => (
+                              <Badge key={serviceIndex} variant="outline" className="text-xs bg-white">
+                                {service.service_name || service.name || 'Serviço'}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {appointment.notes && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">Observações:</p>
+                          <p className="text-sm text-gray-600">{appointment.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              <DrawerFooter className="pt-6">
+                <DrawerClose asChild>
+                  <Button variant="outline" className="w-full">
+                    Fechar
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
     </div>
   );
@@ -542,13 +659,15 @@ function CreateClientDrawer({ onClientCreated }: { onClientCreated: () => void }
   );
 }
 
-function ClientCard({ client, getClientStatus }: { 
+function ClientCard({ client, getClientStatus, appointments, onShowAppointments }: { 
   client: Client;
   getClientStatus: (client: Client) => {
     status: "ativo" | "ocioso" | "inativo";
     color: string;
     bgColor: string;
   };
+  appointments: any[];
+  onShowAppointments: (appointments: any[]) => void;
 }) {
   const initials = client.name
     .split(" ")
@@ -566,6 +685,27 @@ function ClientCard({ client, getClientStatus }: {
   // Handler para agendamento
   const handleSchedule = () => {
     window.location.href = `/agenda?client_id=${client.id}&client_name=${encodeURIComponent(client.name)}`;
+  };
+
+  // Função para contar e filtrar agendamentos dos últimos 30 dias
+  const getClientAppointments = () => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    return appointments.filter(appointment => {
+      const appointmentDate = new Date(appointment.appointment_date);
+      return appointment.client_id === client.id && appointmentDate >= thirtyDaysAgo;
+    });
+  };
+
+  const clientAppointments = getClientAppointments();
+  const appointmentCount = clientAppointments.length;
+
+  // Handler para mostrar agendamentos
+  const handleShowAppointments = () => {
+    if (appointmentCount > 0) {
+      onShowAppointments(clientAppointments);
+    }
   };
 
   return (
@@ -609,6 +749,20 @@ function ClientCard({ client, getClientStatus }: {
             <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
               <MailIcon className="h-3 w-3" />
               <span className="truncate">{client.email}</span>
+            </div>
+          )}
+          
+          {/* Badge de agendamentos dos últimos 30 dias */}
+          {appointmentCount > 0 && (
+            <div className="mb-3">
+              <Badge 
+                variant="secondary" 
+                className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer transition-colors"
+                onClick={handleShowAppointments}
+              >
+                <ClockIcon className="h-3 w-3 mr-1" />
+                Agend. Mês: {appointmentCount}
+              </Badge>
             </div>
           )}
           

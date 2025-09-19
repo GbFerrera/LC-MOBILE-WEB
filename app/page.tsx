@@ -126,7 +126,12 @@ export default function Home() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setScheduleData(response.data);
+        // Filtra os agendamentos para remover registros com status "free"
+        const filteredData = {
+          ...response.data,
+          appointments: response.data.appointments.filter(appointment => appointment.status !== 'free')
+        };
+        setScheduleData(filteredData);
         setError(null); // Limpa erro anterior se sucesso
       } catch (err) {
         console.error('Erro ao buscar agendamentos:', err);
@@ -373,10 +378,10 @@ export default function Home() {
                               ? 'bg-green-100 text-green-700'
                               : appointment.status === 'pending'
                               ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
+                              : 'bg-blue-100 text-blue-700'
                           }`}>
                             {appointment.status === 'confirmed' ? 'Confirmado' : 
-                             appointment.status === 'pending' ? 'Pendente' : 'Cancelado'}
+                             appointment.status === 'completed' ? 'Concluido' : 'Concluido'}
                           </span>
                         </div>
                       </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +12,15 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAuth } from "@/hooks/auth";
 import { api } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { parseISO } from "date-fns";
+import { parseISO, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { 
   PlusIcon, 
   CreditCardIcon, 
@@ -31,7 +36,9 @@ import {
   MinusCircleIcon,
   ArrowLeftIcon,
   FilterIcon,
-  SearchIcon
+  SearchIcon,
+  CalendarIcon,
+  XIcon as X
 } from "lucide-react";
 
 // Interfaces
@@ -139,6 +146,7 @@ export default function CommandsPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [cashDrawerAlertOpen, setCashDrawerAlertOpen] = useState(false);
 
   // Estados para dados
   const [clients, setClients] = useState<Client[]>([]);
@@ -173,17 +181,25 @@ export default function CommandsPage() {
   const [newlyAddedItems, setNewlyAddedItems] = useState<Set<string>>(new Set());
   const [addingItems, setAddingItems] = useState<Set<string>>(new Set());
   const [successItems, setSuccessItems] = useState<Set<string>>(new Set());
+  const [maxValueReached, setMaxValueReached] = useState(false);
 
   // Estados para filtros
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [clientNameFilter, setClientNameFilter] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Estados para filtros do modal de criação
+  const [clientFilter, setClientFilter] = useState<string>('');
+  const [professionalFilter, setProfessionalFilter] = useState<string>('');
+  const [serviceFilter, setServiceFilter] = useState<string>('');
+  const [productFilter, setProductFilter] = useState<string>('');
 
   useEffect(() => {
     if (user?.company_id) {
       fetchCommands();
     }
-  }, [user?.company_id]);
+  }, [user?.company_id, selectedDate, statusFilter]);
 
   // Funções para buscar dados
   const fetchCommands = async () => {
@@ -191,15 +207,25 @@ export default function CommandsPage() {
 
     try {
       setLoading(true);
-      // Corrigir formatação da data para padrão brasileiro
-      const today = new Date();
-      const todayISO = today.getFullYear() + '-' + 
-        String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(today.getDate()).padStart(2, '0');
-      const response = await api.get(`/commands/company/${user.company_id}?date=${todayISO}`, {
+      
+      // Preparar parâmetros de filtro
+      const params: Record<string, string> = {};
+      
+      // Se nenhuma data for selecionada, usar hoje por padrão
+      const dateToFilter = selectedDate || new Date().toISOString().split('T')[0];
+      params.date = dateToFilter;
+      
+      // Adicionar filtro por status se estiver selecionado
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      
+      const response = await api.get(`/commands/company/${user.company_id}`, {
         headers: {
+          company_id: user.company_id,
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        params: params
       });
       setCommands(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
@@ -329,6 +355,44 @@ export default function CommandsPage() {
     }).format(value);
   };
 
+  // Funções para formatação de input monetário
+  const formatCurrencyInput = (value: string, maxValue?: number, onMaxReached?: (reached: boolean) => void) => {
+    // Remove tudo exceto números
+    const numbers = value.replace(/\D/g, '');
+    
+    // Se vazio, retorna vazio
+    if (!numbers) {
+      onMaxReached?.(false);
+      return '';
+    }
+    
+    // Converte para número e divide por 100 para ter os centavos
+    let numberValue = parseInt(numbers) / 100;
+    let limitReached = false;
+    
+    // Limita ao valor máximo se especificado
+    if (maxValue !== undefined && numberValue > maxValue) {
+      numberValue = maxValue;
+      limitReached = true;
+    }
+    
+    // Notifica se o limite foi atingido
+    onMaxReached?.(limitReached);
+    
+    // Formata com separadores brasileiros
+    return numberValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const parseCurrencyInput = (value: string): number => {
+    // Remove pontos (separadores de milhar) e substitui vírgula por ponto
+    const cleanValue = value.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(cleanValue);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const formatDate = (dateString: string) => {
     const date = parseISO(dateString);
     return date.toLocaleDateString('pt-BR', {
@@ -410,6 +474,12 @@ export default function CommandsPage() {
   const openCreateCommandModal = () => {
     setCreateCommandModalOpen(true);
     setCurrentTab('client');
+    // Limpar filtros
+    setClientFilter('');
+    setProfessionalFilter('');
+    setServiceFilter('');
+    setProductFilter('');
+    // Carregar dados
     fetchClients();
     fetchServices();
     fetchProducts();
@@ -437,6 +507,7 @@ export default function CommandsPage() {
     setSelectedPaymentMethods([]);
     setPaymentAmount('');
     setSelectedPaymentType('cash');
+    setMaxValueReached(false);
     setPaymentModalOpen(true);
   };
 
@@ -466,7 +537,7 @@ export default function CommandsPage() {
 
       const response = await api.post('/commands', {
         client_id: selectedClient,
-        professional_id: selectedProfessional || null,
+        professional_id: selectedProfessional && selectedProfessional !== 'none' ? selectedProfessional : null,
         items: items.map(item => ({
           item_type: item.type,
           product_id: item.type === 'product' ? item.id : null,
@@ -509,15 +580,17 @@ export default function CommandsPage() {
 
   // Funções para gerenciar métodos de pagamento
   const addPaymentMethod = () => {
-    if (!paymentAmount || parseFloat(paymentAmount) <= 0) return;
+    const parsedAmount = parseCurrencyInput(paymentAmount);
+    if (!paymentAmount || parsedAmount <= 0) return;
 
     const newMethod = {
       method: selectedPaymentType,
-      amount: parseFloat(paymentAmount)
+      amount: parsedAmount
     };
 
     setSelectedPaymentMethods(prev => [...prev, newMethod]);
     setPaymentAmount('');
+    setMaxValueReached(false);
   };
 
   const removePaymentMethod = (index: number) => {
@@ -564,13 +637,30 @@ export default function CommandsPage() {
       
       // Refresh commands
       await fetchCommands();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao processar pagamento:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao processar pagamento",
-        variant: "destructive",
-      });
+      
+      // Verificar se o erro é relacionado à gaveta de caixa não aberta
+      if (error?.response?.status === 400 || 
+          error?.toString().includes("400") || 
+          error.response?.status === 400) {
+        
+        // Exibir a mensagem específica sobre a gaveta de caixa
+        toast({
+          title: "Erro",
+          description: "Não é possível criar um pagamento sem uma gaveta de caixa aberta para hoje. Abra uma gaveta primeiro.",
+          variant: "destructive",
+        });
+        
+        // Exibir um alerta personalizado para garantir que o usuário veja a mensagem
+        setCashDrawerAlertOpen(true);
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao processar pagamento",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsProcessingPayment(false);
     }
@@ -723,20 +813,67 @@ export default function CommandsPage() {
     const nameMatch = clientNameFilter === '' || 
       command.client_name.toLowerCase().includes(clientNameFilter.toLowerCase());
     
-    return statusMatch && nameMatch;
+    // Filtro por data
+    let dateMatch = true;
+    if (selectedDate) {
+      const dateFilter = new Date(selectedDate).toISOString().split('T')[0];
+      
+      // Verificar se created_at existe
+      if (command.created_at) {
+        // Extrair a data do formato DD/MM/YYYY HH:mm:ss ou ISO
+        if (typeof command.created_at === 'string' && command.created_at.includes('/')) {
+          const parts = command.created_at.split(' ')[0].split('/');
+          if (parts.length === 3) {
+            // Converter para YYYY-MM-DD para comparação
+            const cmdDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            dateMatch = cmdDate === dateFilter;
+          }
+        } else {
+          // Se não for no formato brasileiro, tentar formato padrão
+          try {
+            const date = new Date(command.created_at);
+            if (!isNaN(date.getTime())) {
+              const cmdDate = date.toISOString().split('T')[0];
+              dateMatch = cmdDate === dateFilter;
+            }
+          } catch (error) {
+            dateMatch = false;
+          }
+        }
+      } else {
+        dateMatch = false;
+      }
+    }
+    
+    return statusMatch && nameMatch && dateMatch;
   });
 
   // Função para limpar filtros
   const clearFilters = () => {
     setStatusFilter('all');
     setClientNameFilter('');
+    setSelectedDate('');
+  };
+
+  // Função para lidar com mudança de data
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date.toISOString().split('T')[0]);
+    } else {
+      setSelectedDate('');
+    }
+  };
+
+  // Função para converter string de data para objeto Date
+  const parseDate = (dateString: string): Date => {
+    return new Date(dateString + 'T00:00:00');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
       <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="w-full mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -811,37 +948,82 @@ export default function CommandsPage() {
             <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <label className="text-emerald-100 text-sm font-medium whitespace-nowrap">
-                    Status:
-                  </label>
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Status:</Label>
                   <Select value={statusFilter} onValueChange={(value: 'all' | 'open' | 'closed') => setStatusFilter(value)}>
-                    <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white">
-                      <SelectValue placeholder="Status" />
+                    <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white placeholder:text-white/70">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="open">Abertas</SelectItem>
                       <SelectItem value="closed">Fechadas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                  <label className="text-emerald-100 text-sm font-medium whitespace-nowrap">
-                    Cliente:
-                  </label>
-                  <div className="relative flex-1">
-                    <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
-                    <Input
-                      placeholder="Buscar por nome do cliente..."
-                      value={clientNameFilter}
-                      onChange={(e) => setClientNameFilter(e.target.value)}
-                      className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Cliente:</Label>
+                  <Input
+                    placeholder="Nome do cliente"
+                    value={clientNameFilter}
+                    onChange={(e) => setClientNameFilter(e.target.value)}
+                    className="w-40 bg-white/20 border-white/30 text-white placeholder:text-white/70"
+                  />
                 </div>
-                
-                {(statusFilter !== 'all' || clientNameFilter !== '') && (
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-white/90 text-sm font-medium min-w-fit">Data:</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-48 justify-start text-left font-normal bg-white/20 border-white/30 text-white hover:bg-white/30",
+                          !selectedDate && "text-white/70"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(parseDate(selectedDate), "dd/MM/yyyy", { locale: ptBR }) : "Selecione uma data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedDate ? parseDate(selectedDate) : undefined}
+                        onSelect={handleDateChange}
+                        initialFocus
+                      />
+                      <div className="p-3 pt-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-sm"
+                          onClick={() => setSelectedDate('')}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Limpar filtro de data
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-4 justify-between mt-6">
+            <div className="relative flex-1 max-w-md">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70 h-4 w-4" />
+              <Input
+                placeholder="Buscar por nome do cliente..."
+                value={clientNameFilter}
+                onChange={(e) => setClientNameFilter(e.target.value)}
+                className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {(statusFilter !== 'all' || clientNameFilter !== '' || selectedDate !== '') && (
                   <Button
                     variant="ghost"
                     onClick={clearFilters}
@@ -852,15 +1034,14 @@ export default function CommandsPage() {
                     Limpar
                   </Button>
                 )}
-              </div>
-              
-              {filteredCommands.length !== commands.length && (
-                <div className="mt-3 text-emerald-100 text-sm">
-                  Mostrando {filteredCommands.length} de {commands.length} comandas
-                </div>
-              )}
             </div>
-          )}
+            
+            {filteredCommands.length !== commands.length && (
+              <div className="mt-3 text-emerald-100 text-sm">
+                Mostrando {filteredCommands.length} de {commands.length} comandas
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -1072,202 +1253,518 @@ export default function CommandsPage() {
 
       {/* Modal para criar comanda */}
       <Dialog open={createCommandModalOpen} onOpenChange={setCreateCommandModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlusIcon className="h-5 w-5" />
-              Nova Comanda
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[95vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sm:p-6 -m-4 sm:-m-6 mb-4 sm:mb-6 rounded-t-lg">
+            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
+              <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
+                <PlusIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold truncate">Nova Comanda</h2>
+                <p className="text-emerald-100 text-xs sm:text-sm font-normal mt-1">Configure cliente, responsável e itens</p>
+              </div>
             </DialogTitle>
           </DialogHeader>
 
           <Tabs value={currentTab} onValueChange={(value: any) => setCurrentTab(value)}>
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="client" className="flex items-center gap-2">
-                <UsersIcon className="h-4 w-4" />
-                Cliente
+              <TabsTrigger value="client" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+                <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Cliente</span>
               </TabsTrigger>
-              <TabsTrigger value="items" className="flex items-center gap-2">
-                <ShoppingCartIcon className="h-4 w-4" />
-                Itens
+              <TabsTrigger value="items" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+                <ShoppingCartIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Itens</span>
               </TabsTrigger>
-              <TabsTrigger value="cart" className="flex items-center gap-2">
-                <CheckIcon className="h-4 w-4" />
-                Carrinho ({cartItems.length})
+              <TabsTrigger value="cart" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+                <CheckIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Carrinho ({cartItems.length})</span>
+                <span className="xs:hidden">🛒 {cartItems.length}</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="client" className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">Selecionar Cliente</Label>
-                  <div className="space-y-2 mt-2 max-h-60 overflow-y-auto">
-                    {clients.map((client) => (
+            <TabsContent value="client" className="space-y-4 sm:space-y-6">
+              {/* Header da seção */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3 sm:p-6">
+                <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 bg-emerald-600 text-white rounded-full flex-shrink-0">
+                      <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-emerald-800 text-base sm:text-lg truncate">Selecionar Cliente</h3>
+                      <p className="text-emerald-600 text-xs sm:text-sm">Escolha o cliente para esta comanda</p>
+                    </div>
+                  </div>
+                  
+                  {/* Select de Profissional no canto */}
+                  <div className="w-full lg:w-64 lg:flex-shrink-0">
+                    <Label className="text-xs text-teal-700 mb-1 block">Profissional (Opcional)</Label>
+                    <Select value={selectedProfessional || undefined} onValueChange={setSelectedProfessional}>
+                      <SelectTrigger className="border-teal-300 focus:border-teal-500 text-sm w-full">
+                        <SelectValue placeholder="Selecionar profissional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum profissional</SelectItem>
+                        {professionals.map((professional) => (
+                          <SelectItem key={professional.id} value={professional.id}>
+                            <span className="font-medium">{professional.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Filtro de Cliente */}
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar cliente por nome ou telefone..."
+                    value={clientFilter}
+                    onChange={(e) => setClientFilter(e.target.value)}
+                    className="pl-10 border-emerald-300 focus:border-emerald-500 bg-white/70"
+                  />
+                </div>
+              </div>
+              
+              {/* Lista de Clientes com Cores */}
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {clients
+                  .filter(client => 
+                    clientFilter === '' || 
+                    client.name.toLowerCase().includes(clientFilter.toLowerCase()) ||
+                    client.phone_number.includes(clientFilter)
+                  )
+                  .map((client, index) => {
+                    const colors = [
+                      'from-green-50 to-emerald-50 border-green-200',
+                      'from-teal-50 to-cyan-50 border-teal-200',
+                      'from-blue-50 to-indigo-50 border-blue-200'
+                    ];
+                    const colorClass = colors[index % colors.length];
+                    
+                    return (
                       <div
                         key={client.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        className={`p-3 sm:p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md bg-gradient-to-r ${
                           selectedClient === client.id
-                            ? 'border-emerald-500 bg-emerald-50'
-                            : 'border-gray-200 hover:border-emerald-300'
+                            ? 'border-emerald-500 bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg'
+                            : `${colorClass} hover:shadow-md`
                         }`}
                         onClick={() => setSelectedClient(client.id)}
                       >
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-sm text-gray-500">{client.phone_number}</div>
+                        <div className="flex items-center justify-between min-w-0">
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                            <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${
+                              selectedClient === client.id 
+                                ? 'bg-emerald-600 text-white' 
+                                : 'bg-white/70 text-gray-600'
+                            }`}>
+                              <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900 text-sm sm:text-base truncate">{client.name}</div>
+                              <div className="text-xs sm:text-sm text-gray-600 flex items-center gap-1">
+                                <span>📞</span>
+                                <span className="truncate">{client.phone_number}</span>
+                              </div>
+                              {client.email && (
+                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                  <span>✉️</span>
+                                  <span className="truncate">{client.email}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {selectedClient === client.id && (
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              <Badge className="bg-emerald-600 text-white text-xs">
+                                <CheckIcon className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Selecionado</span>
+                                <span className="sm:hidden">✓</span>
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })}
+                
+                {clients.filter(client => 
+                  clientFilter === '' || 
+                  client.name.toLowerCase().includes(clientFilter.toLowerCase()) ||
+                  client.phone_number.includes(clientFilter)
+                ).length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    {clientFilter ? (
+                      <>
+                        <SearchIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p>Nenhum cliente encontrado</p>
+                      </>
+                    ) : (
+                      <>
+                        <UsersIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p>Carregando clientes...</p>
+                      </>
+                    )}
                   </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium">Profissional (Opcional)</Label>
-                  <div className="space-y-2 mt-2">
-                    {professionals.map((professional) => (
-                      <div
-                        key={professional.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedProfessional === professional.id
-                            ? 'border-emerald-500 bg-emerald-50'
-                            : 'border-gray-200 hover:border-emerald-300'
-                        }`}
-                        onClick={() => setSelectedProfessional(professional.id)}
-                      >
-                        <div className="font-medium">{professional.name}</div>
-                        <div className="text-sm text-gray-500">{professional.position}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
             </TabsContent>
 
-            <TabsContent value="items" className="space-y-4">
+            <TabsContent value="items" className="space-y-6">
               <Tabs value={itemTab} onValueChange={(value: any) => setItemTab(value)}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="service">Serviços</TabsTrigger>
-                  <TabsTrigger value="product">Produtos</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-emerald-100 to-teal-100 p-1">
+                  <TabsTrigger value="service" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+                    <div className="flex items-center gap-2">
+                      <ClockIcon className="h-4 w-4" />
+                      Serviços
+                    </div>
+                  </TabsTrigger>
+                  <TabsTrigger value="product" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+                    <div className="flex items-center gap-2">
+                      <ShoppingCartIcon className="h-4 w-4" />
+                      Produtos
+                    </div>
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="service" className="space-y-4">
-                  {services.map((service) => (
-                    <Card key={service.service_id || service.id} className="p-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{service.service_name || service.name}</h4>
-                          <p className="text-emerald-600 font-semibold">
-                            {formatCurrency(service.service_price || service.price || 0)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateItemQuantity(
-                                service.service_id || service.id || '',
-                                getItemQuantity(service.service_id || service.id || '') - 1
-                              )}
-                            >
-                              <MinusCircleIcon className="h-4 w-4" />
-                            </Button>
-                            <span className="font-medium w-8 text-center">
-                              {getItemQuantity(service.service_id || service.id || '')}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateItemQuantity(
-                                service.service_id || service.id || '',
-                                getItemQuantity(service.service_id || service.id || '') + 1
-                              )}
-                            >
-                              <PlusCircleIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => addToCart(service, 'service')}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            Adicionar
-                          </Button>
-                        </div>
+                  {/* Filtro de Serviços */}
+                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-emerald-600 text-white rounded-full">
+                        <ClockIcon className="h-4 w-4" />
                       </div>
-                    </Card>
-                  ))}
+                      <h3 className="font-semibold text-emerald-800">Serviços Disponíveis</h3>
+                    </div>
+                    <div className="relative">
+                      <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 h-4 w-4" />
+                      <Input
+                        placeholder="Buscar serviços por nome..."
+                        value={serviceFilter}
+                        onChange={(e) => setServiceFilter(e.target.value)}
+                        className="pl-10 border-emerald-300 focus:border-emerald-500 bg-white/70"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    {services
+                      .filter(service => 
+                        serviceFilter === '' || 
+                        (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase())
+                      )
+                      .map((service) => {
+                        const serviceId = service.service_id || service.id || '';
+                        const serviceName = service.service_name || service.name || '';
+                        const servicePrice = service.service_price || service.price || 0;
+                        const quantity = getItemQuantity(serviceId);
+                        const isInCart = cartItems.some(item => item.id === serviceId && item.type === 'service');
+                        
+                        return (
+                          <Card key={serviceId} className={`p-5 border-2 transition-all duration-300 hover:shadow-lg ${
+                            isInCart ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-emerald-200 hover:border-emerald-400'
+                          }`}>
+                            <div className="space-y-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`p-1.5 rounded-full ${
+                                      isInCart ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-600'
+                                    }`}>
+                                      <ClockIcon className="h-3 w-3" />
+                                    </div>
+                                    <h4 className="font-semibold text-gray-900 text-sm">{serviceName}</h4>
+                                  </div>
+                                  <p className="text-xl font-bold text-emerald-600 mb-2">
+                                    {formatCurrency(servicePrice)}
+                                  </p>
+                                  {service.service_description && (
+                                    <p className="text-xs text-gray-500 leading-tight">
+                                      {service.service_description}
+                                    </p>
+                                  )}
+                                  {service.service_duration && (
+                                    <p className="text-xs text-emerald-600 mt-1">
+                                      Duração: {service.service_duration} min
+                                    </p>
+                                  )}
+                                </div>
+                                {isInCart && (
+                                  <div className="p-1 bg-emerald-600 text-white rounded-full">
+                                    <CheckIcon className="h-3 w-3" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 bg-emerald-100 rounded-full px-3 py-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-emerald-600 hover:bg-emerald-200"
+                                    onClick={() => updateItemQuantity(serviceId, quantity - 1)}
+                                  >
+                                    <MinusCircleIcon className="h-3 w-3" />
+                                  </Button>
+                                  <span className="font-bold text-emerald-700 w-6 text-center text-sm">
+                                    {quantity}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-emerald-600 hover:bg-emerald-200"
+                                    onClick={() => updateItemQuantity(serviceId, quantity + 1)}
+                                  >
+                                    <PlusCircleIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => addToCart(service, 'service')}
+                                  className={`transition-all ${
+                                    isInCart 
+                                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white' 
+                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                  }`}
+                                >
+                                  {isInCart ? (
+                                    <>
+                                      <CheckIcon className="h-3 w-3 mr-1" />
+                                      Atualizar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PlusIcon className="h-3 w-3 mr-1" />
+                                      Adicionar
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                  {services.filter(service => 
+                    serviceFilter === '' || 
+                    (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase())
+                  ).length === 0 && serviceFilter && (
+                    <div className="text-center py-12 text-gray-500">
+                      <ClockIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                      <p>Nenhum serviço encontrado</p>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="product" className="space-y-4">
-                  {products.map((product) => (
-                    <Card key={product.id} className="p-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{product.name}</h4>
-                          <p className="text-emerald-600 font-semibold">
-                            {formatCurrency(product.price)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateItemQuantity(product.id, getItemQuantity(product.id) - 1)}
-                            >
-                              <MinusCircleIcon className="h-4 w-4" />
-                            </Button>
-                            <span className="font-medium w-8 text-center">
-                              {getItemQuantity(product.id)}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateItemQuantity(product.id, getItemQuantity(product.id) + 1)}
-                            >
-                              <PlusCircleIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => addToCart(product, 'product')}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            Adicionar
-                          </Button>
-                        </div>
+                  {/* Filtro de Produtos */}
+                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-teal-600 text-white rounded-full">
+                        <ShoppingCartIcon className="h-4 w-4" />
                       </div>
-                    </Card>
-                  ))}
+                      <h3 className="font-semibold text-teal-800">Produtos Disponíveis</h3>
+                    </div>
+                    <div className="relative">
+                      <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-teal-400 h-4 w-4" />
+                      <Input
+                        placeholder="Buscar produtos por nome..."
+                        value={productFilter}
+                        onChange={(e) => setProductFilter(e.target.value)}
+                        className="pl-10 border-teal-300 focus:border-teal-500 bg-white/70"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    {products
+                      .filter(product => 
+                        productFilter === '' || 
+                        product.name.toLowerCase().includes(productFilter.toLowerCase())
+                      )
+                      .map((product) => {
+                        const quantity = getItemQuantity(product.id);
+                        const isInCart = cartItems.some(item => item.id === product.id && item.type === 'product');
+                        
+                        return (
+                          <Card key={product.id} className={`p-5 border-2 transition-all duration-300 hover:shadow-lg ${
+                            isInCart ? 'border-teal-500 bg-teal-50 shadow-md' : 'border-teal-200 hover:border-teal-400'
+                          }`}>
+                            <div className="space-y-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`p-1.5 rounded-full ${
+                                      isInCart ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-600'
+                                    }`}>
+                                      <ShoppingCartIcon className="h-3 w-3" />
+                                    </div>
+                                    <h4 className="font-semibold text-gray-900 text-sm">{product.name}</h4>
+                                  </div>
+                                  <p className="text-xl font-bold text-teal-600 mb-2">
+                                    {formatCurrency(product.price)}
+                                  </p>
+                                  {product.description && (
+                                    <p className="text-xs text-gray-500 leading-tight">
+                                      {product.description}
+                                    </p>
+                                  )}
+                                  {product.stock !== undefined && (
+                                    <p className="text-xs text-teal-600 mt-1">
+                                      Estoque: {product.stock}
+                                    </p>
+                                  )}
+                                </div>
+                                {isInCart && (
+                                  <div className="p-1 bg-teal-600 text-white rounded-full">
+                                    <CheckIcon className="h-3 w-3" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 bg-teal-100 rounded-full px-3 py-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-teal-600 hover:bg-teal-200"
+                                    onClick={() => updateItemQuantity(product.id, quantity - 1)}
+                                  >
+                                    <MinusCircleIcon className="h-3 w-3" />
+                                  </Button>
+                                  <span className="font-bold text-teal-700 w-6 text-center text-sm">
+                                    {quantity}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-teal-600 hover:bg-teal-200"
+                                    onClick={() => updateItemQuantity(product.id, quantity + 1)}
+                                    disabled={product.stock !== undefined && quantity >= product.stock}
+                                  >
+                                    <PlusCircleIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => addToCart(product, 'product')}
+                                  className={`transition-all ${
+                                    isInCart 
+                                      ? 'bg-teal-700 hover:bg-teal-800 text-white' 
+                                      : 'bg-teal-600 hover:bg-teal-700 text-white'
+                                  }`}
+                                  disabled={product.stock !== undefined && product.stock === 0}
+                                >
+                                  {isInCart ? (
+                                    <>
+                                      <CheckIcon className="h-3 w-3 mr-1" />
+                                      Atualizar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PlusIcon className="h-3 w-3 mr-1" />
+                                      Adicionar
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                  {products.filter(product => 
+                    productFilter === '' || 
+                    product.name.toLowerCase().includes(productFilter.toLowerCase())
+                  ).length === 0 && productFilter && (
+                    <div className="text-center py-12 text-gray-500">
+                      <ShoppingCartIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                      <p>Nenhum produto encontrado</p>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </TabsContent>
 
-            <TabsContent value="cart" className="space-y-4">
+            <TabsContent value="cart" className="space-y-6">
+              {/* Header do carrinho */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-600 text-white rounded-full">
+                    <ShoppingCartIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-green-800 text-lg">Resumo do Pedido</h3>
+                    <p className="text-green-600 text-sm">
+                      {cartItems.length} {cartItems.length === 1 ? 'item adicionado' : 'itens adicionados'}
+                    </p>
+                  </div>
+                  {cartItems.length > 0 && (
+                    <div className="ml-auto">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCartItems([])}
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        Limpar tudo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-4">
                 {cartItems.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <ShoppingCartIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                    <p>Nenhum item no carrinho</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <div className="bg-gray-100 rounded-full p-6 w-24 h-24 mx-auto mb-4">
+                      <ShoppingCartIcon className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="font-medium text-lg mb-2">Carrinho vazio</h3>
+                    <p className="text-sm">Adicione serviços ou produtos na aba anterior</p>
                   </div>
                 ) : (
                   <>
                     {cartItems.map((item) => (
-                      <Card key={`${item.id}-${item.type}`} className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{item.name}</h4>
-                            <p className="text-sm text-gray-600">
-                              {item.quantity}x {formatCurrency(item.price)} = {formatCurrency(item.total)}
-                            </p>
+                      <Card key={`${item.id}-${item.type}`} className="p-5 border-2 border-green-200 bg-gradient-to-r from-white to-green-50">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-full ${
+                            item.type === 'service' ? 'bg-emerald-100 text-emerald-600' : 'bg-teal-100 text-teal-600'
+                          }`}>
+                            {item.type === 'service' ? (
+                              <ClockIcon className="h-4 w-4" />
+                            ) : (
+                              <ShoppingCartIcon className="h-4 w-4" />
+                            )}
                           </div>
+                          
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                              <Badge variant="outline" className={`text-xs ${
+                                item.type === 'service' ? 'border-emerald-300 text-emerald-600' : 'border-teal-300 text-teal-600'
+                              }`}>
+                                {item.type === 'service' ? 'Serviço' : 'Produto'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span>Qtd: {item.quantity}</span>
+                              <span>×</span>
+                              <span className="font-medium text-green-600">{formatCurrency(item.price)}</span>
+                              <span>=</span>
+                              <span className="font-bold text-green-700">{formatCurrency(item.total)}</span>
+                            </div>
+                          </div>
+
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => removeFromCart(item.id, item.type)}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </Button>
@@ -1275,12 +1772,18 @@ export default function CommandsPage() {
                       </Card>
                     ))}
 
-                    <Card className="p-4 bg-emerald-50 border-emerald-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold">Total:</span>
-                        <span className="text-2xl font-bold text-emerald-600">
-                          {formatCurrency(getCartTotal())}
-                        </span>
+                    {/* Card do total */}
+                    <Card className="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-none shadow-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-emerald-100 text-sm mb-1">Total da Comanda</p>
+                          <span className="text-3xl font-bold">
+                            {formatCurrency(getCartTotal())}
+                          </span>
+                        </div>
+                        <div className="p-3 bg-white/20 rounded-full">
+                          <CheckIcon className="h-8 w-8" />
+                        </div>
                       </div>
                     </Card>
                   </>
@@ -1289,17 +1792,18 @@ export default function CommandsPage() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-between pt-6 border-t">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between pt-4 sm:pt-6 border-t">
             <Button 
               variant="outline" 
               onClick={() => setCreateCommandModalOpen(false)}
+              className="w-full sm:w-auto"
             >
               Cancelar
             </Button>
             <Button
               onClick={createCommand}
               disabled={!selectedClient || cartItems.length === 0 || isCreatingCommand}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 w-full sm:w-auto"
             >
               {isCreatingCommand ? 'Criando...' : 'Criar Comanda'}
             </Button>
@@ -1364,22 +1868,33 @@ export default function CommandsPage() {
 
                 {/* Campo de valor */}
                 <div className="space-y-2">
-                  <Label htmlFor="paymentAmount">Valor</Label>
+                  <Label htmlFor="paymentAmount">
+                    Valor (Máx: {formatCurrency(selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0))})
+                  </Label>
                   <Input
                     id="paymentAmount"
-                    type="number"
-                    step="0.01"
+                    type="text"
                     placeholder="0,00"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="text-lg"
+                    onChange={(e) => {
+                      const remainingValue = selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0);
+                      const formatted = formatCurrencyInput(e.target.value, remainingValue, setMaxValueReached);
+                      setPaymentAmount(formatted);
+                    }}
+                    className={`text-lg ${maxValueReached ? 'border-orange-400 bg-orange-50' : ''}`}
                   />
+                  {maxValueReached && (
+                    <p className="text-sm text-orange-600 flex items-center gap-1">
+                      <XIcon className="h-4 w-4" />
+                      Valor limitado ao máximo disponível da comanda
+                    </p>
+                  )}
                 </div>
 
                 <Button
                   onClick={addPaymentMethod}
                   className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+                  disabled={!paymentAmount || parseCurrencyInput(paymentAmount) <= 0}
                 >
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Adicionar Método
@@ -1799,6 +2314,34 @@ export default function CommandsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Alert Dialog para gaveta de caixa */}
+      <AlertDialog open={cashDrawerAlertOpen} onOpenChange={setCashDrawerAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
+                <span className="text-amber-600 font-bold text-sm">!</span>
+              </div>
+              Atenção
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Não é possível criar um pagamento sem uma gaveta de caixa aberta para hoje. Você será redirecionado para a página de Finanças ao clicar em 'Entendi'.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction 
+              onClick={() => {
+                setCashDrawerAlertOpen(false);
+                router.push("/financas");
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Entendi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

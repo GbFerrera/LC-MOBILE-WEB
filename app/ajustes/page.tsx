@@ -34,6 +34,9 @@ export default function AjustesPage() {
   const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
   const [isServicesDialogOpen, setIsServicesDialogOpen] = useState(false);
   const [isCreateServiceDialogOpen, setIsCreateServiceDialogOpen] = useState(false);
+  const [isEditServiceDialogOpen, setIsEditServiceDialogOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [isUpdatingService, setIsUpdatingService] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serviceHoursLoading, setServiceHoursLoading] = useState(false);
   const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
@@ -64,6 +67,13 @@ export default function AjustesPage() {
     position: ""
   });
   const [newServiceForm, setNewServiceForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    duration: ""
+  });
+
+  const [editServiceForm, setEditServiceForm] = useState({
     name: "",
     description: "",
     price: "",
@@ -688,6 +698,58 @@ export default function AjustesPage() {
     }
   };
 
+  // Abrir modal de edição de serviço
+  const handleEditServiceClick = (service: any) => {
+    setSelectedService(service);
+    setEditServiceForm({
+      name: service.service_name,
+      description: service.service_description || "",
+      price: service.base_price.toString(),
+      duration: service.base_duration.toString()
+    });
+    setIsEditServiceDialogOpen(true);
+  };
+
+  // Atualizar serviço existente
+  const handleUpdateService = async () => {
+    if (!selectedService || !user?.company_id) {
+      toast.error("Dados do serviço ou empresa não identificados");
+      return;
+    }
+
+    if (!editServiceForm.name || !editServiceForm.price || !editServiceForm.duration) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setIsUpdatingService(true);
+    try {
+      const serviceData = {
+        name: editServiceForm.name,
+        description: editServiceForm.description,
+        price: parseFloat(editServiceForm.price),
+        duration: parseInt(editServiceForm.duration)
+      };
+
+      await api.put(`/service/${selectedService.service_id}`, serviceData, {
+        headers: {
+          company_id: user.company_id
+        }
+      });
+
+      toast.success("Serviço atualizado com sucesso!");
+      setIsEditServiceDialogOpen(false);
+      
+      // Recarregar a lista de serviços
+      fetchServices();
+    } catch (error: any) {
+      console.error('Erro ao atualizar serviço:', error);
+      toast.error(error.response?.data?.error || "Erro ao atualizar serviço");
+    } finally {
+      setIsUpdatingService(false);
+    }
+  };
+
   // Criar novo serviço
   const handleCreateService = async () => {
     if (!user?.company_id) {
@@ -907,7 +969,7 @@ export default function AjustesPage() {
                         <Button
                           onClick={() => setIsCreateServiceDialogOpen(true)}
                           size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
+                          className="bg-orange-500 text-white hover:bg-orange-600 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
                         >
                           <PlusIcon className="h-4 w-4 mr-2" />
                           Novo Serviço
@@ -950,6 +1012,14 @@ export default function AjustesPage() {
                                       </div>
                                     </div>
                                   </div>
+                                  <Button
+                                    onClick={() => handleEditServiceClick(service)}
+                                    size="sm"
+                                    className="bg-orange-500 text-white hover:bg-orange-600 transition-all duration-300 shadow-sm hover:shadow-md"
+                                  >
+                                    <PencilIcon className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -980,6 +1050,117 @@ export default function AjustesPage() {
                         className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                       >
                         Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Edit Service Dialog */}
+                <Dialog open={isEditServiceDialogOpen} onOpenChange={setIsEditServiceDialogOpen}>
+                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg">
+                          <PencilIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Editar Serviço
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Atualize as informações do serviço
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4">                        
+                        <div>
+                          <Label htmlFor="edit-service-name" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Nome do Serviço *
+                          </Label>
+                          <Input
+                            id="edit-service-name"
+                            placeholder="Ex: Corte de Cabelo"
+                            value={editServiceForm.name}
+                            onChange={(e) => setEditServiceForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="edit-service-description" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Descrição
+                          </Label>
+                          <Input
+                            id="edit-service-description"
+                            placeholder="Ex: Corte masculino com máquina e tesoura"
+                            value={editServiceForm.description}
+                            onChange={(e) => setEditServiceForm(prev => ({ ...prev, description: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="edit-service-price" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Preço (R$) *
+                            </Label>
+                            <Input
+                              id="edit-service-price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="30.00"
+                              value={editServiceForm.price}
+                              onChange={(e) => setEditServiceForm(prev => ({ ...prev, price: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="edit-service-duration" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Duração (min) *
+                            </Label>
+                            <Input
+                              id="edit-service-duration"
+                              type="number"
+                              min="1"
+                              placeholder="30"
+                              value={editServiceForm.duration}
+                              onChange={(e) => setEditServiceForm(prev => ({ ...prev, duration: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditServiceDialogOpen(false);
+                          setSelectedService(null);
+                        }}
+                        disabled={isUpdatingService}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleUpdateService}
+                        disabled={isUpdatingService}
+                        className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        {isUpdatingService ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                            Atualizando...
+                          </>
+                        ) : (
+                          <>
+                            <PencilIcon className="h-4 w-4 mr-2" />
+                            Atualizar Serviço
+                          </>
+                        )}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

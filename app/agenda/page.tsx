@@ -187,7 +187,9 @@ export default function AgendaPage() {
   // Estado do diálogo de agendamento
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [selectedEndTime, setSelectedEndTime] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFreeIntervalMode, setIsFreeIntervalMode] = useState(false);
 
   // Estado do drawer de detalhes do agendamento
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -454,10 +456,18 @@ export default function AgendaPage() {
       notes: "",
     });
     setSelectedSlot("");
+    setSelectedEndTime("");
+    setIsFreeIntervalMode(false);
   };
 
   const openAppointmentDialog = (slot: string) => {
     setSelectedSlot(slot);
+    // Calcular horário final padrão (15 minutos depois)
+    const [hours, minutes] = slot.split(":").map(Number);
+    const endTime = new Date();
+    endTime.setHours(hours, minutes + 15);
+    const formattedEndTime = endTime.toTimeString().slice(0, 5);
+    setSelectedEndTime(formattedEndTime);
     setIsDialogOpen(true);
   };
 
@@ -482,7 +492,38 @@ export default function AgendaPage() {
     try {
       setIsSubmitting(true);
 
-      // Validar dados do formulário
+      // Se estiver no modo Intervalo Livre, usar lógica diferente
+      if (isFreeIntervalMode) {
+        // Validar se horário final foi selecionado
+        if (!selectedEndTime) {
+          throw new Error("Por favor, selecione o horário final do intervalo");
+        }
+
+        const intervalData = {
+          professional_id: user.id,
+          appointment_date: date.toISOString().split("T")[0],
+          start_time: selectedSlot,
+          end_time: selectedEndTime,
+          notes: formData.notes || "Intervalo livre criado via slot",
+        };
+
+        const response = await api.post(
+          "/schedules/free-interval",
+          intervalData,
+          {
+            headers: {
+              company_id: user?.company_id,
+            },
+          }
+        );
+
+        toast.success("Intervalo livre criado com sucesso!");
+        closeAppointmentDialog();
+        fetchAppointments(user.id, date);
+        return;
+      }
+
+      // Validar dados do formulário para agendamento normal
       if (!formData.client_id || formData.service_ids.length === 0) {
         throw new Error("Por favor, selecione o cliente e pelo menos um serviço");
       }
@@ -815,10 +856,10 @@ export default function AgendaPage() {
       }
     } else if (isFree) {
       return {
-        containerClass: "bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed shadow-md",
-        timeClass: "text-orange-700",
-        textClass: "text-orange-600",
-        iconColor: "text-orange-500"
+        containerClass: "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100",
+        timeClass: "text-gray-700",
+        textClass: "text-gray-600",
+        iconColor: "text-gray-500"
       };
     } else {
       // Slot disponível (cinza)
@@ -875,6 +916,34 @@ export default function AgendaPage() {
     });
 
     return Array.from(availableMinutes).sort();
+  };
+
+  // Gera horários de fim válidos para intervalos livres (slots de 15 minutos)
+  const getValidEndTimes = (startTime: string) => {
+    if (!startTime) return [];
+    
+    const [startHour, startMinute] = startTime.split(":").map(Number);
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTimes: string[] = [];
+    
+    // Gerar opções de horário final em intervalos de 15 minutos
+    // Mínimo: 15 minutos depois do início
+    // Máximo: até o final do expediente
+    const maxEndMinutes = Math.max(...availableSlots.map(slot => {
+      const [hour, minute] = slot.split(":").map(Number);
+      return hour * 60 + minute + 15; // Último slot + 15 minutos
+    }));
+    
+    for (let minutes = startTotalMinutes + 15; minutes <= maxEndMinutes; minutes += 15) {
+      const hour = Math.floor(minutes / 60);
+      const minute = minutes % 60;
+      const timeString = `${hour.toString().padStart(2, "0")}:${minute
+        .toString()
+        .padStart(2, "0")}`;
+      endTimes.push(timeString);
+    }
+    
+    return endTimes;
   };
 
   const formattedDate = formatDate(date);
@@ -940,6 +1009,8 @@ export default function AgendaPage() {
         return "Concluído";
       case "canceled":
         return "Cancelado";
+      case "free":
+        return "Intervalo";
       default:
         return status;
     }
@@ -956,6 +1027,8 @@ export default function AgendaPage() {
         return "bg-blue-200 text-gray-700";
       case "canceled":
         return "bg-red-200 text-gray-700";
+      case "free":
+        return "bg-gray-500/10 text-gray-600 border-gray-500/20";
       default:
         return "bg-gray-200 text-gray-700";
     }
@@ -1058,7 +1131,7 @@ export default function AgendaPage() {
       }
     } catch (error) {
       console.log("Erro ao configurar intervalo:", error);
-      alert(error.response.data.message)
+      alert(error.response.data.message);
     } finally {
       setIsLoadingButton(false);
     }
@@ -1344,7 +1417,7 @@ export default function AgendaPage() {
                                 ? "bg-blue-200 border-2 border-blue-300 cursor-pointer hover:shadow-md text-gray-700"
                                 : "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
                               : isFree
-                              ? "bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed"
+                              ? "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100"
                               : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
                           }`}
                           onClick={
@@ -1355,7 +1428,14 @@ export default function AgendaPage() {
                                   setIsDrawerOpen(true);
                                 }
                               : isFree
-                              ? undefined // Intervalo livre não é clicável
+                              ? () => {
+                                  // Mostrar detalhes do intervalo livre no drawer
+                                  const freeInterval = getFreeIntervalDetails(slot);
+                                  if (freeInterval) {
+                                    setSelectedAppointment(freeInterval);
+                                    setIsDrawerOpen(true);
+                                  }
+                                }
                               : () => handleSlotClick(slot)
                           }
                           title={
@@ -1364,7 +1444,7 @@ export default function AgendaPage() {
                                   appointment?.client?.name || "Cliente"
                                 }`
                               : isFree
-                              ? "Horário de intervalo - Não disponível para agendamento"
+                              ? "Intervalo livre - Clique para ver detalhes ou cancelar"
                               : "Clique para agendar"
                           }
                         >
@@ -1374,7 +1454,7 @@ export default function AgendaPage() {
                               isBooked && appointment && appointment.status !== 'canceled'
                                 ? "bg-white/60"
                                 : isFree
-                                ? "bg-orange-100"
+                                ? "bg-gray-300"
                                 : "bg-green-100"
                             }`}>
                               <svg
@@ -1382,7 +1462,7 @@ export default function AgendaPage() {
                                   isBooked && appointment && appointment.status !== 'canceled'
                                     ? "text-gray-600"
                                     : isFree
-                                    ? "text-orange-600"
+                                    ? "text-gray-700"
                                     : "text-green-600"
                                 }`}
                                 fill="none"
@@ -1402,7 +1482,7 @@ export default function AgendaPage() {
                                 isBooked && appointment && appointment.status !== 'canceled'
                                   ? "text-gray-700"
                                   : isFree
-                                  ? "text-orange-700"
+                                  ? "text-gray-700"
                                   : "text-gray-700"
                               }`}>
                                 {slot}
@@ -1411,7 +1491,7 @@ export default function AgendaPage() {
                                 isBooked && appointment && appointment.status !== 'canceled'
                                   ? "text-gray-600"
                                   : isFree
-                                  ? "text-orange-600"
+                                  ? "text-gray-600"
                                   : "text-green-600"
                               }`}>
                                 {isBooked && appointment && appointment.status !== 'canceled'
@@ -1447,7 +1527,7 @@ export default function AgendaPage() {
                                 {getStatusText(appointment.status)}
                               </div>
                             ) : isFree ? (
-                              <div className="text-orange-600">
+                              <div className="text-gray-600">
                                 <CircleX size={20} />
                               </div>
                             ) : (
@@ -1484,9 +1564,15 @@ export default function AgendaPage() {
         <DialogContent className="sm:max-w-[500px] rounded-2xl border-0 shadow-2xl">
           <form onSubmit={handleSubmitAppointment}>
             <DialogHeader className="text-center pb-6">
-              <div className="mx-auto bg-gradient-to-br from-emerald-100 to-teal-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                isFreeIntervalMode 
+                  ? "bg-gradient-to-br from-emerald-100 to-teal-100" 
+                  : "bg-gradient-to-br from-emerald-100 to-teal-100"
+              }`}>
                 <svg
-                  className="w-8 h-8 text-emerald-600"
+                  className={`w-8 h-8 ${
+                    isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1495,29 +1581,84 @@ export default function AgendaPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    d={isFreeIntervalMode 
+                      ? "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      : "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    }
                   />
                 </svg>
               </div>
-              <DialogTitle className="text-2xl font-bold text-gray-800">
-                Novo Agendamento
+              
+              {/* Toggle Switch Minimalista */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-3 bg-gray-100 rounded-full p-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeIntervalMode(false)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      !isFreeIntervalMode
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Novo Agendamento
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeIntervalMode(true)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      isFreeIntervalMode
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Intervalo Livre
+                  </button>
+                </div>
+              </div>
+
+              <DialogTitle className={`text-2xl font-bold ${
+                isFreeIntervalMode ? "text-emerald-800" : "text-gray-800"
+              }`}>
+                {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
               </DialogTitle>
               <DialogDescription className="text-gray-600 mt-2">
-                Preencha os dados para criar um novo agendamento para{" "}
-                <span className="font-semibold text-emerald-600">
-                  {selectedSlot}
-                </span>
+                {isFreeIntervalMode 
+                  ? (
+                    <>
+                      Criar um intervalo livre para{" "}
+                      <span className="font-semibold text-emerald-600">
+                        {selectedSlot}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Preencha os dados para criar um novo agendamento para{" "}
+                      <span className="font-semibold text-emerald-600">
+                        {selectedSlot}
+                      </span>
+                    </>
+                  )
+                }
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-6">
               {/* Data e Horário - Destacado */}
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+              <div className={`rounded-xl p-4 border-2 ${
+                isFreeIntervalMode 
+                  ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200" 
+                  : "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200"
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-emerald-100 rounded-lg p-2">
+                    <div className={`rounded-lg p-2 ${
+                      isFreeIntervalMode ? "bg-emerald-100" : "bg-emerald-100"
+                    }`}>
                       <svg
-                        className="w-5 h-5 text-emerald-600"
+                        className={`w-5 h-5 ${
+                          isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
+                        }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1531,18 +1672,64 @@ export default function AgendaPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-semibold text-emerald-800">
+                      <p className={`font-semibold ${
+                        isFreeIntervalMode ? "text-emerald-800" : "text-emerald-800"
+                      }`}>
                         Data e Horário
                       </p>
-                      <p className="text-emerald-700">
+                      <p className={`${
+                        isFreeIntervalMode ? "text-emerald-700" : "text-emerald-700"
+                      }`}>
                         {date.toLocaleDateString("pt-BR")} às {selectedSlot}
+                        {isFreeIntervalMode && selectedEndTime && ` - ${selectedEndTime}`}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Cliente - Com busca */}
+              {/* Horário Final - Apenas para Intervalo Livre */}
+              {isFreeIntervalMode && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-emerald-700 flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário Final *
+                  </Label>
+                  <Select
+                    value={selectedEndTime}
+                    onValueChange={setSelectedEndTime}
+                  >
+                    <SelectTrigger className="h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-lg">
+                      <SelectValue placeholder="Selecione o horário final" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getValidEndTimes(selectedSlot).map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-emerald-600">
+                    Horários disponíveis em intervalos de 15 minutos
+                  </p>
+                </div>
+              )}
+
+              {/* Cliente - Com busca (apenas para agendamento normal) */}
+              {!isFreeIntervalMode && (
               <div className="space-y-2">
                 <Label
                   htmlFor="client_id"
@@ -1648,8 +1835,10 @@ export default function AgendaPage() {
                   )}
                 </div>
               </div>
+              )}
 
-              {/* Serviços - Select com Dropdown Customizado */}
+              {/* Serviços - Select com Dropdown Customizado (apenas para agendamento normal) */}
+              {!isFreeIntervalMode && (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-700 flex items-center">
                   <svg
@@ -1785,15 +1974,20 @@ export default function AgendaPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Observações */}
               <div className="space-y-2">
                 <Label
                   htmlFor="notes"
-                  className="text-sm font-semibold text-gray-700 flex items-center"
+                  className={`text-sm font-semibold flex items-center ${
+                    isFreeIntervalMode ? "text-emerald-700" : "text-gray-700"
+                  }`}
                 >
                   <svg
-                    className="w-4 h-4 mr-2 text-gray-500"
+                    className={`w-4 h-4 mr-2 ${
+                      isFreeIntervalMode ? "text-emerald-500" : "text-gray-500"
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1805,15 +1999,22 @@ export default function AgendaPage() {
                       d="M7 8h10M7 12h4m-7 8l4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z"
                     />
                   </svg>
-                  Observações
+                  {isFreeIntervalMode ? "Motivo do Intervalo" : "Observações"}
                 </Label>
                 <Textarea
                   id="notes"
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  placeholder="Alguma observação importante?"
-                  className="min-h-[80px] border-2 border-gray-200 focus:border-emerald-400 rounded-lg resize-none"
+                  placeholder={isFreeIntervalMode 
+                    ? "Informe o motivo do intervalo livre (opcional)"
+                    : "Alguma observação importante?"
+                  }
+                  className={`min-h-[80px] border-2 rounded-lg resize-none ${
+                    isFreeIntervalMode 
+                      ? "border-emerald-200 focus:border-emerald-400" 
+                      : "border-gray-200 focus:border-emerald-400"
+                  }`}
                 />
               </div>
             </div>
@@ -1831,7 +2032,11 @@ export default function AgendaPage() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isFreeIntervalMode
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                    : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                }`}
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
@@ -1854,7 +2059,7 @@ export default function AgendaPage() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Salvando...
+                    {isFreeIntervalMode ? "Criando intervalo..." : "Salvando..."}
                   </span>
                 ) : (
                   <span className="flex items-center">
@@ -1871,7 +2076,7 @@ export default function AgendaPage() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    Agendar
+                    {isFreeIntervalMode ? "Criar Intervalo" : "Agendar"}
                   </span>
                 )}
               </Button>
@@ -1885,10 +2090,15 @@ export default function AgendaPage() {
         <DrawerContent className="max-h-[85vh]">
           <DrawerHeader className="text-center pb-2">
             <DrawerTitle className="text-xl font-bold text-gray-800">
-              {selectedAppointment?.client?.name || "Cliente"}
+              {selectedAppointment?.status === "free" 
+                ? "Intervalo Livre" 
+                : selectedAppointment?.client?.name || "Cliente"
+              }
             </DrawerTitle>
             <DrawerDescription className="text-gray-600">
-              {selectedAppointment?.services && selectedAppointment.services.length > 1 
+              {selectedAppointment?.status === "free" 
+                ? `${selectedAppointment?.start_time?.slice(0, 5)} - ${selectedAppointment?.end_time?.slice(0, 5)}`
+                : selectedAppointment?.services && selectedAppointment.services.length > 1 
                 ? `${selectedAppointment.services.length} serviços • R$ ${selectedAppointment.services.reduce((total, service) => total + (parseFloat(service.price) || 0), 0).toFixed(2)}`
                 : `${selectedAppointment?.services?.[0]?.service_name || "Serviço"} • R$ ${selectedAppointment?.services?.[0]?.price || "0.00"}`
               }
@@ -1900,12 +2110,15 @@ export default function AgendaPage() {
               <>
                 {/* Informações Principais */}
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Telefone</span>
-                    <span className="font-medium">
-                      {selectedAppointment.client?.phone_number || "N/A"}
-                    </span>
-                  </div>
+                  {/* Telefone - apenas para agendamentos normais */}
+                  {selectedAppointment.status !== "free" && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Telefone</span>
+                      <span className="font-medium">
+                        {selectedAppointment.client?.phone_number || "N/A"}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Horário</span>
@@ -1915,9 +2128,18 @@ export default function AgendaPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Status</span>
-                    <div className="relative">
+                  {/* Para intervalos livres, mostrar Tipo em vez de Status */}
+                  {selectedAppointment.status === "free" ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Tipo</span>
+                      <div className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/10 text-gray-600 border border-gray-500/20">
+                        Intervalo Livre
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Status</span>
+                      <div className="relative">
                       <button
                         onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
                         disabled={isUpdatingStatus}
@@ -2100,10 +2322,10 @@ export default function AgendaPage() {
                         ></div>
                       )}
                     </div>
-                  </div>
-
-                  {/* Lista de Serviços */}
-                  {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                    </div>
+                  )}
+                  {/* Lista de Serviços - apenas para agendamentos normais */}
+                  {selectedAppointment.status !== "free" && selectedAppointment.services && selectedAppointment.services.length > 0 && (
                     <div className="pt-2 border-t border-gray-200">
                       <span className="text-gray-600 text-sm mb-2 block">
                         {selectedAppointment.services.length > 1 ? 'Serviços:' : 'Serviço:'}
@@ -2139,8 +2361,8 @@ export default function AgendaPage() {
           </div>
 
           <DrawerFooter className="pt-4 border-t border-gray-100 space-y-3">
-            {/* Botão WhatsApp */}
-            {selectedAppointment?.client?.phone_number && (
+            {/* Botão WhatsApp - apenas para agendamentos normais */}
+            {selectedAppointment?.status !== "free" && selectedAppointment?.client?.phone_number && (
               <Button
                 onClick={() => openWhatsApp(
                   selectedAppointment.client.phone_number,
@@ -2158,6 +2380,46 @@ export default function AgendaPage() {
                   </svg>
                   <span>Enviar WhatsApp</span>
                 </span>
+              </Button>
+            )}
+            
+            {/* Botão Cancelar Intervalo - apenas para intervalos livres */}
+            {selectedAppointment?.status === "free" && (
+              <Button
+                onClick={() => {
+                  if (selectedAppointment) {
+                    updateAppointmentStatus(selectedAppointment.id, "canceled");
+                  }
+                }}
+                disabled={isUpdatingStatus}
+                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
+              >
+                {isUpdatingStatus ? (
+                  <span className="flex items-center justify-center space-x-2">
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span>Cancelando...</span>
+                  </span>
+                ) : (
+                  <span>Cancelar Intervalo</span>
+                )}
               </Button>
             )}
             
@@ -2194,6 +2456,27 @@ export default function AgendaPage() {
         onOpenChange={setIsIntervalDrawerOpen}
       >
         <DrawerContent className="max-h-[90vh] bg-white">
+          {/* Header Modernizado */}
+          <div className="text-center pb-6 pt-8 px-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200">
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-emerald-100 to-teal-100">
+              <svg
+                className="w-8 h-8 text-emerald-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-emerald-800">Intervalo Livre</h2>
+            <p className="text-emerald-700 mt-2">Crie um intervalo livre em uma data específica</p>
+          </div>
+          
           <div className="flex-1 overflow-y-auto max-h-[70vh]">
             <form
               onSubmit={handleIntervalSubmit}
@@ -2204,9 +2487,22 @@ export default function AgendaPage() {
                 <div className="md:col-span-2">
                   <Label
                     htmlFor="professional_id"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                    className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center"
                   >
-                    👤 Profissional
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                    Profissional
                   </Label>
                   <Input
                     id="professional_id"
@@ -2217,33 +2513,66 @@ export default function AgendaPage() {
                   />
                 </div>
 
-                {/* Appointment Date */}
-                <div>
-                  <Label
-                    htmlFor="appointment_date"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
-                  >
-                    📅 Data do Agendamento
-                  </Label>
-                  <Input
-                    id="appointment_date"
-                    type="date"
-                    value={formIntervals.appointment_date}
-                    onChange={(e) =>
-                      handleIntervalFormChange(
-                        "appointment_date",
-                        e.target.value
-                      )
-                    }
-                    className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm"
-                    required
-                  />
+                {/* Data Destacada */}
+                <div className="md:col-span-2">
+                  <div className="rounded-xl p-4 border-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="rounded-lg p-2 bg-emerald-100">
+                          <svg
+                            className="w-5 h-5 text-emerald-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-emerald-800 mb-2">
+                            Data do Intervalo Livre
+                          </p>
+                          <Input
+                            id="appointment_date"
+                            type="date"
+                            value={formIntervals.appointment_date}
+                            onChange={(e) =>
+                              handleIntervalFormChange(
+                                "appointment_date",
+                                e.target.value
+                              )
+                            }
+                            className="border-2 border-emerald-200 focus:border-emerald-400 rounded-lg bg-white shadow-sm"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Start Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    🕐 Horário de Início
+                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário de Início
                   </Label>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
@@ -2307,8 +2636,21 @@ export default function AgendaPage() {
 
                 {/* End Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    🕐 Horário de Fim
+                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário Final
                   </Label>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
@@ -2370,23 +2712,35 @@ export default function AgendaPage() {
                   </div>
                 </div>
 
-                {/* Notes */}
-                <div className="md:col-span-2">
+                {/* Observações */}
+                <div className="md:col-span-2 space-y-2">
                   <Label
                     htmlFor="notes"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                    className="text-sm font-semibold text-emerald-700 flex items-center"
                   >
-                    📝 Observações (opci)
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 8h10M7 12h4m-7 8l4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z"
+                      />
+                    </svg>
+                    Motivo do Intervalo
                   </Label>
                   <Textarea
                     id="notes"
-                    placeholder="Selecione o motivo do intervalo livre"
+                    placeholder="Informe o motivo do intervalo livre (opcional)"
                     value={formIntervals.notes}
                     onChange={(e) =>
                       handleIntervalFormChange("notes", e.target.value)
                     }
-                    className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm min-h-[100px] resize-none"
-                    rows={4}
+                    className="min-h-[80px] border-2 rounded-lg resize-none border-emerald-200 focus:border-emerald-400"
                   />
                 </div>
               </div>

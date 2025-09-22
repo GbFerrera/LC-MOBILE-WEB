@@ -51,6 +51,13 @@ interface Service {
   service_duration: number;
 }
 
+interface FitSlot {
+  time: string;
+  endTime: string;
+  duration: number;
+  isEncaixe: boolean;
+}
+
 interface Schedule {
   id: number;
   professional_id: number;
@@ -70,6 +77,28 @@ interface ScheduleResponse {
   hasSchedule: boolean;
   schedules: Schedule[];
 }
+
+// Funções utilitárias para lógica de encaixes
+const timeToMinutes = (timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (minutes: number): string => {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute
+    .toString()
+    .padStart(2, "0")}`;
+};
+
+const getNextStandardSlot = (minutes: number): number => {
+  return Math.ceil(minutes / 15) * 15;
+};
+
+const isShortInterval = (startMinutes: number, endMinutes: number): boolean => {
+  return (endMinutes - startMinutes) < 30 && (endMinutes - startMinutes) >= 15;
+};
 
 function generateTimeSlots(
   data: any,
@@ -190,6 +219,9 @@ export default function AgendaPage() {
   const [selectedEndTime, setSelectedEndTime] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFreeIntervalMode, setIsFreeIntervalMode] = useState(false);
+  const [isEncaixe, setIsEncaixe] = useState(false);
+  const [encaixeEndTime, setEncaixeEndTime] = useState<string>("");
+  const [fitSlots, setFitSlots] = useState<FitSlot[]>([]);
 
   // Estado do drawer de detalhes do agendamento
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -232,6 +264,61 @@ export default function AgendaPage() {
     notes: "",
   });
 
+  // Função para detectar slots de encaixe
+  const detectFitSlots = (availableSlots: string[], appointments: any[]): FitSlot[] => {
+    const fitSlots: FitSlot[] = [];
+    
+    // Ordenar agendamentos por horário
+    const sortedAppointments = appointments
+      .filter(appt => appt.status !== "free" && appt.status !== "canceled")
+      .sort((a, b) => {
+        const timeA = timeToMinutes(a.start_time.slice(0, 5));
+        const timeB = timeToMinutes(b.start_time.slice(0, 5));
+        return timeA - timeB;
+      });
+
+    for (const appointment of sortedAppointments) {
+      const endTimeStr = appointment.end_time.slice(0, 5);
+      const endMinutes = timeToMinutes(endTimeStr);
+      
+      // Verificar se o agendamento termina em um horário não-padrão (não múltiplo de 15)
+      const nextStandardSlotMinutes = getNextStandardSlot(endMinutes);
+      
+      if (nextStandardSlotMinutes > endMinutes) {
+        const duration = nextStandardSlotMinutes - endMinutes;
+        
+        // Só criar encaixe se a duração for de pelo menos 10 minutos e máximo 30 minutos
+        if (duration >= 10 && duration <= 30) {
+          const fitStartTime = minutesToTime(endMinutes);
+          const fitEndTime = minutesToTime(nextStandardSlotMinutes);
+          
+          // Verificar se não há conflito com outros agendamentos
+          const hasConflict = sortedAppointments.some(otherAppt => {
+            if (otherAppt.id === appointment.id) return false; // Não comparar consigo mesmo
+            
+            const otherStartMinutes = timeToMinutes(otherAppt.start_time.slice(0, 5));
+            const otherEndMinutes = timeToMinutes(otherAppt.end_time.slice(0, 5));
+            
+            // Verificar sobreposição: o encaixe (endMinutes até nextStandardSlotMinutes) 
+            // não deve sobrepor com outro agendamento (otherStartMinutes até otherEndMinutes)
+            return (endMinutes < otherEndMinutes && nextStandardSlotMinutes > otherStartMinutes);
+          });
+          
+          if (!hasConflict) {
+            fitSlots.push({
+              time: fitStartTime,
+              endTime: fitEndTime,
+              duration: duration,
+              isEncaixe: true
+            });
+          }
+        }
+      }
+    }
+    
+    return fitSlots;
+  };
+
   // Buscar agendamentos do dia
   const fetchAppointments = async (userId: string, date: Date) => {
     try {
@@ -248,12 +335,11 @@ export default function AgendaPage() {
         }
       );
 
-      console.log("Dados completos da API:", response.data);
-
-      // A API agora retorna: { schedule: {...}, appointments: [...] }
+      // A API retorna: { schedule: {...}, appointments: [...] }
       const appointments = response.data?.appointments || [];
-      console.log("Agendamentos do dia:", appointments);
       setAppointments(appointments);
+      
+      // Detectar slots de encaixe é feito no useEffect que monitora appointments
     } catch (error) {
       console.error("Erro ao buscar agendamentos:", error);
       toast.error("Erro ao carregar agendamentos");
@@ -396,6 +482,14 @@ export default function AgendaPage() {
     }
   }, [date]);
 
+  // Recalcular encaixes quando slots ou agendamentos mudarem
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      const detectedFitSlots = detectFitSlots(availableSlots, appointments);
+      setFitSlots(detectedFitSlots);
+    }
+  }, [availableSlots, appointments]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -458,16 +552,26 @@ export default function AgendaPage() {
     setSelectedSlot("");
     setSelectedEndTime("");
     setIsFreeIntervalMode(false);
+    setIsEncaixe(false);
+    setEncaixeEndTime("");
   };
 
-  const openAppointmentDialog = (slot: string) => {
+  const openAppointmentDialog = (slot: string, isEncaixeSlot = false, encaixeEnd?: string) => {
     setSelectedSlot(slot);
-    // Calcular horário final padrão (15 minutos depois)
-    const [hours, minutes] = slot.split(":").map(Number);
-    const endTime = new Date();
-    endTime.setHours(hours, minutes + 15);
-    const formattedEndTime = endTime.toTimeString().slice(0, 5);
-    setSelectedEndTime(formattedEndTime);
+    setIsEncaixe(isEncaixeSlot);
+    
+    if (isEncaixeSlot && encaixeEnd) {
+      setEncaixeEndTime(encaixeEnd);
+      setSelectedEndTime(encaixeEnd);
+    } else {
+      // Calcular horário final padrão (15 minutos depois)
+      const [hours, minutes] = slot.split(":").map(Number);
+      const endTime = new Date();
+      endTime.setHours(hours, minutes + 15);
+      const formattedEndTime = endTime.toTimeString().slice(0, 5);
+      setSelectedEndTime(formattedEndTime);
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -476,12 +580,12 @@ export default function AgendaPage() {
     resetForm();
   };
 
-  const handleSlotClick = (time: string) => {
+  const handleSlotClick = (time: string, isEncaixeSlot = false, encaixeEnd?: string) => {
     if (!user) {
       toast.error("Você precisa estar logado para agendar");
       return;
     }
-    openAppointmentDialog(time);
+    openAppointmentDialog(time, isEncaixeSlot, encaixeEnd);
   };
 
   const handleSubmitAppointment = async (e: React.FormEvent) => {
@@ -547,13 +651,18 @@ export default function AgendaPage() {
       // Calcular duração total de todos os serviços
       const totalDuration = selectedServices.reduce((total, service) => total + (service.service_duration || 0), 0);
 
-      // Calcular end_time baseado na duração total
-      const endTime = new Date(date);
-      endTime.setHours(
-        parseInt(hours),
-        parseInt(minutes) + totalDuration
-      );
-      const formattedEndTime = endTime.toTimeString().slice(0, 5);
+      // Calcular end_time baseado na duração total ou usar horário de encaixe
+      let formattedEndTime;
+      if (isEncaixe && encaixeEndTime) {
+        formattedEndTime = encaixeEndTime;
+      } else {
+        const endTime = new Date(date);
+        endTime.setHours(
+          parseInt(hours),
+          parseInt(minutes) + totalDuration
+        );
+        formattedEndTime = endTime.toTimeString().slice(0, 5);
+      }
 
       // Criar o payload do agendamento
       const appointmentData = {
@@ -564,6 +673,7 @@ export default function AgendaPage() {
         end_time: formattedEndTime,
         status: status, // Usando o status 'confirmed' definido anteriormente
         notes: formData.notes || "",
+        isEncaixe: isEncaixe, // Flag para indicar que é um encaixe
         services: selectedServices.map(service => ({
           service_id: parseInt(service.service_id?.toString() || service.service_id?.toString() || "0"),
           professional_id: user.id,
@@ -571,7 +681,7 @@ export default function AgendaPage() {
         })),
       };
 
-      console.log("Dados do agendamento:", appointmentData);
+      // Enviar dados do agendamento para a API
 
       // Fazer a requisição para criar o agendamento
       const response = await api.post("/appointments", appointmentData, {
@@ -587,11 +697,14 @@ export default function AgendaPage() {
         throw new Error("Erro ao criar agendamento: resposta inválida");
       }
 
-      toast.success("Agendamento criado com sucesso!");
+      toast.success(`Agendamento ${isEncaixe ? 'de encaixe ' : ''}criado com sucesso!`);
       closeAppointmentDialog();
 
       // Recarregar os horários disponíveis
-      fetchAppointments(user.id, date);
+      // Pequeno delay para garantir que o backend processe
+      setTimeout(async () => {
+        await fetchAppointments(user.id, date);
+      }, 500);
     } catch (error) {
       console.error("Erro ao criar agendamento:", error);
       toast.error(
@@ -722,8 +835,23 @@ export default function AgendaPage() {
     });
   };
 
+  // Verifica se um horário é um slot de encaixe
+  const isFitSlot = (time: string) => {
+    return fitSlots.some(fitSlot => fitSlot.time === time);
+  };
+
+  // Busca detalhes do slot de encaixe
+  const getFitSlotDetails = (time: string) => {
+    return fitSlots.find(fitSlot => fitSlot.time === time);
+  };
+
   // Verifica se um slot deve ser exibido (não está no meio de um agendamento)
   const shouldShowSlot = (time: string) => {
+    // Se é um slot de encaixe, sempre mostrar
+    if (isFitSlot(time)) {
+      return true;
+    }
+
     // Converte horário para minutos
     const timeToMinutes = (timeStr: string) => {
       const [hours, minutes] = timeStr.split(":").map(Number);
@@ -1395,14 +1523,45 @@ export default function AgendaPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Renderizar slots disponíveis */}
-                    {availableSlots
-                      .filter(slot => shouldShowSlot(slot))
+                    {/* Renderizar slots disponíveis e encaixes */}
+                    {(() => {
+                      // Combinar slots disponíveis com slots de encaixe
+                      const allSlots = [...availableSlots.filter(slot => shouldShowSlot(slot))];
+                      
+                      // Adicionar slots de encaixe que não estão na lista de slots disponíveis
+                      fitSlots.forEach(fitSlot => {
+                        if (!allSlots.includes(fitSlot.time)) {
+                          allSlots.push(fitSlot.time);
+                        }
+                      });
+                      
+                      // NOVO: Adicionar horários dos agendamentos existentes (incluindo horários não-padrão)
+                      appointments.forEach(appointment => {
+                        if (appointment.status !== 'canceled') {
+                          const startTime = appointment.start_time.slice(0, 5); // "13:17:00" → "13:17"
+                          if (!allSlots.includes(startTime)) {
+                            // Adicionar slot de agendamento não-padrão
+                            allSlots.push(startTime);
+                          }
+                        }
+                      });
+                      
+                      // Ordenar todos os slots por horário
+                      allSlots.sort((a, b) => {
+                        const timeA = timeToMinutes(a);
+                        const timeB = timeToMinutes(b);
+                        return timeA - timeB;
+                      });
+                      
+                      return allSlots;
+                    })()
                       .map((slot) => {
                         const isBooked = isTimeSlotBooked(slot);
                         const isFree = isFreeInterval(slot);
+                        const isEncaixe = isFitSlot(slot);
                         const appointment = getAppointmentDetails(slot);
                         const freeInterval = getFreeIntervalDetails(slot);
+                        const fitSlotDetails = getFitSlotDetails(slot);
 
                       return (
                         <div
@@ -1418,6 +1577,8 @@ export default function AgendaPage() {
                                 : "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
                               : isFree
                               ? "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100"
+                              : isEncaixe
+                              ? "bg-yellow-50 border-2 border-dashed border-yellow-300 cursor-pointer hover:shadow-md text-gray-700"
                               : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
                           }`}
                           onClick={
@@ -1436,6 +1597,8 @@ export default function AgendaPage() {
                                     setIsDrawerOpen(true);
                                   }
                                 }
+                              : isEncaixe && fitSlotDetails
+                              ? () => handleSlotClick(slot, true, fitSlotDetails.endTime)
                               : () => handleSlotClick(slot)
                           }
                           title={
@@ -1445,6 +1608,8 @@ export default function AgendaPage() {
                                 }`
                               : isFree
                               ? "Intervalo livre - Clique para ver detalhes ou cancelar"
+                              : isEncaixe && fitSlotDetails
+                              ? `Clique para encaixar (${fitSlotDetails.duration} min disponíveis)`
                               : "Clique para agendar"
                           }
                         >
@@ -1455,6 +1620,8 @@ export default function AgendaPage() {
                                 ? "bg-white/60"
                                 : isFree
                                 ? "bg-gray-300"
+                                : isEncaixe
+                                ? "bg-yellow-200"
                                 : "bg-green-100"
                             }`}>
                               <svg
@@ -1463,6 +1630,8 @@ export default function AgendaPage() {
                                     ? "text-gray-600"
                                     : isFree
                                     ? "text-gray-700"
+                                    : isEncaixe
+                                    ? "text-yellow-700"
                                     : "text-green-600"
                                 }`}
                                 fill="none"
@@ -1483,21 +1652,27 @@ export default function AgendaPage() {
                                   ? "text-gray-700"
                                   : isFree
                                   ? "text-gray-700"
+                                  : isEncaixe
+                                  ? "text-yellow-800"
                                   : "text-gray-700"
                               }`}>
-                                {slot}
+                                {isEncaixe && fitSlotDetails ? `${slot} até ${fitSlotDetails.endTime}` : slot}
                               </div>
                               <div className={`text-sm ${
                                 isBooked && appointment && appointment.status !== 'canceled'
                                   ? "text-gray-600"
                                   : isFree
                                   ? "text-gray-600"
+                                  : isEncaixe
+                                  ? "text-yellow-600"
                                   : "text-green-600"
                               }`}>
                                 {isBooked && appointment && appointment.status !== 'canceled'
                                   ? `${appointment.client?.name || "Cliente"}`
                                   : isFree && freeInterval
                                   ? "Intervalo Livre"
+                                  : isEncaixe && fitSlotDetails
+                                  ? `Clique para encaixar (${fitSlotDetails.duration} min disponíveis)`
                                   : "Clique para agendar"
                                 }
                               </div>
@@ -1529,6 +1704,10 @@ export default function AgendaPage() {
                             ) : isFree ? (
                               <div className="text-gray-600">
                                 <CircleX size={20} />
+                              </div>
+                            ) : isEncaixe ? (
+                              <div className="text-yellow-600">
+                                <span className="text-lg font-bold">+</span>
                               </div>
                             ) : (
                               <div className="text-green-600">
@@ -1620,7 +1799,14 @@ export default function AgendaPage() {
               <DialogTitle className={`text-2xl font-bold ${
                 isFreeIntervalMode ? "text-emerald-800" : "text-gray-800"
               }`}>
-                {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
+                <div className="flex items-center justify-center gap-2">
+                  {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
+                  {isEncaixe && !isFreeIntervalMode && (
+                    <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded-full">
+                      Encaixe
+                    </span>
+                  )}
+                </div>
               </DialogTitle>
               <DialogDescription className="text-gray-600 mt-2">
                 {isFreeIntervalMode 
@@ -1629,6 +1815,13 @@ export default function AgendaPage() {
                       Criar um intervalo livre para{" "}
                       <span className="font-semibold text-emerald-600">
                         {selectedSlot}
+                      </span>
+                    </>
+                  ) : isEncaixe ? (
+                    <>
+                      Encaixar agendamento no horário{" "}
+                      <span className="font-semibold text-yellow-700">
+                        {selectedSlot} até {encaixeEndTime}
                       </span>
                     </>
                   ) : (
@@ -1678,10 +1871,11 @@ export default function AgendaPage() {
                         Data e Horário
                       </p>
                       <p className={`${
-                        isFreeIntervalMode ? "text-emerald-700" : "text-emerald-700"
+                        isFreeIntervalMode ? "text-emerald-700" : isEncaixe ? "text-yellow-700" : "text-emerald-700"
                       }`}>
                         {date.toLocaleDateString("pt-BR")} às {selectedSlot}
                         {isFreeIntervalMode && selectedEndTime && ` - ${selectedEndTime}`}
+                        {isEncaixe && encaixeEndTime && ` - ${encaixeEndTime}`}
                       </p>
                     </div>
                   </div>

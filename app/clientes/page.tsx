@@ -29,7 +29,13 @@ import {
   MailIcon,
   CalendarIcon,
   EyeIcon,
-  ClockIcon
+  ClockIcon,
+  Camera,
+  Upload,
+  Edit3,
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -46,6 +52,7 @@ interface Client {
   phone_number: string;
   created_at: string;
   updated_at: string;
+  profile_photo?: string | null;
   last_appointment?: {
     appointment_date: string;
     start_time: string;
@@ -65,6 +72,20 @@ export default function ClientesPage() {
   const [selectedClientAppointments, setSelectedClientAppointments] = useState<any[]>([]);
   const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(false);
 
+  // Photo gallery states
+  const [clientPhotos, setClientPhotos] = useState<any[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [isPhotoGalleryOpen, setIsPhotoGalleryOpen] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [editingPhotoId, setEditingPhotoId] = useState<number | null>(null);
+  const [editingDescription, setEditingDescription] = useState('');
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+  const [fullScreenPhotoIndex, setFullScreenPhotoIndex] = useState<number>(0);
+
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
     setSearchTerm('');
@@ -80,13 +101,15 @@ export default function ClientesPage() {
         // Configurar o interceptor para adicionar o company_id
         setupAPIInterceptors(user?.company_id ?? 0);
         
-        const [clientsResponse, appointmentsResponse] = await Promise.all([
+        const [clientsResponse, appointmentsResponse, clientPhotosResponse] = await Promise.all([
           api.get('/clients'),
-          api.get('/appointments')
+          api.get('/appointments'),
+          api.get('/client-photos/all') // Buscar primeira foto de cada cliente
         ]);
         
         const clientsData = clientsResponse.data;
         const appointmentsData = appointmentsResponse.data;
+        const clientPhotosData = clientPhotosResponse.data || [];
         
         if (!Array.isArray(clientsData)) {
           throw new Error('Formato de dados de clientes inválido');
@@ -96,7 +119,19 @@ export default function ClientesPage() {
           throw new Error('Formato de dados de agendamentos inválido');
         }
         
-        setClients(clientsData);
+        // Criar um mapa das fotos de perfil por client_id
+        const profilePhotosMap = clientPhotosData.reduce((acc: any, photo: any) => {
+          acc[photo.client_id] = photo.photo_url;
+          return acc;
+        }, {});
+        
+        // Adicionar a foto de perfil aos dados dos clientes
+        const clientsWithPhotos = clientsData.map((client: Client) => ({
+          ...client,
+          profile_photo: profilePhotosMap[client.id] || null
+        }));
+        
+        setClients(clientsWithPhotos);
         setAppointments(appointmentsData);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
@@ -166,6 +201,175 @@ export default function ClientesPage() {
         color: "text-red-700",
         bgColor: "bg-red-100",
       };
+    }
+  };
+
+  // Photo gallery functions
+  const loadClientPhotos = async (clientId: number) => {
+    if (!user?.company_id) return;
+    
+    try {
+      const response = await api.get(`/client-photos/${clientId}`, {
+        headers: {
+          company_id: user.company_id.toString(),
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      // Ordenar fotos para garantir que a primeira (foto de perfil) apareça primeiro
+      const photos = response.data || [];
+      const sortedPhotos = photos.sort((a: any, b: any) => {
+        // Ordenar por data de criação (mais antiga primeiro = foto de perfil)
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+      
+      // Se há uma foto de perfil do cliente, garantir que ela seja a primeira
+      const client = clients.find(c => c.id === clientId);
+      if (client?.profile_photo) {
+        // Verificar se a foto de perfil já está na lista
+        const profilePhotoIndex = sortedPhotos.findIndex((photo: any) => photo.photo_url === client.profile_photo);
+        
+        if (profilePhotoIndex > 0) {
+          // Mover a foto de perfil para o início
+          const profilePhoto = sortedPhotos.splice(profilePhotoIndex, 1)[0];
+          sortedPhotos.unshift(profilePhoto);
+        } else if (profilePhotoIndex === -1) {
+          // Se a foto de perfil não está na lista, criar um objeto para ela
+          const profilePhotoObj = {
+            id: `profile-${clientId}`,
+            client_id: clientId,
+            photo_url: client.profile_photo,
+            description: 'Foto de perfil',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          sortedPhotos.unshift(profilePhotoObj);
+        }
+      }
+      
+      setClientPhotos(sortedPhotos);
+    } catch (error) {
+      console.error('Erro ao carregar fotos do cliente:', error);
+      setClientPhotos([]);
+    }
+  };
+
+  const openPhotoGallery = async (clientId: number) => {
+    setSelectedClientId(clientId);
+    setIsPhotoGalleryOpen(true);
+    await loadClientPhotos(clientId);
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Criar preview da imagem
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      // Salvar o arquivo para envio posterior
+      setSelectedFile(file);
+    }
+  };
+
+  const confirmPhotoUpload = async () => {
+    if (selectedFile && selectedClientId && user?.company_id) {
+      try {
+        setIsUploadingPhoto(true);
+        const base64Photo = await convertFileToBase64Photo(selectedFile);
+        
+        await api.post(`/client-photos/${selectedClientId}`, {
+          base64Image: base64Photo,
+          description: uploadDescription.trim() || ''
+        }, {
+          headers: {
+            company_id: user.company_id.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        // Recarregar as fotos após o upload
+        await loadClientPhotos(selectedClientId);
+        
+        // Limpar estados
+        setPhotoPreview(null);
+        setSelectedFile(null);
+        setUploadDescription('');
+      } catch (error) {
+        console.error('Erro ao fazer upload da foto:', error);
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    }
+  };
+
+  const cancelPhotoUpload = () => {
+    setPhotoPreview(null);
+    setSelectedFile(null);
+    setUploadDescription('');
+  };
+
+  const convertFileToBase64Photo = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const deletePhoto = async (photoId: number) => {
+    if (!selectedClientId || !user?.company_id) return;
+
+    try {
+      // Encontrar o índice da foto que será deletada
+      const photoIndex = clientPhotos.findIndex(photo => photo.id === photoId);
+      
+      await api.delete(`/client-photos/photo/${photoId}`, {
+        headers: {
+          company_id: user.company_id.toString(),
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      await loadClientPhotos(selectedClientId);
+      
+      // Ajustar o índice do modal de tela cheia se necessário
+      if (isFullScreenOpen && photoIndex !== -1) {
+        if (clientPhotos.length <= 1) {
+          // Se não há mais fotos, fechar o modal
+          setIsFullScreenOpen(false);
+        } else if (fullScreenPhotoIndex >= photoIndex) {
+          // Se o índice atual é maior ou igual ao deletado, ajustar
+          const newIndex = fullScreenPhotoIndex > 0 ? fullScreenPhotoIndex - 1 : 0;
+          setFullScreenPhotoIndex(newIndex);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao deletar foto:', error);
+      alert('Erro ao deletar foto');
+    }
+  };
+
+  const updatePhotoDescription = async (photoId: number, description: string) => {
+    if (!selectedClientId || !user?.company_id) return;
+
+    try {
+      await api.put(`/client-photos/photo/${photoId}/description`, { description }, {
+        headers: {
+          company_id: user.company_id.toString(),
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      await loadClientPhotos(selectedClientId);
+      setEditingPhotoId(null);
+      setEditingDescription('');
+    } catch (error) {
+      console.error('Erro ao atualizar descrição:', error);
+      alert('Erro ao atualizar descrição');
     }
   };
 
@@ -392,6 +596,7 @@ export default function ClientesPage() {
                     setSelectedClientAppointments(clientAppointments);
                     setIsAppointmentDrawerOpen(true);
                   }}
+                  onOpenPhotoGallery={openPhotoGallery}
                 />
               ))}
             </div>
@@ -489,6 +694,263 @@ export default function ClientesPage() {
           </DrawerContent>
         </Drawer>
       </div>
+
+      {/* Photo Gallery Modal */}
+      {isPhotoGalleryOpen && (
+        <Drawer open={isPhotoGalleryOpen} onOpenChange={setIsPhotoGalleryOpen}>
+          <DrawerContent className="h-[90vh]">
+            <div className="mx-auto w-full max-w-sm h-full flex flex-col">
+              <DrawerHeader className="text-center pb-4 flex-shrink-0">
+                <DrawerTitle className="text-xl font-bold text-gray-900">
+                  Galeria de Fotos
+                </DrawerTitle>
+                <DrawerDescription className="text-gray-600">
+                  Gerencie as fotos do cliente
+                </DrawerDescription>
+              </DrawerHeader>
+              
+              <div className="px-4 flex-1 overflow-y-auto min-h-0">
+                <div className="space-y-4 pb-4">
+                {/* Upload Section */}
+                {!photoPreview ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 space-y-3">
+                    <div className="text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id="photo-upload"
+                        disabled={isUploadingPhoto}
+                      />
+                      <label
+                        htmlFor="photo-upload"
+                        className={`cursor-pointer flex flex-col items-center space-y-2 ${
+                          isUploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <Upload className="h-8 w-8 text-gray-400" />
+                        <span className="text-sm text-gray-600">
+                          {isUploadingPhoto ? 'Enviando...' : 'Clique para selecionar foto'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  /* Photo Preview Section */
+                  <div className="border-2 border-gray-300 rounded-lg p-4 space-y-3">
+                    <div className="text-center">
+                      <div className="relative inline-block">
+                        <img
+                          src={photoPreview}
+                          alt="Preview da foto"
+                          className="w-32 h-32 object-cover rounded-lg border"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Description Input */}
+                    <div>
+                      <Input
+                        value={uploadDescription}
+                        onChange={(e) => setUploadDescription(e.target.value)}
+                        placeholder="Adicione uma descrição (opcional)"
+                        className="text-sm"
+                        disabled={isUploadingPhoto}
+                      />
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={confirmPhotoUpload}
+                        disabled={isUploadingPhoto}
+                        className="flex-1"
+                        size="sm"
+                      >
+                        {isUploadingPhoto ? 'Enviando...' : 'Enviar Foto'}
+                      </Button>
+                      <Button
+                        onClick={cancelPhotoUpload}
+                        disabled={isUploadingPhoto}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Photos Grid */}
+                {clientPhotos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {clientPhotos.map((photo, index) => (
+                      <div key={photo.id} className="relative group">
+                        <div className="aspect-square relative overflow-hidden rounded-lg border">
+                          <img
+                            src={photo.photo_url}
+                            alt={photo.description || `Foto ${index + 1}`}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => {
+                              setFullScreenPhotoIndex(index);
+                              setIsFullScreenOpen(true);
+                            }}
+                          />
+                          
+                          {/* Action buttons */}
+                          <div className="absolute top-2 right-2 flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-white/80 hover:bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingPhotoId(photo.id);
+                                setEditingDescription(photo.description || '');
+                              }}
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-white/80 hover:bg-white text-red-600 hover:text-red-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePhoto(photo.id);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Description */}
+                        {editingPhotoId === photo.id ? (
+                          <div className="mt-2 space-y-2">
+                            <Input
+                              value={editingDescription}
+                              onChange={(e) => setEditingDescription(e.target.value)}
+                              placeholder="Descrição da foto"
+                              className="text-xs"
+                            />
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => updatePhotoDescription(photo.id, editingDescription)}
+                                className="flex-1 h-8 text-xs"
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingPhotoId(null);
+                                  setEditingDescription('');
+                                }}
+                                className="flex-1 h-8 text-xs"
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          photo.description && (
+                            <p className="mt-2 text-xs text-gray-600 text-center">
+                              {photo.description}
+                            </p>
+                          )
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Camera className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">Nenhuma foto adicionada ainda</p>
+                  </div>
+                )}
+                </div>
+              </div>
+              
+              <DrawerFooter className="pt-6 flex-shrink-0">
+                <DrawerClose asChild>
+                  <Button variant="outline" className="w-full">
+                    Fechar
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {/* Full Screen Photo Modal */}
+      {isFullScreenOpen && clientPhotos.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center">
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Close Button */}
+            <Button
+              onClick={() => setIsFullScreenOpen(false)}
+              className="absolute top-4 right-4 z-10 bg-white/20 hover:bg-white/30 text-white border-white/30"
+              variant="outline"
+              size="sm"
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
+
+            {/* Navigation Buttons */}
+            {clientPhotos.length > 1 && (
+              <>
+                <Button
+                  onClick={() => setFullScreenPhotoIndex(prev => 
+                    prev === 0 ? clientPhotos.length - 1 : prev - 1
+                  )}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  variant="outline"
+                  size="sm"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => setFullScreenPhotoIndex(prev => 
+                    prev === clientPhotos.length - 1 ? 0 : prev + 1
+                  )}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  variant="outline"
+                  size="sm"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+
+            {/* Photo */}
+            <img
+              src={clientPhotos[fullScreenPhotoIndex]?.photo_url}
+              alt={clientPhotos[fullScreenPhotoIndex]?.description || `Foto ${fullScreenPhotoIndex + 1}`}
+              className="max-w-full max-h-full object-contain"
+            />
+
+            {/* Photo Info */}
+            {clientPhotos[fullScreenPhotoIndex]?.description && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-lg max-w-md text-center">
+                <p className="text-sm">{clientPhotos[fullScreenPhotoIndex].description}</p>
+              </div>
+            )}
+
+            {/* Photo Counter */}
+            {clientPhotos.length > 1 && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-lg text-sm">
+                {fullScreenPhotoIndex + 1} de {clientPhotos.length}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -659,7 +1121,7 @@ function CreateClientDrawer({ onClientCreated }: { onClientCreated: () => void }
   );
 }
 
-function ClientCard({ client, getClientStatus, appointments, onShowAppointments }: { 
+function ClientCard({ client, getClientStatus, appointments, onShowAppointments, onOpenPhotoGallery }: { 
   client: Client;
   getClientStatus: (client: Client) => {
     status: "ativo" | "ocioso" | "inativo";
@@ -668,6 +1130,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments 
   };
   appointments: any[];
   onShowAppointments: (appointments: any[]) => void;
+  onOpenPhotoGallery: (clientId: number) => void;
 }) {
   const initials = client.name
     .split(" ")
@@ -716,6 +1179,13 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments 
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12 ring-2 ring-emerald-100">
+                {client.profile_photo ? (
+                  <AvatarImage 
+                    src={client.profile_photo} 
+                    alt={`Foto de ${client.name}`}
+                    className="object-cover"
+                  />
+                ) : null}
                 <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold text-sm">
                   {initials}
                 </AvatarFallback>
@@ -777,6 +1247,15 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments 
               Agendar
             </Button>
             
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenPhotoGallery(client.id)}
+              className="px-3 h-9 border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              <Camera className="h-4 w-4" />
+            </Button>
+            
             <Drawer>
               <DrawerTrigger asChild>
                 <Button
@@ -792,6 +1271,13 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments 
                   <DrawerHeader className="text-center pb-4">
                     <div className="mx-auto mb-4">
                       <Avatar className="h-16 w-16 ring-4 ring-emerald-100">
+                        {client.profile_photo ? (
+                          <AvatarImage 
+                            src={client.profile_photo} 
+                            alt={`Foto de ${client.name}`}
+                            className="object-cover"
+                          />
+                        ) : null}
                         <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-bold text-lg">
                           {initials}
                         </AvatarFallback>

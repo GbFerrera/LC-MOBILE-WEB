@@ -2,7 +2,9 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequ
 
 // Criando a instância do axios
 const api: AxiosInstance = axios.create({
-  baseURL: 'https://api.linkcallendar.com',
+ baseURL: process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL 
+  : "https://api.linkcallendar.com",
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

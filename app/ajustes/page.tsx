@@ -287,7 +287,7 @@ export default function AjustesPage() {
     },
     {
       id: "schedule",
-      title: "Horário de Funcionamento",
+      title: "Horários de Atendimentos",
       description: "Defina seus horários de trabalho",
       icon: ClockIcon,
       iconColor: "text-blue-600",

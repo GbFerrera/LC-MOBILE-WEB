@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CircleX, Search } from "lucide-react";
+import { CircleX, Search, RefreshCw } from "lucide-react";
 
 interface Client {
   id: number;
@@ -210,6 +210,7 @@ export default function AgendaPage() {
   const [error, setError] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [lunchSlots, setLunchSlots] = useState<string[]>([]);
+  const [scheduleData, setScheduleData] = useState<any>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoadingButton, setIsLoadingButton] = useState(false);
 
@@ -756,10 +757,12 @@ export default function AgendaPage() {
         );
         setAvailableSlots(slotsData.availableSlots);
         setLunchSlots(slotsData.lunchSlots);
+        setScheduleData(slotsData.scheduleData);
       } else {
         // Se não houver horários, retornamos array vazio
         setAvailableSlots([]);
         setLunchSlots([]);
+        setScheduleData(null);
       }
     } catch (err) {
       console.error("Erro ao buscar horários:", err);
@@ -845,7 +848,7 @@ export default function AgendaPage() {
     return fitSlots.find(fitSlot => fitSlot.time === time);
   };
 
-  // Verifica se um slot deve ser exibido (não está no meio de um agendamento)
+  // Verifica se um slot deve ser exibido (não está no meio de um agendamento ou intervalo livre)
   const shouldShowSlot = (time: string) => {
     // Se é um slot de encaixe, sempre mostrar
     if (isFitSlot(time)) {
@@ -859,6 +862,18 @@ export default function AgendaPage() {
     };
 
     const currentTimeMinutes = timeToMinutes(time);
+
+    // Verifica se este slot está dentro de algum intervalo livre mesclado
+    const mergedFreeIntervals = getMergedFreeIntervals();
+    for (const freeInterval of mergedFreeIntervals) {
+      const startTimeMinutes = timeToMinutes(freeInterval.start);
+      const endTimeMinutes = timeToMinutes(freeInterval.end);
+
+      // Se o slot atual está dentro do intervalo livre (inclusive no início e fim)
+      if (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
+        return false; // Não mostrar este slot
+      }
+    }
 
     // Verifica se este slot está no meio de algum agendamento
     for (const appt of appointments) {
@@ -914,6 +929,60 @@ export default function AgendaPage() {
         currentTimeMinutes <= endTimeMinutes
       );
     });
+  };
+
+  // Mescla intervalos livres consecutivos e retorna array com {start, end}
+  const getMergedFreeIntervals = () => {
+    const freeIntervals = appointments
+      .filter(appt => appt.status === "free")
+      .map(appt => ({
+        start: appt.start_time.includes("T")
+          ? appt.start_time.split("T")[1].slice(0, 5)
+          : appt.start_time.slice(0, 5),
+        end: appt.end_time.includes("T")
+          ? appt.end_time.split("T")[1].slice(0, 5)
+          : appt.end_time.slice(0, 5),
+      }))
+      .sort((a, b) => {
+        const timeA = timeToMinutes(a.start);
+        const timeB = timeToMinutes(b.start);
+        return timeA - timeB;
+      });
+
+    if (freeIntervals.length === 0) return [];
+
+    // Mesclar intervalos consecutivos ou sobrepostos
+    const merged: Array<{ start: string; end: string }> = [];
+    let current = { ...freeIntervals[0] };
+
+    for (let i = 1; i < freeIntervals.length; i++) {
+      const next = freeIntervals[i];
+      const currentEndMinutes = timeToMinutes(current.end);
+      const nextStartMinutes = timeToMinutes(next.start);
+
+      // Se o próximo intervalo começa no mesmo horário ou antes do fim do atual, mesclar
+      if (nextStartMinutes <= currentEndMinutes) {
+        // Estender o intervalo atual até o fim do próximo (se for maior)
+        const nextEndMinutes = timeToMinutes(next.end);
+        if (nextEndMinutes > currentEndMinutes) {
+          current.end = next.end;
+        }
+      } else {
+        // Intervalos não são consecutivos, salvar o atual e começar novo
+        merged.push({ ...current });
+        current = { ...next };
+      }
+    }
+    
+    // Adicionar o último intervalo
+    merged.push(current);
+
+    return merged;
+  };
+
+  // Obtém lista de intervalos livres consolidados (apenas horários de início)
+  const getConsolidatedFreeIntervals = () => {
+    return getMergedFreeIntervals().map(interval => interval.start);
   };
 
   // Busca detalhes do agendamento para um horário específico
@@ -1281,7 +1350,20 @@ export default function AgendaPage() {
               <h1 className="font-bold text-2xl tracking-wide">Agenda</h1>
               <p className="text-emerald-100 text-sm mt-1">{formattedDate}</p>
             </div>
-            <div className="w-10"></div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+              onClick={async () => {
+                if (user?.id) {
+                  await fetchAppointments(user.id.toString(), date);
+                  await fetchSchedules();
+                }
+              }}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
       </header>
@@ -1523,10 +1605,23 @@ export default function AgendaPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Renderizar slots disponíveis e encaixes */}
+                    {/* Renderizar slots disponíveis, encaixes e horário de almoço */}
                     {(() => {
                       // Combinar slots disponíveis com slots de encaixe
                       const allSlots = [...availableSlots.filter(slot => shouldShowSlot(slot))];
+                      
+                      // Adicionar APENAS o primeiro slot de almoço (se houver)
+                      if (lunchSlots.length > 0 && !allSlots.includes(lunchSlots[0])) {
+                        allSlots.push(lunchSlots[0]);
+                      }
+                      
+                      // Adicionar APENAS os horários de início dos intervalos livres consolidados
+                      const consolidatedFreeStarts = getConsolidatedFreeIntervals();
+                      consolidatedFreeStarts.forEach(freeStart => {
+                        if (!allSlots.includes(freeStart)) {
+                          allSlots.push(freeStart);
+                        }
+                      });
                       
                       // Adicionar slots de encaixe que não estão na lista de slots disponíveis
                       fitSlots.forEach(fitSlot => {
@@ -1535,9 +1630,9 @@ export default function AgendaPage() {
                         }
                       });
                       
-                      // NOVO: Adicionar horários dos agendamentos existentes (incluindo horários não-padrão)
+                      // NOVO: Adicionar horários dos agendamentos normais existentes (incluindo horários não-padrão)
                       appointments.forEach(appointment => {
-                        if (appointment.status !== 'canceled') {
+                        if (appointment.status !== 'canceled' && appointment.status !== 'free') {
                           const startTime = appointment.start_time.slice(0, 5); // "13:17:00" → "13:17"
                           if (!allSlots.includes(startTime)) {
                             // Adicionar slot de agendamento não-padrão
@@ -1557,17 +1652,32 @@ export default function AgendaPage() {
                     })()
                       .map((slot) => {
                         const isBooked = isTimeSlotBooked(slot);
-                        const isFree = isFreeInterval(slot);
+                        const consolidatedFreeStarts = getConsolidatedFreeIntervals();
+                        const isFree = consolidatedFreeStarts.includes(slot);
                         const isEncaixe = isFitSlot(slot);
+                        const isLunch = lunchSlots.includes(slot) && slot === lunchSlots[0];
                         const appointment = getAppointmentDetails(slot);
                         const freeInterval = getFreeIntervalDetails(slot);
                         const fitSlotDetails = getFitSlotDetails(slot);
+                        
+                        // Calcular horário de fim do almoço usando o horário exato do scheduleData
+                        const lunchEndTime = isLunch && scheduleData?.lunch_end_time
+                          ? scheduleData.lunch_end_time.slice(0, 5)
+                          : null;
+                        
+                        // Calcular horário de fim do intervalo livre usando intervalos mesclados
+                        const mergedIntervals = getMergedFreeIntervals();
+                        const freeEndTime = isFree 
+                          ? mergedIntervals.find(interval => interval.start === slot)?.end
+                          : null;
 
                       return (
                         <div
                           key={slot}
                           className={`flex items-center justify-between w-full p-4 rounded-xl transition-all duration-200 ${
-                            isBooked && appointment && appointment.status !== 'canceled'
+                            isLunch
+                              ? "bg-amber-50 border-2 border-dashed border-amber-400 text-amber-800 opacity-80"
+                              : isBooked && appointment && appointment.status !== 'canceled'
                               ? appointment.status === 'confirmed'
                                 ? "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
                                 : appointment.status === 'pending'
@@ -1582,7 +1692,9 @@ export default function AgendaPage() {
                               : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
                           }`}
                           onClick={
-                            isBooked && appointment && appointment.status !== 'canceled'
+                            isLunch
+                              ? undefined // Não clicável para horário de almoço
+                              : isBooked && appointment && appointment.status !== 'canceled'
                               ? () => {
                                   // Mostrar detalhes do agendamento no drawer
                                   setSelectedAppointment(appointment);
@@ -1602,7 +1714,9 @@ export default function AgendaPage() {
                               : () => handleSlotClick(slot)
                           }
                           title={
-                            isBooked && appointment && appointment.status !== 'canceled'
+                            isLunch
+                              ? "Horário de almoço"
+                              : isBooked && appointment && appointment.status !== 'canceled'
                               ? `Clique para ver detalhes - ${
                                   appointment?.client?.name || "Cliente"
                                 }`
@@ -1616,7 +1730,9 @@ export default function AgendaPage() {
                           {/* Lado esquerdo - Horário e ícone */}
                           <div className="flex items-center space-x-3">
                             <div className={`p-2 rounded-full ${
-                              isBooked && appointment && appointment.status !== 'canceled'
+                              isLunch
+                                ? "bg-amber-200"
+                                : isBooked && appointment && appointment.status !== 'canceled'
                                 ? "bg-white/60"
                                 : isFree
                                 ? "bg-gray-300"
@@ -1624,31 +1740,37 @@ export default function AgendaPage() {
                                 ? "bg-yellow-200"
                                 : "bg-green-100"
                             }`}>
-                              <svg
-                                className={`w-5 h-5 ${
-                                  isBooked && appointment && appointment.status !== 'canceled'
-                                    ? "text-gray-600"
-                                    : isFree
-                                    ? "text-gray-700"
-                                    : isEncaixe
-                                    ? "text-yellow-700"
-                                    : "text-green-600"
-                                }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
+                              {isLunch ? (
+                                <span className="text-lg">🍽️</span>
+                              ) : (
+                                <svg
+                                  className={`w-5 h-5 ${
+                                    isBooked && appointment && appointment.status !== 'canceled'
+                                      ? "text-gray-600"
+                                      : isFree
+                                      ? "text-gray-700"
+                                      : isEncaixe
+                                      ? "text-yellow-700"
+                                      : "text-green-600"
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              )}
                             </div>
                             <div>
                               <div className={`font-bold text-lg ${
-                                isBooked && appointment && appointment.status !== 'canceled'
+                                isLunch
+                                  ? "text-amber-800"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
                                   ? "text-gray-700"
                                   : isFree
                                   ? "text-gray-700"
@@ -1656,10 +1778,19 @@ export default function AgendaPage() {
                                   ? "text-yellow-800"
                                   : "text-gray-700"
                               }`}>
-                                {isEncaixe && fitSlotDetails ? `${slot} até ${fitSlotDetails.endTime}` : slot}
+                                {isLunch && lunchEndTime 
+                                  ? `${slot} - ${lunchEndTime}` 
+                                  : isFree && freeEndTime
+                                  ? `${slot} - ${freeEndTime}`
+                                  : isEncaixe && fitSlotDetails 
+                                  ? `${slot} até ${fitSlotDetails.endTime}` 
+                                  : slot
+                                }
                               </div>
                               <div className={`text-sm ${
-                                isBooked && appointment && appointment.status !== 'canceled'
+                                isLunch
+                                  ? "text-amber-700"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
                                   ? "text-gray-600"
                                   : isFree
                                   ? "text-gray-600"
@@ -1667,7 +1798,9 @@ export default function AgendaPage() {
                                   ? "text-yellow-600"
                                   : "text-green-600"
                               }`}>
-                                {isBooked && appointment && appointment.status !== 'canceled'
+                                {isLunch
+                                  ? "Horário de Almoço"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
                                   ? `${appointment.client?.name || "Cliente"}`
                                   : isFree && freeInterval
                                   ? "Intervalo Livre"
@@ -1689,7 +1822,11 @@ export default function AgendaPage() {
 
                           {/* Lado direito - Botão ou informações */}
                           <div className="flex items-center">
-                            {isBooked && appointment && appointment.status !== 'canceled' ? (
+                            {isLunch ? (
+                              <div className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-200 text-amber-800 border border-amber-300">
+                                Almoço
+                              </div>
+                            ) : isBooked && appointment && appointment.status !== 'canceled' ? (
                               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                 appointment.status === 'confirmed'
                                   ? "bg-green-600 text-white"

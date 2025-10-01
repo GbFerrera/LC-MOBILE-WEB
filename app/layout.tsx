@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Link Calendar - Barbeiro",
+  title: "Link Callendar - Barbeiro",
   description: "Aplicativo de agendamento para barbearias",
   manifest: "/manifest.json",
   themeColor: "#000000",

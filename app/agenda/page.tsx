@@ -1,12 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { DayPicker } from "react-day-picker";
 import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation"
@@ -18,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Drawer,
@@ -28,7 +24,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,21 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { CircleX, Search } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Alert } from "@chakra-ui/react"
+import { CircleX, Search, RefreshCw } from "lucide-react";
 
 interface Client {
   id: number;
@@ -68,6 +49,13 @@ interface Service {
   service_description: string;
   service_price: string;
   service_duration: number;
+}
+
+interface FitSlot {
+  time: string;
+  endTime: string;
+  duration: number;
+  isEncaixe: boolean;
 }
 
 interface Schedule {
@@ -89,6 +77,28 @@ interface ScheduleResponse {
   hasSchedule: boolean;
   schedules: Schedule[];
 }
+
+// Funções utilitárias para lógica de encaixes
+const timeToMinutes = (timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (minutes: number): string => {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute
+    .toString()
+    .padStart(2, "0")}`;
+};
+
+const getNextStandardSlot = (minutes: number): number => {
+  return Math.ceil(minutes / 15) * 15;
+};
+
+const isShortInterval = (startMinutes: number, endMinutes: number): boolean => {
+  return (endMinutes - startMinutes) < 30 && (endMinutes - startMinutes) >= 15;
+};
 
 function generateTimeSlots(
   data: any,
@@ -200,17 +210,25 @@ export default function AgendaPage() {
   const [error, setError] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [lunchSlots, setLunchSlots] = useState<string[]>([]);
+  const [scheduleData, setScheduleData] = useState<any>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoadingButton, setIsLoadingButton] = useState(false);
 
   // Estado do diálogo de agendamento
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [selectedEndTime, setSelectedEndTime] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFreeIntervalMode, setIsFreeIntervalMode] = useState(false);
+  const [isEncaixe, setIsEncaixe] = useState(false);
+  const [encaixeEndTime, setEncaixeEndTime] = useState<string>("");
+  const [fitSlots, setFitSlots] = useState<FitSlot[]>([]);
 
   // Estado do drawer de detalhes do agendamento
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Estado do drawer de seleção de intervalo
   const [isIntervalDrawerOpen, setIsIntervalDrawerOpen] = useState(false);
@@ -247,6 +265,61 @@ export default function AgendaPage() {
     notes: "",
   });
 
+  // Função para detectar slots de encaixe
+  const detectFitSlots = (availableSlots: string[], appointments: any[]): FitSlot[] => {
+    const fitSlots: FitSlot[] = [];
+    
+    // Ordenar agendamentos por horário
+    const sortedAppointments = appointments
+      .filter(appt => appt.status !== "free" && appt.status !== "canceled")
+      .sort((a, b) => {
+        const timeA = timeToMinutes(a.start_time.slice(0, 5));
+        const timeB = timeToMinutes(b.start_time.slice(0, 5));
+        return timeA - timeB;
+      });
+
+    for (const appointment of sortedAppointments) {
+      const endTimeStr = appointment.end_time.slice(0, 5);
+      const endMinutes = timeToMinutes(endTimeStr);
+      
+      // Verificar se o agendamento termina em um horário não-padrão (não múltiplo de 15)
+      const nextStandardSlotMinutes = getNextStandardSlot(endMinutes);
+      
+      if (nextStandardSlotMinutes > endMinutes) {
+        const duration = nextStandardSlotMinutes - endMinutes;
+        
+        // Só criar encaixe se a duração for de pelo menos 10 minutos e máximo 30 minutos
+        if (duration >= 10 && duration <= 30) {
+          const fitStartTime = minutesToTime(endMinutes);
+          const fitEndTime = minutesToTime(nextStandardSlotMinutes);
+          
+          // Verificar se não há conflito com outros agendamentos
+          const hasConflict = sortedAppointments.some(otherAppt => {
+            if (otherAppt.id === appointment.id) return false; // Não comparar consigo mesmo
+            
+            const otherStartMinutes = timeToMinutes(otherAppt.start_time.slice(0, 5));
+            const otherEndMinutes = timeToMinutes(otherAppt.end_time.slice(0, 5));
+            
+            // Verificar sobreposição: o encaixe (endMinutes até nextStandardSlotMinutes) 
+            // não deve sobrepor com outro agendamento (otherStartMinutes até otherEndMinutes)
+            return (endMinutes < otherEndMinutes && nextStandardSlotMinutes > otherStartMinutes);
+          });
+          
+          if (!hasConflict) {
+            fitSlots.push({
+              time: fitStartTime,
+              endTime: fitEndTime,
+              duration: duration,
+              isEncaixe: true
+            });
+          }
+        }
+      }
+    }
+    
+    return fitSlots;
+  };
+
   // Buscar agendamentos do dia
   const fetchAppointments = async (userId: string, date: Date) => {
     try {
@@ -263,12 +336,11 @@ export default function AgendaPage() {
         }
       );
 
-      console.log("Dados completos da API:", response.data);
-
-      // A API agora retorna: { schedule: {...}, appointments: [...] }
+      // A API retorna: { schedule: {...}, appointments: [...] }
       const appointments = response.data?.appointments || [];
-      console.log("Agendamentos do dia:", appointments);
       setAppointments(appointments);
+      
+      // Detectar slots de encaixe é feito no useEffect que monitora appointments
     } catch (error) {
       console.error("Erro ao buscar agendamentos:", error);
       toast.error("Erro ao carregar agendamentos");
@@ -411,6 +483,14 @@ export default function AgendaPage() {
     }
   }, [date]);
 
+  // Recalcular encaixes quando slots ou agendamentos mudarem
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      const detectedFitSlots = detectFitSlots(availableSlots, appointments);
+      setFitSlots(detectedFitSlots);
+    }
+  }, [availableSlots, appointments]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -471,10 +551,28 @@ export default function AgendaPage() {
       notes: "",
     });
     setSelectedSlot("");
+    setSelectedEndTime("");
+    setIsFreeIntervalMode(false);
+    setIsEncaixe(false);
+    setEncaixeEndTime("");
   };
 
-  const openAppointmentDialog = (slot: string) => {
+  const openAppointmentDialog = (slot: string, isEncaixeSlot = false, encaixeEnd?: string) => {
     setSelectedSlot(slot);
+    setIsEncaixe(isEncaixeSlot);
+    
+    if (isEncaixeSlot && encaixeEnd) {
+      setEncaixeEndTime(encaixeEnd);
+      setSelectedEndTime(encaixeEnd);
+    } else {
+      // Calcular horário final padrão (15 minutos depois)
+      const [hours, minutes] = slot.split(":").map(Number);
+      const endTime = new Date();
+      endTime.setHours(hours, minutes + 15);
+      const formattedEndTime = endTime.toTimeString().slice(0, 5);
+      setSelectedEndTime(formattedEndTime);
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -483,12 +581,12 @@ export default function AgendaPage() {
     resetForm();
   };
 
-  const handleSlotClick = (time: string) => {
+  const handleSlotClick = (time: string, isEncaixeSlot = false, encaixeEnd?: string) => {
     if (!user) {
       toast.error("Você precisa estar logado para agendar");
       return;
     }
-    openAppointmentDialog(time);
+    openAppointmentDialog(time, isEncaixeSlot, encaixeEnd);
   };
 
   const handleSubmitAppointment = async (e: React.FormEvent) => {
@@ -499,7 +597,38 @@ export default function AgendaPage() {
     try {
       setIsSubmitting(true);
 
-      // Validar dados do formulário
+      // Se estiver no modo Intervalo Livre, usar lógica diferente
+      if (isFreeIntervalMode) {
+        // Validar se horário final foi selecionado
+        if (!selectedEndTime) {
+          throw new Error("Por favor, selecione o horário final do intervalo");
+        }
+
+        const intervalData = {
+          professional_id: user.id,
+          appointment_date: date.toISOString().split("T")[0],
+          start_time: selectedSlot,
+          end_time: selectedEndTime,
+          notes: formData.notes || "Intervalo livre criado via slot",
+        };
+
+        const response = await api.post(
+          "/schedules/free-interval",
+          intervalData,
+          {
+            headers: {
+              company_id: user?.company_id,
+            },
+          }
+        );
+
+        toast.success("Intervalo livre criado com sucesso!");
+        closeAppointmentDialog();
+        fetchAppointments(user.id, date);
+        return;
+      }
+
+      // Validar dados do formulário para agendamento normal
       if (!formData.client_id || formData.service_ids.length === 0) {
         throw new Error("Por favor, selecione o cliente e pelo menos um serviço");
       }
@@ -523,13 +652,18 @@ export default function AgendaPage() {
       // Calcular duração total de todos os serviços
       const totalDuration = selectedServices.reduce((total, service) => total + (service.service_duration || 0), 0);
 
-      // Calcular end_time baseado na duração total
-      const endTime = new Date(date);
-      endTime.setHours(
-        parseInt(hours),
-        parseInt(minutes) + totalDuration
-      );
-      const formattedEndTime = endTime.toTimeString().slice(0, 5);
+      // Calcular end_time baseado na duração total ou usar horário de encaixe
+      let formattedEndTime;
+      if (isEncaixe && encaixeEndTime) {
+        formattedEndTime = encaixeEndTime;
+      } else {
+        const endTime = new Date(date);
+        endTime.setHours(
+          parseInt(hours),
+          parseInt(minutes) + totalDuration
+        );
+        formattedEndTime = endTime.toTimeString().slice(0, 5);
+      }
 
       // Criar o payload do agendamento
       const appointmentData = {
@@ -540,6 +674,7 @@ export default function AgendaPage() {
         end_time: formattedEndTime,
         status: status, // Usando o status 'confirmed' definido anteriormente
         notes: formData.notes || "",
+        isEncaixe: isEncaixe, // Flag para indicar que é um encaixe
         services: selectedServices.map(service => ({
           service_id: parseInt(service.service_id?.toString() || service.service_id?.toString() || "0"),
           professional_id: user.id,
@@ -547,7 +682,7 @@ export default function AgendaPage() {
         })),
       };
 
-      console.log("Dados do agendamento:", appointmentData);
+      // Enviar dados do agendamento para a API
 
       // Fazer a requisição para criar o agendamento
       const response = await api.post("/appointments", appointmentData, {
@@ -563,11 +698,14 @@ export default function AgendaPage() {
         throw new Error("Erro ao criar agendamento: resposta inválida");
       }
 
-      toast.success("Agendamento criado com sucesso!");
+      toast.success(`Agendamento ${isEncaixe ? 'de encaixe ' : ''}criado com sucesso!`);
       closeAppointmentDialog();
 
       // Recarregar os horários disponíveis
-      fetchAppointments(user.id, date);
+      // Pequeno delay para garantir que o backend processe
+      setTimeout(async () => {
+        await fetchAppointments(user.id, date);
+      }, 500);
     } catch (error) {
       console.error("Erro ao criar agendamento:", error);
       toast.error(
@@ -619,10 +757,12 @@ export default function AgendaPage() {
         );
         setAvailableSlots(slotsData.availableSlots);
         setLunchSlots(slotsData.lunchSlots);
+        setScheduleData(slotsData.scheduleData);
       } else {
         // Se não houver horários, retornamos array vazio
         setAvailableSlots([]);
         setLunchSlots([]);
+        setScheduleData(null);
       }
     } catch (err) {
       console.error("Erro ao buscar horários:", err);
@@ -698,8 +838,23 @@ export default function AgendaPage() {
     });
   };
 
-  // Verifica se um slot deve ser exibido (não está no meio de um agendamento)
+  // Verifica se um horário é um slot de encaixe
+  const isFitSlot = (time: string) => {
+    return fitSlots.some(fitSlot => fitSlot.time === time);
+  };
+
+  // Busca detalhes do slot de encaixe
+  const getFitSlotDetails = (time: string) => {
+    return fitSlots.find(fitSlot => fitSlot.time === time);
+  };
+
+  // Verifica se um slot deve ser exibido (não está no meio de um agendamento ou intervalo livre)
   const shouldShowSlot = (time: string) => {
+    // Se é um slot de encaixe, sempre mostrar
+    if (isFitSlot(time)) {
+      return true;
+    }
+
     // Converte horário para minutos
     const timeToMinutes = (timeStr: string) => {
       const [hours, minutes] = timeStr.split(":").map(Number);
@@ -707,6 +862,18 @@ export default function AgendaPage() {
     };
 
     const currentTimeMinutes = timeToMinutes(time);
+
+    // Verifica se este slot está dentro de algum intervalo livre mesclado
+    const mergedFreeIntervals = getMergedFreeIntervals();
+    for (const freeInterval of mergedFreeIntervals) {
+      const startTimeMinutes = timeToMinutes(freeInterval.start);
+      const endTimeMinutes = timeToMinutes(freeInterval.end);
+
+      // Se o slot atual está dentro do intervalo livre (inclusive no início e fim)
+      if (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
+        return false; // Não mostrar este slot
+      }
+    }
 
     // Verifica se este slot está no meio de algum agendamento
     for (const appt of appointments) {
@@ -762,6 +929,60 @@ export default function AgendaPage() {
         currentTimeMinutes <= endTimeMinutes
       );
     });
+  };
+
+  // Mescla intervalos livres consecutivos e retorna array com {start, end}
+  const getMergedFreeIntervals = () => {
+    const freeIntervals = appointments
+      .filter(appt => appt.status === "free")
+      .map(appt => ({
+        start: appt.start_time.includes("T")
+          ? appt.start_time.split("T")[1].slice(0, 5)
+          : appt.start_time.slice(0, 5),
+        end: appt.end_time.includes("T")
+          ? appt.end_time.split("T")[1].slice(0, 5)
+          : appt.end_time.slice(0, 5),
+      }))
+      .sort((a, b) => {
+        const timeA = timeToMinutes(a.start);
+        const timeB = timeToMinutes(b.start);
+        return timeA - timeB;
+      });
+
+    if (freeIntervals.length === 0) return [];
+
+    // Mesclar intervalos consecutivos ou sobrepostos
+    const merged: Array<{ start: string; end: string }> = [];
+    let current = { ...freeIntervals[0] };
+
+    for (let i = 1; i < freeIntervals.length; i++) {
+      const next = freeIntervals[i];
+      const currentEndMinutes = timeToMinutes(current.end);
+      const nextStartMinutes = timeToMinutes(next.start);
+
+      // Se o próximo intervalo começa no mesmo horário ou antes do fim do atual, mesclar
+      if (nextStartMinutes <= currentEndMinutes) {
+        // Estender o intervalo atual até o fim do próximo (se for maior)
+        const nextEndMinutes = timeToMinutes(next.end);
+        if (nextEndMinutes > currentEndMinutes) {
+          current.end = next.end;
+        }
+      } else {
+        // Intervalos não são consecutivos, salvar o atual e começar novo
+        merged.push({ ...current });
+        current = { ...next };
+      }
+    }
+    
+    // Adicionar o último intervalo
+    merged.push(current);
+
+    return merged;
+  };
+
+  // Obtém lista de intervalos livres consolidados (apenas horários de início)
+  const getConsolidatedFreeIntervals = () => {
+    return getMergedFreeIntervals().map(interval => interval.start);
   };
 
   // Busca detalhes do agendamento para um horário específico
@@ -832,10 +1053,10 @@ export default function AgendaPage() {
       }
     } else if (isFree) {
       return {
-        containerClass: "bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 cursor-not-allowed shadow-md",
-        timeClass: "text-orange-700",
-        textClass: "text-orange-600",
-        iconColor: "text-orange-500"
+        containerClass: "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100",
+        timeClass: "text-gray-700",
+        textClass: "text-gray-600",
+        iconColor: "text-gray-500"
       };
     } else {
       // Slot disponível (cinza)
@@ -894,7 +1115,145 @@ export default function AgendaPage() {
     return Array.from(availableMinutes).sort();
   };
 
+  // Gera horários de fim válidos para intervalos livres (slots de 15 minutos)
+  const getValidEndTimes = (startTime: string) => {
+    if (!startTime) return [];
+    
+    const [startHour, startMinute] = startTime.split(":").map(Number);
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTimes: string[] = [];
+    
+    // Gerar opções de horário final em intervalos de 15 minutos
+    // Mínimo: 15 minutos depois do início
+    // Máximo: até o final do expediente
+    const maxEndMinutes = Math.max(...availableSlots.map(slot => {
+      const [hour, minute] = slot.split(":").map(Number);
+      return hour * 60 + minute + 15; // Último slot + 15 minutos
+    }));
+    
+    for (let minutes = startTotalMinutes + 15; minutes <= maxEndMinutes; minutes += 15) {
+      const hour = Math.floor(minutes / 60);
+      const minute = minutes % 60;
+      const timeString = `${hour.toString().padStart(2, "0")}:${minute
+        .toString()
+        .padStart(2, "0")}`;
+      endTimes.push(timeString);
+    }
+    
+    return endTimes;
+  };
+
   const formattedDate = formatDate(date);
+
+  // Função para atualizar status do agendamento
+  const updateAppointmentStatus = async (appointmentId: number, newStatus: string) => {
+    if (!user) {
+      toast.error("Usuário não autenticado");
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+
+    try {
+      const response = await api.patch(
+        `/appointments/${appointmentId}/status`,
+        { status: newStatus },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user.company_id?.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (response.data) {
+        // Se for cancelamento, fechar o drawer e recarregar
+        if (newStatus === 'canceled') {
+          setIsDrawerOpen(false);
+          setSelectedAppointment(null);
+          toast.success("Agendamento cancelado! Slot liberado para novo agendamento.");
+        } else {
+          // Atualizar o agendamento selecionado para outros status
+          setSelectedAppointment((prev: any) => ({
+            ...prev,
+            status: newStatus,
+          }));
+          toast.success("Status atualizado com sucesso!");
+        }
+        
+        // Recarregar agendamentos
+        fetchAppointments(user.id, date);
+        setIsStatusMenuOpen(false);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status do agendamento");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Função para obter o texto do status em português
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "Pendente";
+      case "confirmed":
+        return "Confirmado";
+      case "completed":
+        return "Concluído";
+      case "canceled":
+        return "Cancelado";
+      case "free":
+        return "Intervalo";
+      default:
+        return status;
+    }
+  };
+
+  // Função para obter as cores do status (baseado nas imagens fornecidas)
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-orange-200 text-gray-700";
+      case "confirmed":
+        return "bg-green-200 text-gray-700";
+      case "completed":
+        return "bg-blue-200 text-gray-700";
+      case "canceled":
+        return "bg-red-200 text-gray-700";
+      case "free":
+        return "bg-gray-500/10 text-gray-600 border-gray-500/20";
+      default:
+        return "bg-gray-200 text-gray-700";
+    }
+  };
+
+  // Função para abrir WhatsApp do cliente
+  const openWhatsApp = (phoneNumber: string, clientName: string) => {
+    if (!phoneNumber) {
+      toast.error("Número de telefone não disponível");
+      return;
+    }
+
+    // Limpar o número: remover espaços, parênteses, hífens e adicionar código do país se necessário
+    let cleanNumber = phoneNumber.replace(/[\s\(\)\-]/g, '');
+    
+    // Se não começar com 55 (Brasil), adicionar
+    if (!cleanNumber.startsWith('55')) {
+      cleanNumber = '55' + cleanNumber;
+    }
+
+    // Mensagem padrão personalizada
+    const message = `Olá ${clientName}! Queremos conversar sobre o seu agendamento.`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    // Abrir WhatsApp Web ou aplicativo
+    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   const freeInterval = async () => {
 
@@ -969,7 +1328,7 @@ export default function AgendaPage() {
       }
     } catch (error) {
       console.log("Erro ao configurar intervalo:", error);
-      alert(error.response.data.message)
+      alert(error.response.data.message);
     } finally {
       setIsLoadingButton(false);
     }
@@ -991,7 +1350,20 @@ export default function AgendaPage() {
               <h1 className="font-bold text-2xl tracking-wide">Agenda</h1>
               <p className="text-emerald-100 text-sm mt-1">{formattedDate}</p>
             </div>
-            <div className="w-10"></div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+              onClick={async () => {
+                if (user?.id) {
+                  await fetchAppointments(user.id.toString(), date);
+                  await fetchSchedules();
+                }
+              }}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
       </header>
@@ -1232,115 +1604,266 @@ export default function AgendaPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-                    {/* Renderizar slots disponíveis */}
-                    {availableSlots
-                      .filter(slot => shouldShowSlot(slot))
+                  <div className="space-y-3">
+                    {/* Renderizar slots disponíveis, encaixes e horário de almoço */}
+                    {(() => {
+                      // Combinar slots disponíveis com slots de encaixe
+                      const allSlots = [...availableSlots.filter(slot => shouldShowSlot(slot))];
+                      
+                      // Adicionar APENAS o primeiro slot de almoço (se houver)
+                      if (lunchSlots.length > 0 && !allSlots.includes(lunchSlots[0])) {
+                        allSlots.push(lunchSlots[0]);
+                      }
+                      
+                      // Adicionar APENAS os horários de início dos intervalos livres consolidados
+                      const consolidatedFreeStarts = getConsolidatedFreeIntervals();
+                      consolidatedFreeStarts.forEach(freeStart => {
+                        if (!allSlots.includes(freeStart)) {
+                          allSlots.push(freeStart);
+                        }
+                      });
+                      
+                      // Adicionar slots de encaixe que não estão na lista de slots disponíveis
+                      fitSlots.forEach(fitSlot => {
+                        if (!allSlots.includes(fitSlot.time)) {
+                          allSlots.push(fitSlot.time);
+                        }
+                      });
+                      
+                      // NOVO: Adicionar horários dos agendamentos normais existentes (incluindo horários não-padrão)
+                      appointments.forEach(appointment => {
+                        if (appointment.status !== 'canceled' && appointment.status !== 'free') {
+                          const startTime = appointment.start_time.slice(0, 5); // "13:17:00" → "13:17"
+                          if (!allSlots.includes(startTime)) {
+                            // Adicionar slot de agendamento não-padrão
+                            allSlots.push(startTime);
+                          }
+                        }
+                      });
+                      
+                      // Ordenar todos os slots por horário
+                      allSlots.sort((a, b) => {
+                        const timeA = timeToMinutes(a);
+                        const timeB = timeToMinutes(b);
+                        return timeA - timeB;
+                      });
+                      
+                      return allSlots;
+                    })()
                       .map((slot) => {
                         const isBooked = isTimeSlotBooked(slot);
-                        const isFree = isFreeInterval(slot);
+                        const consolidatedFreeStarts = getConsolidatedFreeIntervals();
+                        const isFree = consolidatedFreeStarts.includes(slot);
+                        const isEncaixe = isFitSlot(slot);
+                        const isLunch = lunchSlots.includes(slot) && slot === lunchSlots[0];
                         const appointment = getAppointmentDetails(slot);
                         const freeInterval = getFreeIntervalDetails(slot);
-                        const styles = getSlotStyles(slot);
+                        const fitSlotDetails = getFitSlotDetails(slot);
+                        
+                        // Calcular horário de fim do almoço usando o horário exato do scheduleData
+                        const lunchEndTime = isLunch && scheduleData?.lunch_end_time
+                          ? scheduleData.lunch_end_time.slice(0, 5)
+                          : null;
+                        
+                        // Calcular horário de fim do intervalo livre usando intervalos mesclados
+                        const mergedIntervals = getMergedFreeIntervals();
+                        const freeEndTime = isFree 
+                          ? mergedIntervals.find(interval => interval.start === slot)?.end
+                          : null;
 
                       return (
                         <div
                           key={slot}
-                          className={`group relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${styles.containerClass}`}
+                          className={`flex items-center justify-between w-full p-4 rounded-xl transition-all duration-200 ${
+                            isLunch
+                              ? "bg-amber-50 border-2 border-dashed border-amber-400 text-amber-800 opacity-80"
+                              : isBooked && appointment && appointment.status !== 'canceled'
+                              ? appointment.status === 'confirmed'
+                                ? "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : appointment.status === 'pending'
+                                ? "bg-orange-200 border-2 border-orange-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : appointment.status === 'completed'
+                                ? "bg-blue-200 border-2 border-blue-300 cursor-pointer hover:shadow-md text-gray-700"
+                                : "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
+                              : isFree
+                              ? "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100"
+                              : isEncaixe
+                              ? "bg-yellow-50 border-2 border-dashed border-yellow-300 cursor-pointer hover:shadow-md text-gray-700"
+                              : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
+                          }`}
                           onClick={
-                            isBooked
+                            isLunch
+                              ? undefined // Não clicável para horário de almoço
+                              : isBooked && appointment && appointment.status !== 'canceled'
                               ? () => {
                                   // Mostrar detalhes do agendamento no drawer
-                                  if (appointment) {
-                                    setSelectedAppointment(appointment);
+                                  setSelectedAppointment(appointment);
+                                  setIsDrawerOpen(true);
+                                }
+                              : isFree
+                              ? () => {
+                                  // Mostrar detalhes do intervalo livre no drawer
+                                  const freeInterval = getFreeIntervalDetails(slot);
+                                  if (freeInterval) {
+                                    setSelectedAppointment(freeInterval);
                                     setIsDrawerOpen(true);
                                   }
                                 }
-                              : isFree
-                              ? undefined // Intervalo livre não é clicável
+                              : isEncaixe && fitSlotDetails
+                              ? () => handleSlotClick(slot, true, fitSlotDetails.endTime)
                               : () => handleSlotClick(slot)
                           }
                           title={
-                            isBooked
+                            isLunch
+                              ? "Horário de almoço"
+                              : isBooked && appointment && appointment.status !== 'canceled'
                               ? `Clique para ver detalhes - ${
                                   appointment?.client?.name || "Cliente"
                                 }`
                               : isFree
-                              ? "Horário de intervalo - Não disponível para agendamento"
+                              ? "Intervalo livre - Clique para ver detalhes ou cancelar"
+                              : isEncaixe && fitSlotDetails
+                              ? `Clique para encaixar (${fitSlotDetails.duration} min disponíveis)`
                               : "Clique para agendar"
                           }
                         >
-                          <div
-                            className={`font-bold text-lg mb-1 ${styles.timeClass}`}
-                          >
-                            {slot}
-                          </div>
-
-                          {isBooked && appointment ? (
-                            <>
-                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
-                                {appointment.client?.name || "Cliente"}
-                              </div>
-                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
-                                {appointment.services && appointment.services.length > 1 
-                                  ? `${appointment.services.length} serviços`
-                                  : appointment.services?.[0]?.service_name || "Serviço"
-                                }
-                              </div>
-                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
+                          {/* Lado esquerdo - Horário e ícone */}
+                          <div className="flex items-center space-x-3">
+                            <div className={`p-2 rounded-full ${
+                              isLunch
+                                ? "bg-amber-200"
+                                : isBooked && appointment && appointment.status !== 'canceled'
+                                ? "bg-white/60"
+                                : isFree
+                                ? "bg-gray-300"
+                                : isEncaixe
+                                ? "bg-yellow-200"
+                                : "bg-green-100"
+                            }`}>
+                              {isLunch ? (
+                                <span className="text-lg">🍽️</span>
+                              ) : (
                                 <svg
-                                  className="w-3 h-3 mr-1"
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
+                                  className={`w-5 h-5 ${
+                                    isBooked && appointment && appointment.status !== 'canceled'
+                                      ? "text-gray-600"
+                                      : isFree
+                                      ? "text-gray-700"
+                                      : isEncaixe
+                                      ? "text-yellow-700"
+                                      : "text-green-600"
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
                                 >
                                   <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                    clipRule="evenodd"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                                   />
                                 </svg>
-                                R$ {appointment.services?.[0]?.price || "0.00"}
-                              </div>
-                            </>
-                          ) : isFree && freeInterval ? (
-                            <>
-                              <div className={`text-xs font-medium truncate mb-1 ${styles.textClass}`}>
-                                Intervalo Livre
-                              </div>
-                              <div className={`text-xs truncate mb-1 ${styles.iconColor}`}>
-                                {freeInterval.notes || "Intervalo"}
-                              </div>
-                              <div className={`flex items-center text-xs ${styles.iconColor}`}>
-                                <CircleX className="mr-1" size={16} />
-                                Bloqueado
-                              </div>
-                            </>
-                          ) : !isBooked && !isFree ? (
-                            <div className={`flex items-center text-xs font-medium ${styles.textClass}`}>
-                              <svg
-                                className="w-3 h-3 mr-1"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
-                                />
-                              </svg>
-                              Disponível
+                              )}
                             </div>
-                          ) : null}
+                            <div>
+                              <div className={`font-bold text-lg ${
+                                isLunch
+                                  ? "text-amber-800"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
+                                  ? "text-gray-700"
+                                  : isFree
+                                  ? "text-gray-700"
+                                  : isEncaixe
+                                  ? "text-yellow-800"
+                                  : "text-gray-700"
+                              }`}>
+                                {isLunch && lunchEndTime 
+                                  ? `${slot} - ${lunchEndTime}` 
+                                  : isFree && freeEndTime
+                                  ? `${slot} - ${freeEndTime}`
+                                  : isEncaixe && fitSlotDetails 
+                                  ? `${slot} até ${fitSlotDetails.endTime}` 
+                                  : slot
+                                }
+                              </div>
+                              <div className={`text-sm ${
+                                isLunch
+                                  ? "text-amber-700"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
+                                  ? "text-gray-600"
+                                  : isFree
+                                  ? "text-gray-600"
+                                  : isEncaixe
+                                  ? "text-yellow-600"
+                                  : "text-green-600"
+                              }`}>
+                                {isLunch
+                                  ? "Horário de Almoço"
+                                  : isBooked && appointment && appointment.status !== 'canceled'
+                                  ? `${appointment.client?.name || "Cliente"}`
+                                  : isFree && freeInterval
+                                  ? "Intervalo Livre"
+                                  : isEncaixe && fitSlotDetails
+                                  ? `Clique para encaixar (${fitSlotDetails.duration} min disponíveis)`
+                                  : "Clique para agendar"
+                                }
+                              </div>
+                              {isBooked && appointment && appointment.status !== 'canceled' && appointment.services?.[0] && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {appointment.services.length > 1 
+                                    ? `${appointment.services.length} serviços`
+                                    : appointment.services[0].service_name || "Serviço"
+                                  }
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                          {/* Hover effect indicator */}
-                          {!isBooked && !isFree && (
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                          )}
-                          {isFree && (
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                          )}
+                          {/* Lado direito - Botão ou informações */}
+                          <div className="flex items-center">
+                            {isLunch ? (
+                              <div className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-200 text-amber-800 border border-amber-300">
+                                Almoço
+                              </div>
+                            ) : isBooked && appointment && appointment.status !== 'canceled' ? (
+                              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                appointment.status === 'confirmed'
+                                  ? "bg-green-600 text-white"
+                                  : appointment.status === 'pending'
+                                  ? "bg-white text-gray-700 border border-gray-300"
+                                  : appointment.status === 'completed'
+                                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}>
+                                {getStatusText(appointment.status)}
+                              </div>
+                            ) : isFree ? (
+                              <div className="text-gray-600">
+                                <CircleX size={20} />
+                              </div>
+                            ) : isEncaixe ? (
+                              <div className="text-yellow-600">
+                                <span className="text-lg font-bold">+</span>
+                              </div>
+                            ) : (
+                              <div className="text-green-600">
+                                <svg
+                                  className="w-6 h-6"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 4v16m8-8H4"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -1357,9 +1880,15 @@ export default function AgendaPage() {
         <DialogContent className="sm:max-w-[500px] rounded-2xl border-0 shadow-2xl">
           <form onSubmit={handleSubmitAppointment}>
             <DialogHeader className="text-center pb-6">
-              <div className="mx-auto bg-gradient-to-br from-emerald-100 to-teal-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                isFreeIntervalMode 
+                  ? "bg-gradient-to-br from-emerald-100 to-teal-100" 
+                  : "bg-gradient-to-br from-emerald-100 to-teal-100"
+              }`}>
                 <svg
-                  className="w-8 h-8 text-emerald-600"
+                  className={`w-8 h-8 ${
+                    isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1368,29 +1897,98 @@ export default function AgendaPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    d={isFreeIntervalMode 
+                      ? "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      : "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    }
                   />
                 </svg>
               </div>
-              <DialogTitle className="text-2xl font-bold text-gray-800">
-                Novo Agendamento
+              
+              {/* Toggle Switch Minimalista */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-3 bg-gray-100 rounded-full p-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeIntervalMode(false)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      !isFreeIntervalMode
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Novo Agendamento
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFreeIntervalMode(true)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      isFreeIntervalMode
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Intervalo Livre
+                  </button>
+                </div>
+              </div>
+
+              <DialogTitle className={`text-2xl font-bold ${
+                isFreeIntervalMode ? "text-emerald-800" : "text-gray-800"
+              }`}>
+                <div className="flex items-center justify-center gap-2">
+                  {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
+                  {isEncaixe && !isFreeIntervalMode && (
+                    <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded-full">
+                      Encaixe
+                    </span>
+                  )}
+                </div>
               </DialogTitle>
               <DialogDescription className="text-gray-600 mt-2">
-                Preencha os dados para criar um novo agendamento para{" "}
-                <span className="font-semibold text-emerald-600">
-                  {selectedSlot}
-                </span>
+                {isFreeIntervalMode 
+                  ? (
+                    <>
+                      Criar um intervalo livre para{" "}
+                      <span className="font-semibold text-emerald-600">
+                        {selectedSlot}
+                      </span>
+                    </>
+                  ) : isEncaixe ? (
+                    <>
+                      Encaixar agendamento no horário{" "}
+                      <span className="font-semibold text-yellow-700">
+                        {selectedSlot} até {encaixeEndTime}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Preencha os dados para criar um novo agendamento para{" "}
+                      <span className="font-semibold text-emerald-600">
+                        {selectedSlot}
+                      </span>
+                    </>
+                  )
+                }
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-6">
               {/* Data e Horário - Destacado */}
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+              <div className={`rounded-xl p-4 border-2 ${
+                isFreeIntervalMode 
+                  ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200" 
+                  : "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200"
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-emerald-100 rounded-lg p-2">
+                    <div className={`rounded-lg p-2 ${
+                      isFreeIntervalMode ? "bg-emerald-100" : "bg-emerald-100"
+                    }`}>
                       <svg
-                        className="w-5 h-5 text-emerald-600"
+                        className={`w-5 h-5 ${
+                          isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
+                        }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1404,18 +2002,65 @@ export default function AgendaPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-semibold text-emerald-800">
+                      <p className={`font-semibold ${
+                        isFreeIntervalMode ? "text-emerald-800" : "text-emerald-800"
+                      }`}>
                         Data e Horário
                       </p>
-                      <p className="text-emerald-700">
+                      <p className={`${
+                        isFreeIntervalMode ? "text-emerald-700" : isEncaixe ? "text-yellow-700" : "text-emerald-700"
+                      }`}>
                         {date.toLocaleDateString("pt-BR")} às {selectedSlot}
+                        {isFreeIntervalMode && selectedEndTime && ` - ${selectedEndTime}`}
+                        {isEncaixe && encaixeEndTime && ` - ${encaixeEndTime}`}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Cliente - Com busca */}
+              {/* Horário Final - Apenas para Intervalo Livre */}
+              {isFreeIntervalMode && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-emerald-700 flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário Final *
+                  </Label>
+                  <Select
+                    value={selectedEndTime}
+                    onValueChange={setSelectedEndTime}
+                  >
+                    <SelectTrigger className="h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-lg">
+                      <SelectValue placeholder="Selecione o horário final" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getValidEndTimes(selectedSlot).map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-emerald-600">
+                    Horários disponíveis em intervalos de 15 minutos
+                  </p>
+                </div>
+              )}
+
+              {/* Cliente - Com busca (apenas para agendamento normal) */}
+              {!isFreeIntervalMode && (
               <div className="space-y-2">
                 <Label
                   htmlFor="client_id"
@@ -1521,8 +2166,10 @@ export default function AgendaPage() {
                   )}
                 </div>
               </div>
+              )}
 
-              {/* Serviços - Select com Dropdown Customizado */}
+              {/* Serviços - Select com Dropdown Customizado (apenas para agendamento normal) */}
+              {!isFreeIntervalMode && (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-700 flex items-center">
                   <svg
@@ -1658,15 +2305,20 @@ export default function AgendaPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Observações */}
               <div className="space-y-2">
                 <Label
                   htmlFor="notes"
-                  className="text-sm font-semibold text-gray-700 flex items-center"
+                  className={`text-sm font-semibold flex items-center ${
+                    isFreeIntervalMode ? "text-emerald-700" : "text-gray-700"
+                  }`}
                 >
                   <svg
-                    className="w-4 h-4 mr-2 text-gray-500"
+                    className={`w-4 h-4 mr-2 ${
+                      isFreeIntervalMode ? "text-emerald-500" : "text-gray-500"
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1678,15 +2330,22 @@ export default function AgendaPage() {
                       d="M7 8h10M7 12h4m-7 8l4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z"
                     />
                   </svg>
-                  Observações
+                  {isFreeIntervalMode ? "Motivo do Intervalo" : "Observações"}
                 </Label>
                 <Textarea
                   id="notes"
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  placeholder="Alguma observação importante?"
-                  className="min-h-[80px] border-2 border-gray-200 focus:border-emerald-400 rounded-lg resize-none"
+                  placeholder={isFreeIntervalMode 
+                    ? "Informe o motivo do intervalo livre (opcional)"
+                    : "Alguma observação importante?"
+                  }
+                  className={`min-h-[80px] border-2 rounded-lg resize-none ${
+                    isFreeIntervalMode 
+                      ? "border-emerald-200 focus:border-emerald-400" 
+                      : "border-gray-200 focus:border-emerald-400"
+                  }`}
                 />
               </div>
             </div>
@@ -1704,7 +2363,11 @@ export default function AgendaPage() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isFreeIntervalMode
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                    : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                }`}
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
@@ -1727,7 +2390,7 @@ export default function AgendaPage() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Salvando...
+                    {isFreeIntervalMode ? "Criando intervalo..." : "Salvando..."}
                   </span>
                 ) : (
                   <span className="flex items-center">
@@ -1744,7 +2407,7 @@ export default function AgendaPage() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    Agendar
+                    {isFreeIntervalMode ? "Criar Intervalo" : "Agendar"}
                   </span>
                 )}
               </Button>
@@ -1758,10 +2421,15 @@ export default function AgendaPage() {
         <DrawerContent className="max-h-[85vh]">
           <DrawerHeader className="text-center pb-2">
             <DrawerTitle className="text-xl font-bold text-gray-800">
-              {selectedAppointment?.client?.name || "Cliente"}
+              {selectedAppointment?.status === "free" 
+                ? "Intervalo Livre" 
+                : selectedAppointment?.client?.name || "Cliente"
+              }
             </DrawerTitle>
             <DrawerDescription className="text-gray-600">
-              {selectedAppointment?.services && selectedAppointment.services.length > 1 
+              {selectedAppointment?.status === "free" 
+                ? `${selectedAppointment?.start_time?.slice(0, 5)} - ${selectedAppointment?.end_time?.slice(0, 5)}`
+                : selectedAppointment?.services && selectedAppointment.services.length > 1 
                 ? `${selectedAppointment.services.length} serviços • R$ ${selectedAppointment.services.reduce((total, service) => total + (parseFloat(service.price) || 0), 0).toFixed(2)}`
                 : `${selectedAppointment?.services?.[0]?.service_name || "Serviço"} • R$ ${selectedAppointment?.services?.[0]?.price || "0.00"}`
               }
@@ -1773,12 +2441,15 @@ export default function AgendaPage() {
               <>
                 {/* Informações Principais */}
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Telefone</span>
-                    <span className="font-medium">
-                      {selectedAppointment.client?.phone_number || "N/A"}
-                    </span>
-                  </div>
+                  {/* Telefone - apenas para agendamentos normais */}
+                  {selectedAppointment.status !== "free" && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Telefone</span>
+                      <span className="font-medium">
+                        {selectedAppointment.client?.phone_number || "N/A"}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Horário</span>
@@ -1788,31 +2459,204 @@ export default function AgendaPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Status</span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        selectedAppointment.status === "confirmed"
-                          ? "bg-green-100 text-green-700"
-                          : selectedAppointment.status === "pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : selectedAppointment.status === "completed"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {selectedAppointment.status === "confirmed"
-                        ? "Confirmado"
-                        : selectedAppointment.status === "pending"
-                        ? "Pendente"
-                        : selectedAppointment.status === "completed"
-                        ? "Concluído"
-                        : "Cancelado"}
-                    </span>
-                  </div>
+                  {/* Para intervalos livres, mostrar Tipo em vez de Status */}
+                  {selectedAppointment.status === "free" ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Tipo</span>
+                      <div className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/10 text-gray-600 border border-gray-500/20">
+                        Intervalo Livre
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Status</span>
+                      <div className="relative">
+                      <button
+                        onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
+                        disabled={isUpdatingStatus}
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-all duration-200 hover:shadow-md ${getStatusColor(selectedAppointment.status)} ${
+                          isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
+                        }`}
+                      >
+                        <span>{getStatusText(selectedAppointment.status)}</span>
+                        {isUpdatingStatus ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        )}
+                      </button>
 
-                  {/* Lista de Serviços */}
-                  {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                      {/* Menu de Status - Responsivo para Mobile */}
+                      {isStatusMenuOpen && !isUpdatingStatus && (
+                        <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl border-t-2 border-gray-100 z-50 transform transition-transform duration-300 ease-out">
+                          {/* Handle bar */}
+                          <div className="flex justify-center pt-4 pb-3">
+                            <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                          </div>
+                          
+                          {/* Header */}
+                          <div className="px-6 pb-6 border-b border-gray-200">
+                            <h3 className="text-xl font-bold text-gray-800 text-center">Alterar Status</h3>
+                            <p className="text-base text-gray-600 text-center mt-2 font-medium">
+                              {selectedAppointment.client?.name || "Cliente"}
+                            </p>
+                          </div>
+
+                          {/* Options */}
+                          <div className="px-6 py-4 space-y-3 max-h-80 overflow-y-auto">
+                            {/* Opção Pendente */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'pending')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'pending'
+                                  ? 'bg-orange-200 border-orange-300 shadow-md'
+                                  : 'bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-white border border-gray-300 text-gray-700 rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  P
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Pendente</span>
+                              </div>
+                              {selectedAppointment.status === 'pending' && (
+                                <div className="w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Confirmado */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'confirmed')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'confirmed'
+                                  ? 'bg-green-200 border-green-300 shadow-md'
+                                  : 'bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-green-600 text-white rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✓
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Confirmado</span>
+                              </div>
+                              {selectedAppointment.status === 'confirmed' && (
+                                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Concluído */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'completed')}
+                              className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 ${
+                                selectedAppointment.status === 'completed'
+                                  ? 'bg-blue-200 border-blue-300 shadow-md'
+                                  : 'bg-blue-50 border-blue-200 hover:bg-blue-100 hover:border-blue-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-blue-100 border border-blue-300 text-blue-700 rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✓
+                                </div>
+                                <span className="font-bold text-gray-800 text-left text-lg">Marcar como Concluído</span>
+                              </div>
+                              {selectedAppointment.status === 'completed' && (
+                                <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Opção Cancelado */}
+                            <button
+                              onClick={() => updateAppointmentStatus(selectedAppointment.id, 'canceled')}
+                              className="w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 border-2 bg-red-50 border-red-200 hover:bg-red-100 hover:border-red-300 hover:shadow-md"
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-red-500 text-white rounded-2xl flex items-center justify-center text-base font-bold shadow-sm">
+                                  ✗
+                                </div>
+                                <span className="font-bold text-red-600 text-left text-lg">Cancelar Agendamento</span>
+                              </div>
+                              <div className="w-8 h-8 bg-red-100 border border-red-300 text-red-600 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </div>
+                            </button>
+                          </div>
+
+                          {/* Footer com botão fechar */}
+                          <div className="px-6 py-6 border-t border-gray-200 bg-gray-50 rounded-b-3xl">
+                            <button
+                              onClick={() => setIsStatusMenuOpen(false)}
+                              className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overlay para fechar o menu */}
+                      {isStatusMenuOpen && (
+                        <div
+                          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+                          onClick={() => setIsStatusMenuOpen(false)}
+                        ></div>
+                      )}
+                    </div>
+                    </div>
+                  )}
+                  {/* Lista de Serviços - apenas para agendamentos normais */}
+                  {selectedAppointment.status !== "free" && selectedAppointment.services && selectedAppointment.services.length > 0 && (
                     <div className="pt-2 border-t border-gray-200">
                       <span className="text-gray-600 text-sm mb-2 block">
                         {selectedAppointment.services.length > 1 ? 'Serviços:' : 'Serviço:'}
@@ -1847,7 +2691,69 @@ export default function AgendaPage() {
             )}
           </div>
 
-          <DrawerFooter className="pt-4 border-t border-gray-100">
+          <DrawerFooter className="pt-4 border-t border-gray-100 space-y-3">
+            {/* Botão WhatsApp - apenas para agendamentos normais */}
+            {selectedAppointment?.status !== "free" && selectedAppointment?.client?.phone_number && (
+              <Button
+                onClick={() => openWhatsApp(
+                  selectedAppointment.client.phone_number,
+                  selectedAppointment.client.name || "Cliente"
+                )}
+                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
+              >
+                <span className="flex items-center justify-center space-x-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.106"/>
+                  </svg>
+                  <span>Enviar WhatsApp</span>
+                </span>
+              </Button>
+            )}
+            
+            {/* Botão Cancelar Intervalo - apenas para intervalos livres */}
+            {selectedAppointment?.status === "free" && (
+              <Button
+                onClick={() => {
+                  if (selectedAppointment) {
+                    updateAppointmentStatus(selectedAppointment.id, "canceled");
+                  }
+                }}
+                disabled={isUpdatingStatus}
+                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
+              >
+                {isUpdatingStatus ? (
+                  <span className="flex items-center justify-center space-x-2">
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span>Cancelando...</span>
+                  </span>
+                ) : (
+                  <span>Cancelar Intervalo</span>
+                )}
+              </Button>
+            )}
+            
             <DrawerClose asChild>
               <Button
                 variant="outline"
@@ -1881,6 +2787,27 @@ export default function AgendaPage() {
         onOpenChange={setIsIntervalDrawerOpen}
       >
         <DrawerContent className="max-h-[90vh] bg-white">
+          {/* Header Modernizado */}
+          <div className="text-center pb-6 pt-8 px-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200">
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-emerald-100 to-teal-100">
+              <svg
+                className="w-8 h-8 text-emerald-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-emerald-800">Intervalo Livre</h2>
+            <p className="text-emerald-700 mt-2">Crie um intervalo livre em uma data específica</p>
+          </div>
+          
           <div className="flex-1 overflow-y-auto max-h-[70vh]">
             <form
               onSubmit={handleIntervalSubmit}
@@ -1891,9 +2818,22 @@ export default function AgendaPage() {
                 <div className="md:col-span-2">
                   <Label
                     htmlFor="professional_id"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                    className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center"
                   >
-                    👤 Profissional
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                    Profissional
                   </Label>
                   <Input
                     id="professional_id"
@@ -1904,33 +2844,66 @@ export default function AgendaPage() {
                   />
                 </div>
 
-                {/* Appointment Date */}
-                <div>
-                  <Label
-                    htmlFor="appointment_date"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
-                  >
-                    📅 Data do Agendamento
-                  </Label>
-                  <Input
-                    id="appointment_date"
-                    type="date"
-                    value={formIntervals.appointment_date}
-                    onChange={(e) =>
-                      handleIntervalFormChange(
-                        "appointment_date",
-                        e.target.value
-                      )
-                    }
-                    className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm"
-                    required
-                  />
+                {/* Data Destacada */}
+                <div className="md:col-span-2">
+                  <div className="rounded-xl p-4 border-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="rounded-lg p-2 bg-emerald-100">
+                          <svg
+                            className="w-5 h-5 text-emerald-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-emerald-800 mb-2">
+                            Data do Intervalo Livre
+                          </p>
+                          <Input
+                            id="appointment_date"
+                            type="date"
+                            value={formIntervals.appointment_date}
+                            onChange={(e) =>
+                              handleIntervalFormChange(
+                                "appointment_date",
+                                e.target.value
+                              )
+                            }
+                            className="border-2 border-emerald-200 focus:border-emerald-400 rounded-lg bg-white shadow-sm"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Start Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    🕐 Horário de Início
+                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário de Início
                   </Label>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
@@ -1994,8 +2967,21 @@ export default function AgendaPage() {
 
                 {/* End Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    🕐 Horário de Fim
+                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Horário Final
                   </Label>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
@@ -2057,23 +3043,35 @@ export default function AgendaPage() {
                   </div>
                 </div>
 
-                {/* Notes */}
-                <div className="md:col-span-2">
+                {/* Observações */}
+                <div className="md:col-span-2 space-y-2">
                   <Label
                     htmlFor="notes"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                    className="text-sm font-semibold text-emerald-700 flex items-center"
                   >
-                    📝 Observações (opci)
+                    <svg
+                      className="w-4 h-4 mr-2 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 8h10M7 12h4m-7 8l4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z"
+                      />
+                    </svg>
+                    Motivo do Intervalo
                   </Label>
                   <Textarea
                     id="notes"
-                    placeholder="Selecione o motivo do intervalo livre"
+                    placeholder="Informe o motivo do intervalo livre (opcional)"
                     value={formIntervals.notes}
                     onChange={(e) =>
                       handleIntervalFormChange("notes", e.target.value)
                     }
-                    className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm min-h-[100px] resize-none"
-                    rows={4}
+                    className="min-h-[80px] border-2 rounded-lg resize-none border-emerald-200 focus:border-emerald-400"
                   />
                 </div>
               </div>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calendar, CheckCircle, DollarSign, Filter, RotateCcw, Settings, TrendingUp, Wallet, RefreshCw, HandCoins } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle, DollarSign, Filter, RotateCcw, Settings, TrendingUp, Wallet, RefreshCw, HandCoins, Users } from "lucide-react";
 
 // Interfaces para tipagem
 interface CommissionConfig {
@@ -67,6 +67,13 @@ interface EarningsReport {
   appointments_detail: AppointmentDetail[];
 }
 
+interface TeamMember {
+  id: number;
+  name: string;
+  position: string;
+  email: string;
+}
+
 export default function CommissionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -75,6 +82,8 @@ export default function CommissionsPage() {
   const [earningsReport, setEarningsReport] = useState<EarningsReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
   // Estado de filtro removido pois não é mais necessário
   const [startDate, setStartDate] = useState<string>(() => {
     const now = new Date();
@@ -86,7 +95,28 @@ export default function CommissionsPage() {
     return now.toISOString().split('T')[0];
   });
 
-  // Função para buscar relatório de ganhos do profissional logado
+  // Verificar se usuário tem acesso a ver todas as comissões
+  const canViewAllCommissions = user?.position && ['admin', 'manager'].includes(user.position.toLowerCase());
+
+  // Função para buscar membros da equipe (apenas para admin/manager)
+  const fetchTeamMembers = async () => {
+    if (!user?.company_id || !canViewAllCommissions) return;
+    
+    try {
+      const response = await api.get('/teams', {
+        headers: {
+          'company_id': user.company_id,
+          'user_id': user.id
+        }
+      });
+      
+      setTeamMembers(response.data);
+    } catch (error: any) {
+      console.error('Erro ao carregar membros da equipe:', error);
+    }
+  };
+
+  // Função para buscar relatório de ganhos
   const fetchCommissions = async () => {
     if (!user?.id) return;
     
@@ -94,8 +124,13 @@ export default function CommissionsPage() {
     setError(null);
     
     try {
+      // Determinar qual profissional buscar
+      const professionalId = canViewAllCommissions && selectedProfessionalId 
+        ? selectedProfessionalId 
+        : user.id;
+      
       // Buscar relatório de ganhos (com datas padrão ou selecionadas)
-      const earningsResponse = await api.get(`/commissions/professional/${user.id}/report?start_date=${startDate}&end_date=${endDate}`, {
+      const earningsResponse = await api.get(`/commissions/professional/${professionalId}/report?start_date=${startDate}&end_date=${endDate}`, {
         headers: {
           'company_id': user.company_id,
           'user_id': user.id
@@ -110,7 +145,7 @@ export default function CommissionsPage() {
       
       // Verificar se é erro de usuário não encontrado (sem comissão)
       if (error.response?.status === 404 || error.response?.data?.message?.includes('Usuário não encontrado')) {
-        setError('Você ainda não possui comissões configuradas. Entre em contato com seu gerente para configurar suas comissões.');
+        setError('Este profissional ainda não possui comissões configuradas.');
       } else {
         setError(error.response?.data?.message || 'Erro ao carregar dados das comissões');
       }
@@ -120,8 +155,14 @@ export default function CommissionsPage() {
   };
 
   useEffect(() => {
+    if (canViewAllCommissions) {
+      fetchTeamMembers();
+    }
+  }, [user?.company_id, canViewAllCommissions]);
+
+  useEffect(() => {
     fetchCommissions();
-  }, [user?.id, startDate, endDate]);
+  }, [user?.id, startDate, endDate, selectedProfessionalId]);
 
   // Funções auxiliares removidas pois não são mais necessárias
 
@@ -147,7 +188,7 @@ export default function CommissionsPage() {
                     Comissões
                   </h1>
                   <p className="text-emerald-100 text-sm mt-1">
-                    Acompanhe seus ganhos e comissões
+                    {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                   </p>
                 </div>
               </div>
@@ -198,7 +239,7 @@ export default function CommissionsPage() {
                     Comissões
                   </h1>
                   <p className="text-emerald-100 text-sm mt-1">
-                    Acompanhe seus ganhos e comissões
+                    {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                   </p>
                 </div>
               </div>
@@ -273,7 +314,7 @@ export default function CommissionsPage() {
                   Comissões
                 </h1>
                 <p className="text-emerald-100 text-sm mt-1">
-                  Acompanhe seus ganhos e comissões
+                  {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                 </p>
               </div>
             </div>
@@ -293,6 +334,50 @@ export default function CommissionsPage() {
       </header>
 
       <div className="px-4 py-6 space-y-6 overflow-x-hidden w-full">
+        {/* Seletor de Profissional (apenas para admin/manager) */}
+        {canViewAllCommissions && (
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+                Selecionar Profissional
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Profissional</label>
+                  <select
+                    value={selectedProfessionalId || ''}
+                    onChange={(e) => setSelectedProfessionalId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                  >
+                    <option value="">Selecione um profissional...</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name} - {member.position}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedProfessionalId && (
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedProfessionalId(null)}
+                      className="px-4 py-2 text-sm border-2 rounded-lg hover:bg-gray-50"
+                    >
+                      Limpar Seleção
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filtros de Data */}
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-4">
@@ -338,7 +423,7 @@ export default function CommissionsPage() {
           </CardContent>
         </Card>
 
-        {!earningsReport && (
+        {!earningsReport && !canViewAllCommissions && (
           <Card className="border-0 shadow-lg">
             <CardContent className="p-8 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -346,6 +431,18 @@ export default function CommissionsPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Selecione um Período</h3>
               <p className="text-gray-600 max-w-sm mx-auto">Escolha as datas inicial e final para visualizar seu relatório de comissões.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!earningsReport && canViewAllCommissions && !selectedProfessionalId && (
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Selecione um Profissional</h3>
+              <p className="text-gray-600 max-w-sm mx-auto">Escolha um profissional para visualizar suas comissões e relatórios.</p>
             </CardContent>
           </Card>
         )}
@@ -358,7 +455,12 @@ export default function CommissionsPage() {
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                   <DollarSign className="h-5 w-5" />
                 </div>
-                <span className="text-white/80 text-sm font-medium">Seus Ganhos no Período</span>
+                <span className="text-white/80 text-sm font-medium">
+                  {canViewAllCommissions && selectedProfessionalId 
+                    ? `Ganhos de ${earningsReport.professional?.name || 'Profissional'} no Período` 
+                    : 'Seus Ganhos no Período'
+                  }
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -454,7 +556,10 @@ export default function CommissionsPage() {
                 <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
                   <HandCoins className="h-4 w-4 text-white" />
                 </div>
-                Suas Comissões por Serviço ({earningsReport.services.length})
+                {canViewAllCommissions && selectedProfessionalId 
+                  ? `Comissões de ${earningsReport.professional?.name || 'Profissional'} por Serviço (${earningsReport.services.length})` 
+                  : `Suas Comissões por Serviço (${earningsReport.services.length})`
+                }
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -464,7 +569,12 @@ export default function CommissionsPage() {
                     <HandCoins className="h-8 w-8 text-gray-400" />
                   </div>
                   <p className="text-gray-500 font-medium mb-2">Nenhuma comissão registrada</p>
-                  <p className="text-gray-400 text-sm">Você não possui comissões no período selecionado</p>
+                  <p className="text-gray-400 text-sm">
+                    {canViewAllCommissions && selectedProfessionalId 
+                      ? 'Este profissional não possui comissões no período selecionado' 
+                      : 'Você não possui comissões no período selecionado'
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-1">

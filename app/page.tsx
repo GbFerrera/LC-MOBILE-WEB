@@ -192,12 +192,14 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
-              <Avatar className="h-12 w-12 sm:h-16 sm:w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden">
-                <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
-                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-sm sm:text-lg font-bold">
-                  {user?.name?.substring(0, 2)}
-                </AvatarFallback>
-              </Avatar>
+              <Link href="/ajustes" className="cursor-pointer">
+                <Avatar className="h-12 w-12 sm:h-16 sm:w-16 border-3 border-white/20 shadow-xl bg-gray-100 overflow-hidden hover:ring-4 hover:ring-white/30 transition-all duration-200">
+                  <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
+                  <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-sm sm:text-lg font-bold">
+                    {user?.name?.substring(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               <div className="min-w-0 flex-1">
                 <h1 className="font-bold text-lg sm:text-2xl tracking-wide text-white truncate">Olá, {user?.name}!</h1>
                 <p className="text-emerald-100 text-xs sm:text-sm mt-1">
@@ -293,7 +295,7 @@ export default function Home() {
             </div>
           </Link>
 
-          <Link href="/commitions" className="group">
+          <Link href="/commissions" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-800 to-emerald-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
                 <HandCoinsIcon className="h-6 w-6 text-white" />

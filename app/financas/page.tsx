@@ -8,6 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+const translatePaymentMethod = (method: string) => {
+  switch (method) {
+    case 'cash':
+      return 'Dinheiro';
+    case 'credit':
+      return 'Cartão Crédito';
+    case 'debit':
+      return 'Cartão Débito';
+    case 'pix':
+      return 'PIX';
+    default:
+      return method; // Retorna o original se não houver tradução
+  }
+};
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1337,7 +1352,7 @@ export default function FinancePage() {
                               </div>
                               <div className="flex-1">
                                 <p className="font-semibold text-gray-900 mb-1">
-                                  {transaction.category}
+                                  {translatePaymentMethod(transaction.category)}
                                 </p>
                                 <p className="text-sm text-gray-600 mb-1">
                                   {transaction.description}
@@ -1762,7 +1777,7 @@ export default function FinancePage() {
                         transaction.type === 'expense' ? 'bg-red-500' : 'bg-orange-500'
                       }`}></div>
                       <div>
-                        <p className="font-medium text-sm">{transaction.category}</p>
+                        <p className="font-medium text-sm">{translatePaymentMethod(transaction.category)}</p>
                         <p className="text-xs text-gray-500">
                           {transaction.description} • {new Date(transaction.created_at).toLocaleDateString('pt-BR')} às {new Date(transaction.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </p>

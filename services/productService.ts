@@ -1,34 +1,109 @@
-import { api } from './api';
+import { api } from "./api";
 
-export const getProductPhotos = async (productId: string, companyId: string) => {
-  if (!companyId) {
-    throw new Error('Company ID is required for authorization.');
-  }
-  if (!productId) {
-    throw new Error('Product ID is required.');
-  }
+interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock?: number;
+  url_image?: string | null;
+}
 
+interface CreateProductPayload {
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  url_image?: string | null;
+}
+
+export const UpdateProduct = async (
+  productId: number,
+  companyId: number,
+  payload: UpdateProductPayload
+) => {
   try {
-    const response = await api.get(`/product-photos/${productId}`, {
+    const response = await api.put(`/products/${productId}`, payload, {
       headers: {
-        company_id: companyId,
+        "Content-Type": "application/json",
+        "company_id": companyId.toString(),
       },
     });
     return response.data;
-  } catch (error: any) {
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Error fetching product photos:', error.response.data);
-      throw new Error(error.response.data.message || 'Failed to fetch product photos.');
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('Error fetching product photos: No response received', error.request);
-      throw new Error('No response received from server.');
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Error fetching product photos:', error.message);
-      throw new Error('Error setting up the request.');
-    }
+  } catch (error) {
+    console.error("Erro ao atualizar produto:", error);
+    throw error;
+  }
+};
+
+export const DeleteProduct = async (productId: number, companyId: number) => {
+  try {
+    const response = await api.delete(`/products/${productId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "company_id": companyId.toString(),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao excluir produto:", error);
+    throw error;
+  }
+};
+
+export const CreateProduct = async (companyId: number, payload: CreateProductPayload) => {
+  try {
+    const response = await api.post("/products", payload, {
+      headers: {
+        "Content-Type": "application/json",
+        "company_id": companyId.toString(),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao criar produto:", error);
+    throw error;
+  }
+};
+
+
+export const uploadProductPhoto = async (productId: string, base64Image: string, companyId: string) => {
+  const response = await api.post(`/product-photos/${productId}`, { base64Image }, {
+    headers: {
+      company_id: companyId,
+    },
+  });
+  return response.data;
+};
+
+export const getPhotosByProduct = async (productId: string, companyId: string) => {
+  const response = await api.get(`/product-photos/${productId}`, {
+    headers: {
+      company_id: companyId,
+    },
+  });
+  return response.data;
+};
+
+export const getAllProductPhotos = async (companyId: string) => {
+  const response = await api.get('/product-photos', {
+    headers: {
+      company_id: companyId,
+    },
+  });
+  return response.data;
+};
+
+export const GetAllProducts = async (companyId: string) => {
+  try {
+    const response = await api.get('/products', {
+      headers: {
+        "Content-Type": "application/json",
+        "company_id": companyId,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar todos os produtos:", error);
+    throw error;
   }
 };

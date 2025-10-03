@@ -35,7 +35,9 @@ import {
   ShieldIcon,
   LightbulbIcon,
   HeartIcon,
-  ThumbsUpIcon
+  ThumbsUpIcon,
+  PackageIcon,
+  TargetIcon
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
@@ -305,7 +307,27 @@ export default function Home() {
             </div>
           </Link>
 
-           <Link href="/ajustes" className="group">
+          <Link href="/produtos" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <PackageIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-cyan-600 transition-colors">Produtos</span>
+              <p className="text-xs text-gray-500 mt-1">Gestão de produtos</p>
+            </div>
+          </Link>
+
+          <Link href="/metas" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <TargetIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-amber-600 transition-colors">Metas</span>
+              <p className="text-xs text-gray-500 mt-1">Acompanhamento</p>
+            </div>
+          </Link>
+
+          <Link href="/ajustes" className="group">
             <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-800 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
                 <SettingsIcon className="h-6 w-6 text-white" />

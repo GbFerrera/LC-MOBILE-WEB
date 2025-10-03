@@ -17,6 +17,7 @@ import {
   CalendarOffIcon,
   CalendarDays,
   X,
+  Calendar,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
@@ -34,6 +35,9 @@ export default function AjustesPage() {
   const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
   const [isServicesDialogOpen, setIsServicesDialogOpen] = useState(false);
   const [isCreateServiceDialogOpen, setIsCreateServiceDialogOpen] = useState(false);
+  const [isEditServiceDialogOpen, setIsEditServiceDialogOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [isUpdatingService, setIsUpdatingService] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serviceHoursLoading, setServiceHoursLoading] = useState(false);
   const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
@@ -44,6 +48,16 @@ export default function AjustesPage() {
   const [isCreatingDayOff, setIsCreatingDayOff] = useState(false);
   const [specificDayOffs, setSpecificDayOffs] = useState<string[]>([]);
   const [loadingDayOffs, setLoadingDayOffs] = useState(false);
+  
+  // Estados para intervalos livres
+  const [isFreeIntervalDialogOpen, setIsFreeIntervalDialogOpen] = useState(false);
+  const [selectedFreeIntervalDate, setSelectedFreeIntervalDate] = useState("");
+  const [freeIntervalStartHour, setFreeIntervalStartHour] = useState("09");
+  const [freeIntervalStartMinute, setFreeIntervalStartMinute] = useState("00");
+  const [freeIntervalEndHour, setFreeIntervalEndHour] = useState("10");
+  const [freeIntervalEndMinute, setFreeIntervalEndMinute] = useState("00");
+  const [freeIntervalNotes, setFreeIntervalNotes] = useState("");
+  const [isCreatingFreeInterval, setIsCreatingFreeInterval] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [serviceHours, setServiceHours] = useState<any[]>([]);
@@ -64,6 +78,13 @@ export default function AjustesPage() {
     position: ""
   });
   const [newServiceForm, setNewServiceForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    duration: ""
+  });
+
+  const [editServiceForm, setEditServiceForm] = useState({
     name: "",
     description: "",
     price: "",
@@ -266,7 +287,7 @@ export default function AjustesPage() {
     },
     {
       id: "schedule",
-      title: "Horário de Funcionamento",
+      title: "Horários de Atendimentos",
       description: "Defina seus horários de trabalho",
       icon: ClockIcon,
       iconColor: "text-blue-600",
@@ -284,7 +305,7 @@ export default function AjustesPage() {
 
   const handleLogout = () => {
     signOut();
-    router.push("/Login");
+    router.push("/login");
   };
 
   // Buscar horários de funcionamento do usuário
@@ -663,6 +684,103 @@ export default function AjustesPage() {
     handleScheduleUpdate(newSchedules);
   };
 
+  // Função para atualizar horários separadamente (início/fim/almoço)
+  const handleTimeChange = (day: string, field: 'start_time' | 'end_time' | 'lunch_start_time' | 'lunch_end_time', value: string) => {
+    if (!serviceHours || serviceHours.length === 0) return;
+
+    const newSchedules = serviceHours.map((schedule: any) => {
+      if (schedule.day_of_week === day && !schedule.is_day_off) {
+        return {
+          ...schedule,
+          [field]: value
+        };
+      }
+      return schedule;
+    });
+
+    setServiceHours(newSchedules);
+    handleScheduleUpdate(newSchedules);
+  };
+
+  // Função para manipular a mudança de horário com horas e minutos separados
+  const handleSeparateTimeChange = (day: string, field: 'start_time' | 'end_time' | 'lunch_start_time' | 'lunch_end_time', hour: string, minute: string) => {
+    const formattedTime = `${hour}:${minute}`;
+    handleTimeChange(day, field, formattedTime);
+  };
+
+  // Função para toggle de horário de almoço
+  const handleLunchToggle = (day: string, checked: boolean) => {
+    if (!serviceHours || serviceHours.length === 0) return;
+
+    const newSchedules = serviceHours.map((schedule: any) => {
+      if (schedule.day_of_week === day && !schedule.is_day_off) {
+        return {
+          ...schedule,
+          lunch_start_time: checked ? "12:00" : null,
+          lunch_end_time: checked ? "13:00" : null
+        };
+      }
+      return schedule;
+    });
+
+    setServiceHours(newSchedules);
+    handleScheduleUpdate(newSchedules);
+  };
+
+  // Função para criar intervalo livre
+  const handleCreateFreeInterval = async () => {
+    if (!user?.id || !user?.company_id) {
+      toast.error("Usuário ou empresa não identificados");
+      return;
+    }
+
+    if (!selectedFreeIntervalDate || !freeIntervalStartHour || !freeIntervalStartMinute || !freeIntervalEndHour || !freeIntervalEndMinute) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setIsCreatingFreeInterval(true);
+    try {
+      const freeIntervalData = {
+        professional_id: user.id,
+        appointment_date: selectedFreeIntervalDate,
+        start_time: `${freeIntervalStartHour}:${freeIntervalStartMinute}`,
+        end_time: `${freeIntervalEndHour}:${freeIntervalEndMinute}`,
+        notes: freeIntervalNotes
+      };
+
+      await api.post('/schedules/free-interval', freeIntervalData, {
+        headers: {
+          company_id: user.company_id
+        }
+      });
+
+      toast.success("Intervalo livre criado com sucesso!");
+      setIsFreeIntervalDialogOpen(false);
+      setSelectedFreeIntervalDate("");
+      setFreeIntervalStartHour("09");
+      setFreeIntervalStartMinute("00");
+      setFreeIntervalEndHour("10");
+      setFreeIntervalEndMinute("00");
+      setFreeIntervalNotes("");
+      
+      // Recarregar os horários
+      fetchServiceHours();
+    } catch (error: any) {
+      console.error('Erro ao criar intervalo livre:', error);
+      
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Erro ao criar intervalo livre");
+      }
+    } finally {
+      setIsCreatingFreeInterval(false);
+    }
+  };
+
   // Função para criar cronograma inicial se não existir
   const handleCreateSchedule = async () => {
     if (!user?.id) return;
@@ -685,6 +803,58 @@ export default function AjustesPage() {
       toast.error("Erro ao criar cronograma");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Abrir modal de edição de serviço
+  const handleEditServiceClick = (service: any) => {
+    setSelectedService(service);
+    setEditServiceForm({
+      name: service.service_name,
+      description: service.service_description || "",
+      price: service.base_price.toString(),
+      duration: service.base_duration.toString()
+    });
+    setIsEditServiceDialogOpen(true);
+  };
+
+  // Atualizar serviço existente
+  const handleUpdateService = async () => {
+    if (!selectedService || !user?.company_id) {
+      toast.error("Dados do serviço ou empresa não identificados");
+      return;
+    }
+
+    if (!editServiceForm.name || !editServiceForm.price || !editServiceForm.duration) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setIsUpdatingService(true);
+    try {
+      const serviceData = {
+        name: editServiceForm.name,
+        description: editServiceForm.description,
+        price: parseFloat(editServiceForm.price),
+        duration: parseInt(editServiceForm.duration)
+      };
+
+      await api.put(`/service/${selectedService.service_id}`, serviceData, {
+        headers: {
+          company_id: user.company_id
+        }
+      });
+
+      toast.success("Serviço atualizado com sucesso!");
+      setIsEditServiceDialogOpen(false);
+      
+      // Recarregar a lista de serviços
+      fetchServices();
+    } catch (error: any) {
+      console.error('Erro ao atualizar serviço:', error);
+      toast.error(error.response?.data?.error || "Erro ao atualizar serviço");
+    } finally {
+      setIsUpdatingService(false);
     }
   };
 
@@ -907,7 +1077,7 @@ export default function AjustesPage() {
                         <Button
                           onClick={() => setIsCreateServiceDialogOpen(true)}
                           size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
+                          className="bg-orange-500 text-white hover:bg-orange-600 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
                         >
                           <PlusIcon className="h-4 w-4 mr-2" />
                           Novo Serviço
@@ -950,6 +1120,14 @@ export default function AjustesPage() {
                                       </div>
                                     </div>
                                   </div>
+                                  <Button
+                                    onClick={() => handleEditServiceClick(service)}
+                                    size="sm"
+                                    className="bg-orange-500 text-white hover:bg-orange-600 transition-all duration-300 shadow-sm hover:shadow-md"
+                                  >
+                                    <PencilIcon className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -980,6 +1158,117 @@ export default function AjustesPage() {
                         className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                       >
                         Fechar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Edit Service Dialog */}
+                <Dialog open={isEditServiceDialogOpen} onOpenChange={setIsEditServiceDialogOpen}>
+                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg">
+                          <PencilIcon className="h-6 w-6 text-white" />
+                        </div>
+                        Editar Serviço
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Atualize as informações do serviço
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4">                        
+                        <div>
+                          <Label htmlFor="edit-service-name" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Nome do Serviço *
+                          </Label>
+                          <Input
+                            id="edit-service-name"
+                            placeholder="Ex: Corte de Cabelo"
+                            value={editServiceForm.name}
+                            onChange={(e) => setEditServiceForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="edit-service-description" className="text-sm font-medium text-gray-700 mb-2 block">
+                            Descrição
+                          </Label>
+                          <Input
+                            id="edit-service-description"
+                            placeholder="Ex: Corte masculino com máquina e tesoura"
+                            value={editServiceForm.description}
+                            onChange={(e) => setEditServiceForm(prev => ({ ...prev, description: e.target.value }))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="edit-service-price" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Preço (R$) *
+                            </Label>
+                            <Input
+                              id="edit-service-price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="30.00"
+                              value={editServiceForm.price}
+                              onChange={(e) => setEditServiceForm(prev => ({ ...prev, price: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="edit-service-duration" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Duração (min) *
+                            </Label>
+                            <Input
+                              id="edit-service-duration"
+                              type="number"
+                              min="1"
+                              placeholder="30"
+                              value={editServiceForm.duration}
+                              onChange={(e) => setEditServiceForm(prev => ({ ...prev, duration: e.target.value }))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditServiceDialogOpen(false);
+                          setSelectedService(null);
+                        }}
+                        disabled={isUpdatingService}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleUpdateService}
+                        disabled={isUpdatingService}
+                        className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        {isUpdatingService ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                            Atualizando...
+                          </>
+                        ) : (
+                          <>
+                            <PencilIcon className="h-4 w-4 mr-2" />
+                            Atualizar Serviço
+                          </>
+                        )}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1097,34 +1386,44 @@ export default function AjustesPage() {
 
                 {/* Service Hours Dialog */}
                 <Dialog open={isServiceHoursDialogOpen} onOpenChange={setIsServiceHoursDialogOpen}>
-                  <DialogContent className="sm:max-w-4xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm w-[90vw] rounded-3xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader className="pb-6 border-b border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-blue-100 rounded-2xl">
-                            <ClockIcon className="h-6 w-6 text-blue-600" />
+                  <DialogContent className="sm:max-w-4xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm w-[95vw] sm:w-[90vw] rounded-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-4 sm:pb-6 border-b border-gray-100">
+                      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="p-2 sm:p-3 bg-blue-100 rounded-2xl">
+                            <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                           </div>
                           <div>
-                            <DialogTitle className="text-2xl font-bold text-gray-900">
+                            <DialogTitle className="text-lg sm:text-2xl font-bold text-gray-900">
                               Horários de Trabalho
                             </DialogTitle>
-                            <DialogDescription className="text-gray-600 mt-1">
+                            <DialogDescription className="text-sm sm:text-base text-gray-600 mt-1">
                               Configure seus dias e horários de funcionamento
                             </DialogDescription>
                           </div>
                         </div>
-                        <Button
-                          onClick={() => setIsDayOffDialogOpen(true)}
-                          size="sm"
-                          className="bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl px-4 py-2"
-                        >
-                          <CalendarOffIcon className="h-4 w-4 mr-2" />
-                          Nova Folga
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                          <Button
+                            onClick={() => setIsFreeIntervalDialogOpen(true)}
+                            size="sm"
+                            className="bg-blue-100 hover:bg-blue-200 text-blue-700 border border-blue-200 hover:border-blue-300 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl px-3 sm:px-4 py-2 text-sm"
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Intervalo Livre
+                          </Button>
+                          <Button
+                            onClick={() => setIsDayOffDialogOpen(true)}
+                            size="sm"
+                            className="bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl px-3 sm:px-4 py-2 text-sm"
+                          >
+                            <CalendarOffIcon className="h-4 w-4 mr-2" />
+                            Nova Folga
+                          </Button>
+                        </div>
                       </div>
                     </DialogHeader>
 
-                    <div className="flex-1 overflow-y-auto py-6">
+                    <div className="flex-1 overflow-y-auto py-4 sm:py-6 px-2 sm:px-0">
                       {serviceHoursLoading ? (
                         <div className="flex flex-col items-center justify-center py-16">
                           <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
@@ -1141,53 +1440,253 @@ export default function AjustesPage() {
                             <div className="grid gap-4">
                               {sortSchedulesByDay(serviceHours.filter(s => s.day_of_week)).map((schedule, index) => (
                                 <div key={index} className="group">
-                                  <div className={`bg-white border rounded-2xl p-6 transition-all duration-300 hover:shadow-md ${
+                                  <div className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-md ${
                                     schedule.is_day_off
                                       ? 'border-red-200 hover:border-red-300'
                                       : 'border-emerald-200 hover:border-emerald-300'
                                     }`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center gap-4">
-                                        <div className={`w-3 h-3 rounded-full ${
-                                          schedule.is_day_off ? 'bg-red-500' : 'bg-emerald-500'
-                                        }`}></div>
-                                        <h4 className="text-lg font-semibold text-gray-900">
-                                          {formatDayOfWeek(schedule.day_of_week)}
-                                        </h4>
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-sm text-gray-600">Dia de folga</span>
-                                        <Switch
-                                          checked={schedule.is_day_off || false}
-                                          onCheckedChange={(checked) => handleDayOffToggle(schedule.day_of_week, checked)}
-                                          disabled={saving}
-                                        />
+                                    {/* Header do dia */}
+                                    <div className="p-4 sm:p-6 border-b border-gray-100">
+                                      <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                                        <div className="flex items-center gap-3 sm:gap-4">
+                                          <div className={`w-3 h-3 rounded-full ${
+                                            schedule.is_day_off ? 'bg-red-500' : 'bg-emerald-500'
+                                          }`}></div>
+                                          <h4 className="text-base sm:text-lg font-semibold text-gray-900">
+                                            {formatDayOfWeek(schedule.day_of_week)}
+                                          </h4>
+                                        </div>
+                                        <div className="flex items-center gap-3 justify-between sm:justify-end">
+                                          <span className="text-sm text-gray-600">Dia de folga</span>
+                                          <Switch
+                                            checked={schedule.is_day_off || false}
+                                            onCheckedChange={(checked) => handleDayOffToggle(schedule.day_of_week, checked)}
+                                            disabled={saving}
+                                          />
+                                        </div>
                                       </div>
                                     </div>
+
+                                    {/* Conteúdo do dia */}
                                     {schedule.is_day_off ? (
-                                      <div className="bg-red-50 rounded-xl p-4">
-                                        <p className="text-red-700 font-medium text-center">
-                                          🏖️ Dia de descanso
-                                        </p>
+                                      <div className="p-4 sm:p-6">
+                                        <div className="bg-red-50 rounded-xl p-4">
+                                          <p className="text-red-700 font-medium text-center">
+                                            🏖️ Dia de descanso
+                                          </p>
+                                        </div>
                                       </div>
                                     ) : (
-                                      <div className="space-y-3">
+                                      <div className="p-4 sm:p-6 space-y-4">
+                                        {/* Horários de Trabalho */}
                                         <div className="bg-emerald-50 rounded-xl p-4">
-                                          <div className="flex items-center justify-center gap-2">
-                                            <span className="text-emerald-700 font-medium">
-                                              {formatTime(schedule.start_time)} → {formatTime(schedule.end_time)}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        {schedule.lunch_start_time && schedule.lunch_end_time && (
-                                          <div className="bg-amber-50 rounded-xl p-3">
-                                            <div className="flex items-center justify-center gap-2">
-                                              <span className="text-amber-700 text-sm">
-                                                🍽️ Almoço: {formatTime(schedule.lunch_start_time)} - {formatTime(schedule.lunch_end_time)}
-                                              </span>
+                                          <h5 className="text-emerald-800 font-medium mb-3 flex items-center gap-2">
+                                            <ClockIcon className="w-4 h-4" />
+                                            Horário de Trabalho
+                                          </h5>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                            {/* Horário de Início */}
+                                            <div>
+                                              <label className="block text-xs font-medium text-emerald-700 mb-2">
+                                                Início
+                                              </label>
+                                              <div className="flex gap-1">
+                                                <select
+                                                  value={schedule.start_time ? schedule.start_time.split(':')[0] : "09"}
+                                                  onChange={(e) => handleSeparateTimeChange(
+                                                    schedule.day_of_week, 
+                                                    "start_time", 
+                                                    e.target.value, 
+                                                    schedule.start_time ? schedule.start_time.split(':')[1] : "00"
+                                                  )}
+                                                  disabled={saving}
+                                                  className="flex-1 p-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white min-w-0"
+                                                >
+                                                  {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                                    <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                                      {hour.toString().padStart(2, '0')}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                                <span className="text-emerald-600 self-center px-1">:</span>
+                                                <select
+                                                  value={schedule.start_time ? schedule.start_time.split(':')[1] : "00"}
+                                                  onChange={(e) => handleSeparateTimeChange(
+                                                    schedule.day_of_week, 
+                                                    "start_time", 
+                                                    schedule.start_time ? schedule.start_time.split(':')[0] : "09", 
+                                                    e.target.value
+                                                  )}
+                                                  disabled={saving}
+                                                  className="flex-1 p-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white min-w-0"
+                                                >
+                                                  <option value="00">00</option>
+                                                  <option value="15">15</option>
+                                                  <option value="30">30</option>
+                                                  <option value="45">45</option>
+                                                </select>
+                                              </div>
+                                            </div>
+
+                                            {/* Horário de Fim */}
+                                            <div>
+                                              <label className="block text-xs font-medium text-emerald-700 mb-2">
+                                                Fim
+                                              </label>
+                                              <div className="flex gap-1">
+                                                <select
+                                                  value={schedule.end_time ? schedule.end_time.split(':')[0] : "18"}
+                                                  onChange={(e) => handleSeparateTimeChange(
+                                                    schedule.day_of_week, 
+                                                    "end_time", 
+                                                    e.target.value, 
+                                                    schedule.end_time ? schedule.end_time.split(':')[1] : "00"
+                                                  )}
+                                                  disabled={saving}
+                                                  className="flex-1 p-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white min-w-0"
+                                                >
+                                                  {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                                    <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                                      {hour.toString().padStart(2, '0')}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                                <span className="text-emerald-600 self-center px-1">:</span>
+                                                <select
+                                                  value={schedule.end_time ? schedule.end_time.split(':')[1] : "00"}
+                                                  onChange={(e) => handleSeparateTimeChange(
+                                                    schedule.day_of_week, 
+                                                    "end_time", 
+                                                    schedule.end_time ? schedule.end_time.split(':')[0] : "18", 
+                                                    e.target.value
+                                                  )}
+                                                  disabled={saving}
+                                                  className="flex-1 p-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white min-w-0"
+                                                >
+                                                  <option value="00">00</option>
+                                                  <option value="15">15</option>
+                                                  <option value="30">30</option>
+                                                  <option value="45">45</option>
+                                                </select>
+                                              </div>
                                             </div>
                                           </div>
-                                        )}
+                                        </div>
+
+                                        {/* Horário de Almoço */}
+                                        <div className="bg-amber-50 rounded-xl p-4">
+                                          <div className="flex items-center justify-between mb-3">
+                                            <h5 className="text-amber-800 font-medium flex items-center gap-2">
+                                              🍽️ Horário de Almoço
+                                            </h5>
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs text-amber-700">
+                                                {!!(schedule.lunch_start_time || schedule.lunch_end_time) ? "Ativado" : "Desativado"}
+                                              </span>
+                                              <Switch
+                                                checked={!!(schedule.lunch_start_time || schedule.lunch_end_time)}
+                                                onCheckedChange={(checked) => handleLunchToggle(schedule.day_of_week, checked)}
+                                                disabled={saving}
+                                                className="data-[state=checked]:bg-amber-600"
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {!!(schedule.lunch_start_time || schedule.lunch_end_time) ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                              {/* Início do Almoço */}
+                                              <div>
+                                                <label className="block text-xs font-medium text-amber-700 mb-2">
+                                                  Início do Almoço
+                                                </label>
+                                                <div className="flex gap-1">
+                                                  <select
+                                                    value={schedule.lunch_start_time ? schedule.lunch_start_time.split(':')[0] : "12"}
+                                                    onChange={(e) => handleSeparateTimeChange(
+                                                      schedule.day_of_week, 
+                                                      "lunch_start_time", 
+                                                      e.target.value, 
+                                                      schedule.lunch_start_time ? schedule.lunch_start_time.split(':')[1] : "00"
+                                                    )}
+                                                    disabled={saving}
+                                                    className="flex-1 p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white min-w-0"
+                                                  >
+                                                    {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                                      <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                                        {hour.toString().padStart(2, '0')}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                  <span className="text-amber-600 self-center px-1">:</span>
+                                                  <select
+                                                    value={schedule.lunch_start_time ? schedule.lunch_start_time.split(':')[1] : "00"}
+                                                    onChange={(e) => handleSeparateTimeChange(
+                                                      schedule.day_of_week, 
+                                                      "lunch_start_time", 
+                                                      schedule.lunch_start_time ? schedule.lunch_start_time.split(':')[0] : "12", 
+                                                      e.target.value
+                                                    )}
+                                                    disabled={saving}
+                                                    className="flex-1 p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white min-w-0"
+                                                  >
+                                                    <option value="00">00</option>
+                                                    <option value="15">15</option>
+                                                    <option value="30">30</option>
+                                                    <option value="45">45</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+
+                                              {/* Fim do Almoço */}
+                                              <div>
+                                                <label className="block text-xs font-medium text-amber-700 mb-2">
+                                                  Fim do Almoço
+                                                </label>
+                                                <div className="flex gap-1">
+                                                  <select
+                                                    value={schedule.lunch_end_time ? schedule.lunch_end_time.split(':')[0] : "13"}
+                                                    onChange={(e) => handleSeparateTimeChange(
+                                                      schedule.day_of_week, 
+                                                      "lunch_end_time", 
+                                                      e.target.value, 
+                                                      schedule.lunch_end_time ? schedule.lunch_end_time.split(':')[1] : "00"
+                                                    )}
+                                                    disabled={saving}
+                                                    className="flex-1 p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white min-w-0"
+                                                  >
+                                                    {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                                      <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                                        {hour.toString().padStart(2, '0')}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                  <span className="text-amber-600 self-center px-1">:</span>
+                                                  <select
+                                                    value={schedule.lunch_end_time ? schedule.lunch_end_time.split(':')[1] : "00"}
+                                                    onChange={(e) => handleSeparateTimeChange(
+                                                      schedule.day_of_week, 
+                                                      "lunch_end_time", 
+                                                      schedule.lunch_end_time ? schedule.lunch_end_time.split(':')[0] : "13", 
+                                                      e.target.value
+                                                    )}
+                                                    disabled={saving}
+                                                    className="flex-1 p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white min-w-0"
+                                                  >
+                                                    <option value="00">00</option>
+                                                    <option value="15">15</option>
+                                                    <option value="30">30</option>
+                                                    <option value="45">45</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="text-center py-3">
+                                              <p className="text-amber-700/70 text-sm">Horário de almoço desativado</p>
+                                              <p className="text-amber-600/50 text-xs mt-1">Use o interruptor acima para ativar</p>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1327,6 +1826,185 @@ export default function AjustesPage() {
                           <>
                             <CalendarOffIcon className="h-4 w-4 mr-2" />
                             Adicionar Folga
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Free Interval Dialog */}
+                <Dialog open={isFreeIntervalDialogOpen} onOpenChange={setIsFreeIntervalDialogOpen}>
+                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white w-[90vw] rounded-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-6">
+                      <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                        <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                          <Calendar className="h-6 w-6 text-white" />
+                        </div>
+                        Criar Intervalo Livre
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 text-base">
+                        Reserve um horário específico em uma data para intervalo livre
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6">
+                      {/* Seleção de Data */}
+                      <div>
+                        <Label htmlFor="free-interval-date" className="text-sm font-medium text-gray-700 mb-2 block">
+                          Data do Intervalo *
+                        </Label>
+                        <Input
+                          id="free-interval-date"
+                          type="date"
+                          value={selectedFreeIntervalDate}
+                          onChange={(e) => setSelectedFreeIntervalDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]} // Não permite datas passadas
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Seleção de Horários */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Horário de Início *
+                          </Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <select
+                                value={freeIntervalStartHour}
+                                onChange={(e) => setFreeIntervalStartHour(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-sm"
+                              >
+                                {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                  <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                    {hour.toString().padStart(2, '0')}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <span className="text-blue-600 self-center font-medium">:</span>
+                            <div className="flex-1">
+                              <select
+                                value={freeIntervalStartMinute}
+                                onChange={(e) => setFreeIntervalStartMinute(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-sm"
+                              >
+                                <option value="00">00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Horário de Fim *
+                          </Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <select
+                                value={freeIntervalEndHour}
+                                onChange={(e) => setFreeIntervalEndHour(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-sm"
+                              >
+                                {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                  <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                    {hour.toString().padStart(2, '0')}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <span className="text-blue-600 self-center font-medium">:</span>
+                            <div className="flex-1">
+                              <select
+                                value={freeIntervalEndMinute}
+                                onChange={(e) => setFreeIntervalEndMinute(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-sm"
+                              >
+                                <option value="00">00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Observações */}
+                      <div>
+                        <Label htmlFor="free-interval-notes" className="text-sm font-medium text-gray-700 mb-2 block">
+                          Observações (opcional)
+                        </Label>
+                        <textarea
+                          id="free-interval-notes"
+                          value={freeIntervalNotes}
+                          onChange={(e) => setFreeIntervalNotes(e.target.value)}
+                          placeholder="Motivo do intervalo livre (ex: reunião, pausa pessoal, etc.)"
+                          rows={3}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none text-sm"
+                        />
+                      </div>
+
+                      {/* Preview do Intervalo */}
+                      {selectedFreeIntervalDate && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                          <h4 className="text-blue-800 font-medium mb-2 flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            Resumo do Intervalo
+                          </h4>
+                          <div className="space-y-1 text-sm">
+                            <p className="text-blue-700">
+                              <strong>Data:</strong> {new Date(selectedFreeIntervalDate + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </p>
+                            <p className="text-blue-700">
+                              <strong>Horário:</strong> {freeIntervalStartHour}:{freeIntervalStartMinute} às {freeIntervalEndHour}:{freeIntervalEndMinute}
+                            </p>
+                            {freeIntervalNotes && (
+                              <p className="text-blue-700">
+                                <strong>Observações:</strong> {freeIntervalNotes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <DialogFooter className="pt-6 border-t border-gray-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsFreeIntervalDialogOpen(false);
+                          setSelectedFreeIntervalDate("");
+                          setFreeIntervalStartHour("09");
+                          setFreeIntervalStartMinute("00");
+                          setFreeIntervalEndHour("10");
+                          setFreeIntervalEndMinute("00");
+                          setFreeIntervalNotes("");
+                        }}
+                        disabled={isCreatingFreeInterval}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleCreateFreeInterval}
+                        disabled={isCreatingFreeInterval || !selectedFreeIntervalDate}
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        {isCreatingFreeInterval ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                            Criando...
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Criar Intervalo
                           </>
                         )}
                       </Button>

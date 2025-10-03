@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./client-layout";
-import { AuthProvider } from "@/hooks/auth";
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -15,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Link Calendar - Barbeiro",
+  title: "Link Callendar - Barbeiro",
   description: "Aplicativo de agendamento para barbearias",
   manifest: "/manifest.json",
   themeColor: "#000000",
@@ -35,6 +33,7 @@ export const metadata: Metadata = {
     userScalable: false,
   },
 };
+
 
 export default function RootLayout({
   children,

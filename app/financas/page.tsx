@@ -8,6 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+const translatePaymentMethod = (method: string) => {
+  switch (method) {
+    case 'cash':
+      return 'Dinheiro';
+    case 'credit':
+      return 'Cartão Crédito';
+    case 'debit':
+      return 'Cartão Débito';
+    case 'pix':
+      return 'PIX';
+    default:
+      return method; // Retorna o original se não houver tradução
+  }
+};
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1079,6 +1094,55 @@ export default function FinancePage() {
     }
   };
 
+  // Verificação de permissão de acesso - somente admin e manager podem acessar
+  const allowedPositions = ['admin', 'manager'];
+  const hasAccess = user && user.position && allowedPositions.includes(user.position.toLowerCase());
+
+  if (user && !hasAccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto p-8">
+          <Card className="border-0 shadow-2xl">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                Acesso Restrito
+              </h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Desculpe, você não tem permissão para acessar a página de finanças. 
+                Esta área é restrita para administradores e gerentes.
+              </p>
+              <div className="space-y-3">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">Seu perfil:</span> {
+                      user.position === 'employee' ? 'Funcionário' : 
+                      user.position === 'admin' ? 'Administrador' :
+                      user.position === 'manager' ? 'Gerente' : 
+                      user.position || 'Não definido'
+                    }
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">Perfis com acesso:</span> Administrador, Gerente
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => router.push('/')}
+                  className="w-full bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
+                >
+                  <ArrowLeft className="h-5 w-5 mr-2" />
+                  Voltar ao Início
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       {/* Header */}
@@ -1337,7 +1401,7 @@ export default function FinancePage() {
                               </div>
                               <div className="flex-1">
                                 <p className="font-semibold text-gray-900 mb-1">
-                                  {transaction.category}
+                                  {translatePaymentMethod(transaction.category)}
                                 </p>
                                 <p className="text-sm text-gray-600 mb-1">
                                   {transaction.description}
@@ -1762,7 +1826,7 @@ export default function FinancePage() {
                         transaction.type === 'expense' ? 'bg-red-500' : 'bg-orange-500'
                       }`}></div>
                       <div>
-                        <p className="font-medium text-sm">{transaction.category}</p>
+                        <p className="font-medium text-sm">{translatePaymentMethod(transaction.category)}</p>
                         <p className="text-xs text-gray-500">
                           {transaction.description} • {new Date(transaction.created_at).toLocaleDateString('pt-BR')} às {new Date(transaction.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </p>

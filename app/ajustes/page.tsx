@@ -305,7 +305,7 @@ export default function AjustesPage() {
 
   const handleLogout = () => {
     signOut();
-    router.push("/Login");
+    router.push("/login");
   };
 
   // Buscar horários de funcionamento do usuário

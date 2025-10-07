@@ -98,6 +98,8 @@ interface CommandItem {
   price: string;
   quantity: number;
   item_type: string;
+  professional_id?: string;
+  professional_name?: string;
 }
 
 interface PaymentMethod {
@@ -147,6 +149,8 @@ export default function CommandsPage() {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
   const [cashDrawerAlertOpen, setCashDrawerAlertOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [commandToDelete, setCommandToDelete] = useState<CommandDetails | null>(null);
 
   // Estados para dados
   const [clients, setClients] = useState<Client[]>([]);
@@ -176,7 +180,7 @@ export default function CommandsPage() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isCreatingCommand, setIsCreatingCommand] = useState(false);
   const [commandToAddItem, setCommandToAddItem] = useState<string>('');
-  const [currentTab, setCurrentTab] = useState<'client' | 'items' | 'cart'>('client');
+  const [currentTab, setCurrentTab] = useState<'responsible' | 'items' | 'cart'>('responsible');
   const [itemTab, setItemTab] = useState<'service' | 'product'>('service');
   const [newlyAddedItems, setNewlyAddedItems] = useState<Set<string>>(new Set());
   const [addingItems, setAddingItems] = useState<Set<string>>(new Set());
@@ -220,14 +224,48 @@ export default function CommandsPage() {
         params.status = statusFilter;
       }
       
-      const response = await api.get(`/commands/company/${user.company_id}`, {
-        headers: {
-          company_id: user.company_id,
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        params: params
+      // Buscar comandas e profissionais em paralelo para mapeamento
+      const [commandsResponse, professionalsResponse] = await Promise.all([
+        api.get(`/commands/company/${user.company_id}`, {
+          headers: {
+            company_id: user.company_id,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          params: params
+        }),
+        api.get('/teams', {
+          headers: {
+            company_id: user.company_id.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        })
+      ]);
+      
+      // Criar mapeamento de profissionais
+      const professionalsMap: Record<string, string> = {};
+      (professionalsResponse.data || []).forEach((professional: any) => {
+        professionalsMap[professional.id.toString()] = professional.name;
       });
-      setCommands(Array.isArray(response.data) ? response.data : []);
+      
+      // Enriquecer comandas com nomes dos profissionais
+      const enrichedCommands = (commandsResponse.data || []).map((command: any) => {
+        const enrichedItems = (command.items || []).map((item: any) => {
+          if (item.professional_id) {
+            return {
+              ...item,
+              professional_name: professionalsMap[item.professional_id.toString()] || 'Profissional não encontrado'
+            };
+          }
+          return item;
+        });
+        
+        return {
+          ...command,
+          items: enrichedItems
+        };
+      });
+      
+      setCommands(Array.isArray(enrichedCommands) ? enrichedCommands : []);
     } catch (error) {
       console.error('Erro ao buscar comandas:', error);
       toast({
@@ -473,7 +511,7 @@ export default function CommandsPage() {
 
   const openCreateCommandModal = () => {
     setCreateCommandModalOpen(true);
-    setCurrentTab('client');
+    setCurrentTab('responsible');
     // Limpar filtros
     setClientFilter('');
     setProfessionalFilter('');
@@ -488,9 +526,11 @@ export default function CommandsPage() {
 
   const openAddItemModal = (commandId: string) => {
     setCommandToAddItem(commandId);
+    setSelectedProfessional(''); // Limpar profissional selecionado
     setAddItemModalOpen(true);
     fetchServices();
     fetchProducts();
+    fetchProfessionals(); // Carregar profissionais
   };
 
   const openPaymentModal = (command: CommandDetails) => {
@@ -525,26 +565,33 @@ export default function CommandsPage() {
       });
       return;
     }
+    
+    if (!selectedProfessional) {
+      toast({
+        title: "Erro",
+        description: "Selecione um profissional responsável",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsCreatingCommand(true);
     try {
-      const items = cartItems.map(item => ({
-        id: item.id,
-        type: item.type,
+      // Formatar os itens para o formato esperado pela API (igual LC-FRONT)
+      const formattedItems = cartItems.map(item => ({
+        item_type: item.type,
+        [item.type === "service" ? "service_id" : "product_id"]: item.id,
         quantity: item.quantity,
-        price: item.price
+        price: item.price,
+        discount_type: 'none',
+        discount_value: 0,
+        professional_id: selectedProfessional === "none" ? null : selectedProfessional || null
       }));
 
       const response = await api.post('/commands', {
         client_id: selectedClient,
-        professional_id: selectedProfessional && selectedProfessional !== 'none' ? selectedProfessional : null,
-        items: items.map(item => ({
-          item_type: item.type,
-          product_id: item.type === 'product' ? item.id : null,
-          service_id: item.type === 'service' ? item.id : null,
-          quantity: item.quantity,
-          price: item.price
-        }))
+        company_id: user.company_id,
+        items: formattedItems
       }, {
         headers: {
           company_id: user.company_id.toString(),
@@ -562,7 +609,7 @@ export default function CommandsPage() {
       setSelectedProfessional('');
       setCartItems([]);
       setCreateCommandModalOpen(false);
-      setCurrentTab('client');
+      setCurrentTab('responsible');
       
       // Refresh commands
       await fetchCommands();
@@ -682,6 +729,16 @@ export default function CommandsPage() {
     type: 'service' | 'product';
     quantity: number;
   }) => {
+    // Validar se profissional foi selecionado
+    if (!selectedProfessional) {
+      toast({
+        title: "Erro",
+        description: "Selecione um profissional responsável antes de adicionar itens",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const itemId = item.id;
     
     try {
@@ -698,7 +755,8 @@ export default function CommandsPage() {
           product_id: item.type === 'product' ? item.id : null,
           service_id: item.type === 'service' ? item.id : null,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          professional_id: selectedProfessional === 'none' ? null : selectedProfessional
         }]
       }, {
         headers: {
@@ -802,6 +860,47 @@ export default function CommandsPage() {
         variant: "destructive",
       });
     }
+  };
+
+  // Função para deletar comanda
+  const deleteCommand = async () => {
+    if (!commandToDelete) return;
+
+    try {
+      await api.delete(`/commands/${commandToDelete.id}`, {
+        headers: {
+          company_id: user.company_id.toString(),
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      toast({
+        title: "Comanda excluída!",
+        description: `A comanda foi excluída com sucesso`,
+      });
+
+      // Fechar modais
+      setDeleteConfirmOpen(false);
+      setDetailsModalOpen(false);
+      setCommandToDelete(null);
+      setSelectedCommandForDetails(null);
+
+      // Refresh commands
+      await fetchCommands();
+    } catch (error) {
+      console.error('Erro ao deletar comanda:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao deletar comanda",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para abrir confirmação de exclusão
+  const handleDeleteCommand = (command: CommandDetails) => {
+    setCommandToDelete(command);
+    setDeleteConfirmOpen(true);
   };
 
   // Função para filtrar comandas
@@ -1158,20 +1257,24 @@ export default function CommandsPage() {
                                 </span>
                               )}
                             </span>
+                            {item.professional_id && (
+                              <div className="text-xs text-emerald-600 font-medium mt-1">
+                                👤 {item.professional_name || 'Profissional não encontrado'}
+                              </div>
+                            )}
                           </div>
-                          <button 
-                            className="text-gray-400 hover:text-red-600 mx-4 transition-colors duration-200"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (command.status === 'open') {
+                          {command.status === 'open' && (
+                            <button 
+                              className="text-gray-400 hover:text-red-600 mx-4 transition-colors duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 removeItemFromCommand(command.id, item.id, item.name);
-                              }
-                            }}
-                            disabled={command.status === 'closed'}
-                            title={command.status === 'closed' ? 'Não é possível remover itens de comandas fechadas' : 'Remover item'}
-                          >
-                            <XIcon className="w-4 h-4" />
-                          </button>
+                              }}
+                              title="Remover item"
+                            >
+                              <XIcon className="w-4 h-4" />
+                            </button>
+                          )}
                           <div className="text-right">
                             <span className={`font-medium ${
                               isNewlyAdded ? 'text-emerald-600 font-bold' : 'text-gray-800'
@@ -1266,54 +1369,89 @@ export default function CommandsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs value={currentTab} onValueChange={(value: any) => setCurrentTab(value)}>
+          <Tabs 
+            value={currentTab} 
+            onValueChange={(value: any) => {
+              // Só permite ir para "items" ou "cart" se cliente e profissional estiverem selecionados
+              if ((value === "items" || value === "cart") && (!selectedClient || !selectedProfessional)) {
+                toast({
+                  title: "Dados obrigatórios",
+                  description: "Selecione um cliente e um profissional antes de adicionar itens.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setCurrentTab(value);
+            }}
+          >
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="client" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <TabsTrigger value="responsible" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
                 <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Cliente</span>
+                <span className="hidden xs:inline">Responsável</span>
               </TabsTrigger>
-              <TabsTrigger value="items" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <TabsTrigger 
+                value="items" 
+                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 ${
+                  !selectedClient || !selectedProfessional 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : ''
+                }`}
+                disabled={!selectedClient || !selectedProfessional}
+              >
                 <ShoppingCartIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden xs:inline">Itens</span>
+                {(!selectedClient || !selectedProfessional) && (
+                  <span className="ml-1 text-xs">🔒</span>
+                )}
               </TabsTrigger>
-              <TabsTrigger value="cart" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <TabsTrigger 
+                value="cart" 
+                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 ${
+                  !selectedClient || !selectedProfessional 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : ''
+                }`}
+                disabled={!selectedClient || !selectedProfessional}
+              >
                 <CheckIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden xs:inline">Carrinho ({cartItems.length})</span>
                 <span className="xs:hidden">🛒 {cartItems.length}</span>
+                {(!selectedClient || !selectedProfessional) && (
+                  <span className="ml-1 text-xs">🔒</span>
+                )}
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="client" className="space-y-4 sm:space-y-6">
+            <TabsContent value="responsible" className="space-y-4 sm:space-y-6">
               {/* Header da seção */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3 sm:p-6">
-                <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 mb-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-emerald-600 text-white rounded-full flex-shrink-0">
-                      <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-emerald-800 text-base sm:text-lg truncate">Selecionar Cliente</h3>
-                      <p className="text-emerald-600 text-xs sm:text-sm">Escolha o cliente para esta comanda</p>
-                    </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-emerald-600 text-white rounded-full flex-shrink-0">
+                    <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  
-                  {/* Select de Profissional no canto */}
-                  <div className="w-full lg:w-64 lg:flex-shrink-0">
-                    <Label className="text-xs text-teal-700 mb-1 block">Profissional (Opcional)</Label>
-                    <Select value={selectedProfessional || undefined} onValueChange={setSelectedProfessional}>
-                      <SelectTrigger className="border-teal-300 focus:border-teal-500 text-sm w-full">
-                        <SelectValue placeholder="Selecionar profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum profissional</SelectItem>
-                        {professionals.map((professional) => (
-                          <SelectItem key={professional.id} value={professional.id}>
-                            <span className="font-medium">{professional.name}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-emerald-800 text-base sm:text-lg truncate">Selecionar Cliente e Profissional</h3>
+                    <p className="text-emerald-600 text-xs sm:text-sm">Escolha o cliente e o profissional responsável</p>
                   </div>
+                </div>
+                
+                {/* Select de Profissional Responsável */}
+                <div className="mb-4">
+                  <Label className="text-sm font-medium text-emerald-700 mb-2 block">
+                    Profissional Responsável *
+                  </Label>
+                  <Select value={selectedProfessional || undefined} onValueChange={setSelectedProfessional}>
+                    <SelectTrigger className="border-emerald-300 focus:border-emerald-500 w-full">
+                      <SelectValue placeholder="Selecione o profissional responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {professionals.map((professional) => (
+                        <SelectItem key={professional.id} value={professional.id}>
+                          <span className="font-medium">{professional.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 {/* Filtro de Cliente */}
@@ -1327,6 +1465,22 @@ export default function CommandsPage() {
                   />
                 </div>
               </div>
+              
+              {/* Aviso sobre campos obrigatórios */}
+              {(!selectedClient || !selectedProfessional) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-amber-100 p-1 rounded-md">
+                      <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-amber-700">
+                      <strong>Atenção:</strong> Selecione um cliente e um profissional para prosseguir.
+                    </p>
+                  </div>
+                </div>
+              )}
               
               {/* Lista de Clientes com Cores */}
               <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -1802,7 +1956,7 @@ export default function CommandsPage() {
             </Button>
             <Button
               onClick={createCommand}
-              disabled={!selectedClient || cartItems.length === 0 || isCreatingCommand}
+              disabled={!selectedClient || !selectedProfessional || cartItems.length === 0 || isCreatingCommand}
               className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 w-full sm:w-auto"
             >
               {isCreatingCommand ? 'Criando...' : 'Criar Comanda'}
@@ -1961,68 +2115,68 @@ export default function CommandsPage() {
 
       {/* Modal de Detalhes da Comanda */}
       <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <EyeIcon className="h-5 w-5" />
-              Detalhes da Comanda #{selectedCommandForDetails?.id}
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <EyeIcon className="h-5 w-5 flex-shrink-0" />
+              Detalhes da Comanda
             </DialogTitle>
           </DialogHeader>
 
           {selectedCommandForDetails && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Informações da Comanda */}
-              <Card className="p-4">
+              <Card className="p-3 sm:p-4">
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-lg mb-3">Informações da Comanda</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <h3 className="font-semibold text-base sm:text-lg mb-3">Informações da Comanda</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <Label className="text-sm text-gray-600">Cliente:</Label>
-                      <p className="font-medium">{selectedCommandForDetails.client_name}</p>
+                      <Label className="text-xs sm:text-sm text-gray-600">Cliente:</Label>
+                      <p className="font-medium text-sm sm:text-base">{selectedCommandForDetails.client_name}</p>
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-600">Data:</Label>
-                      <p className="font-medium">{formatDate(selectedCommandForDetails.created_at)}</p>
+                      <Label className="text-xs sm:text-sm text-gray-600">Data:</Label>
+                      <p className="font-medium text-sm sm:text-base">{formatDate(selectedCommandForDetails.created_at)}</p>
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-600">Status:</Label>
-                      <Badge variant={selectedCommandForDetails.status === 'closed' ? 'default' : 'secondary'}>
+                      <Label className="text-xs sm:text-sm text-gray-600">Status:</Label>
+                      <Badge variant={selectedCommandForDetails.status === 'closed' ? 'default' : 'secondary'} className="text-xs sm:text-sm">
                         {selectedCommandForDetails.status === 'closed' ? 'Paga' : 'Aberta'}
                       </Badge>
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-600">Total:</Label>
-                      <p className="text-2xl font-bold text-emerald-600">
+                      <Label className="text-xs sm:text-sm text-gray-600">Total:</Label>
+                      <p className="text-xl sm:text-2xl font-bold text-emerald-600">
                         {formatCurrency(selectedCommandForDetails.total)}
                       </p>
                     </div>
                   </div>
                   {selectedCommandForDetails.professional_name && (
                     <div>
-                      <Label className="text-sm text-gray-600">Profissional:</Label>
-                      <p className="font-medium text-emerald-600">{selectedCommandForDetails.professional_name}</p>
+                      <Label className="text-xs sm:text-sm text-gray-600">Profissional:</Label>
+                      <p className="font-medium text-emerald-600 text-sm sm:text-base">{selectedCommandForDetails.professional_name}</p>
                     </div>
                   )}
                 </div>
               </Card>
 
               {/* Lista de Itens */}
-              <Card className="p-4">
-                <h3 className="font-semibold text-lg mb-3">
+              <Card className="p-3 sm:p-4">
+                <h3 className="font-semibold text-base sm:text-lg mb-3">
                   Itens da Comanda ({selectedCommandForDetails.items.length})
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {selectedCommandForDetails.items.map((item, index) => (
-                    <Card key={index} className="p-3 bg-gray-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{item.name}</h4>
-                          <p className="text-sm text-gray-600">
-                            Quantidade: {item.quantity} | Preço unitário: {formatCurrency(parseFloat(item.price))}
+                    <Card key={index} className="p-2 sm:p-3 bg-gray-50">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm sm:text-base truncate">{item.name}</h4>
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            Qtd: {item.quantity} | Unit: {formatCurrency(parseFloat(item.price))}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-emerald-600">
+                        <div className="text-left sm:text-right flex-shrink-0">
+                          <p className="font-semibold text-emerald-600 text-sm sm:text-base">
                             {formatCurrency(parseFloat(item.price) * item.quantity)}
                           </p>
                         </div>
@@ -2034,20 +2188,20 @@ export default function CommandsPage() {
 
               {/* Informações de Pagamento */}
               {selectedCommandForDetails.status === 'closed' && selectedCommandForDetails.payment?.payment_methods && (
-                <Card className="p-4 bg-green-50 border-green-200">
-                  <h3 className="font-semibold text-lg mb-3 text-green-800">Detalhes do Pagamento</h3>
+                <Card className="p-3 sm:p-4 bg-green-50 border-green-200">
+                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-green-800">Detalhes do Pagamento</h3>
                   <div className="space-y-2">
                     {selectedCommandForDetails.payment.paid_at && (
-                      <p className="text-sm text-green-700">
+                      <p className="text-xs sm:text-sm text-green-700">
                         Pago em: {formatDate(selectedCommandForDetails.payment.paid_at)}
                       </p>
                     )}
                     {selectedCommandForDetails.payment.payment_methods.map((method, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <span className="text-green-700">
+                      <div key={index} className="flex justify-between items-center text-sm">
+                        <span className="text-green-700 text-xs sm:text-sm">
                           {getPaymentMethodLabel(method.method)}
                         </span>
-                        <span className="font-semibold text-green-800">
+                        <span className="font-semibold text-green-800 text-xs sm:text-sm">
                           {formatCurrency(parseFloat(method.amount))}
                         </span>
                       </div>
@@ -2056,10 +2210,18 @@ export default function CommandsPage() {
                 </Card>
               )}
 
-              <div className="flex justify-end pt-6 border-t">
+              <div className="flex flex-col-reverse sm:flex-row justify-between gap-2 sm:gap-0 pt-4 sm:pt-6 border-t">
+                <Button 
+                  variant="destructive"
+                  onClick={() => handleDeleteCommand(selectedCommandForDetails)}
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto text-sm"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Excluir Comanda
+                </Button>
                 <Button 
                   onClick={() => setDetailsModalOpen(false)}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto text-sm"
                 >
                   Fechar
                 </Button>
@@ -2068,6 +2230,57 @@ export default function CommandsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="w-[95vw] max-w-md mx-auto">
+          <AlertDialogHeader className="space-y-3">
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 text-lg">
+              <TrashIcon className="h-5 w-5 flex-shrink-0" />
+              Confirmar Exclusão da Comanda
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <div className="text-gray-700">Tem certeza que deseja excluir esta comanda?</div>
+                {commandToDelete && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                    <div className="font-medium text-gray-900">
+                      Cliente: {commandToDelete.client_name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Total: {formatCurrency(commandToDelete.total)}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Itens: {commandToDelete.items.length}
+                    </div>
+                  </div>
+                )}
+                <div className="text-red-600 font-medium">Esta ação não pode ser desfeita!</div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setCommandToDelete(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteCommand}
+              className="flex items-center justify-center gap-2 w-full sm:w-auto"
+            >
+              <TrashIcon className="h-4 w-4" />
+              Excluir Comanda
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de Adicionar Itens */}
       <Dialog open={addItemModalOpen} onOpenChange={setAddItemModalOpen}>
@@ -2079,7 +2292,87 @@ export default function CommandsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs value={itemTab} onValueChange={setItemTab as any}>
+          {/* Primeira etapa: Seleção obrigatória de profissional */}
+          {!selectedProfessional ? (
+            <div className="space-y-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="bg-amber-100 p-1.5 rounded-md">
+                    <UsersIcon className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-amber-800">Seleção de Profissional</h3>
+                </div>
+                <p className="text-sm text-amber-700">
+                  Para adicionar um item à comanda, é obrigatório selecionar o profissional responsável.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Selecione o Profissional *
+                </Label>
+                <Select
+                  value={selectedProfessional || undefined}
+                  onValueChange={setSelectedProfessional}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecionar profissional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {professionals && professionals.length > 0 ? (
+                      professionals.map(prof => (
+                        <SelectItem key={prof.id} value={prof.id}>
+                          {prof.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="loading" disabled>
+                        Carregando profissionais...
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            /* Segunda etapa: Seleção de serviços e produtos após escolher profissional */
+            <div className="space-y-4">
+              {/* Profissional selecionado */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-green-100 p-1.5 rounded-md">
+                      <UsersIcon className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Profissional Selecionado:</p>
+                      <p className="text-sm text-green-700">
+                        {(() => {
+                          const professional = professionals?.find(p => p.id === selectedProfessional);
+                          if (professional) {
+                            const position = professional.position === 'admin' ? 'Administrador' : 
+                                           professional.position === 'manager' ? 'Gerente' : 
+                                           professional.position === 'employee' ? 'Funcionário' : 
+                                           professional.position;
+                            return `${professional.name} - ${position}`;
+                          }
+                          return 'Nenhum profissional selecionado';
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedProfessional('')}
+                    className="text-green-600 border-green-300 hover:bg-green-100"
+                  >
+                    Alterar
+                  </Button>
+                </div>
+              </div>
+
+              <Tabs value={itemTab} onValueChange={setItemTab as any}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="service">Serviços</TabsTrigger>
               <TabsTrigger value="product">Produtos</TabsTrigger>
@@ -2303,6 +2596,8 @@ export default function CommandsPage() {
               </div>
             </TabsContent>
           </Tabs>
+            </div>
+          )}
 
           <div className="flex justify-end pt-6 border-t">
             <Button 

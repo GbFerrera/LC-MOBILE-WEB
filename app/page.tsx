@@ -350,7 +350,7 @@ export default function Home() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
                 <HandCoinsIcon className="h-6 w-6 text-white" />
               </div>
-              <span className="font-semibold text-gray-800 group-hover:text-purple-600 transition-colors">Remuneração</span>
+              <span className="font-semibold text-gray-800 group-hover:text-purple-600 transition-colors">Remunerações</span>
               <p className="text-xs text-gray-500 mt-1">Gestão de pagamentos</p>
             </div>
           </Link>
@@ -360,8 +360,8 @@ export default function Home() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
                 <ActivityIcon className="h-6 w-6 text-white" />
               </div>
-              <span className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">Transações</span>
-              <p className="text-xs text-gray-500 mt-1">Histórico financeiro</p>
+              <span className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">Despesas</span>
+              <p className="text-xs text-gray-500 mt-1">Gerencie suas despesas</p>
             </div>
           </Link>
         </div>

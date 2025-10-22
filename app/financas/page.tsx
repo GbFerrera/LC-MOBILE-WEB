@@ -1058,7 +1058,9 @@ export default function FinancePage() {
   };
   
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    // Remove o 'Z' para tratar como horário local em vez de UTC
+    const localDateString = dateString.replace('Z', '');
+    return new Date(localDateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -1242,8 +1244,9 @@ export default function FinancePage() {
                   {formatCurrency(balance.balance)}
                 </p>
                 <p className="text-white/70 text-sm">
-                  Gaveta #{currentDrawer.id} • Aberta às {formatDate(currentDrawer.opened_at).split(' ')[1]}
+                  Aberta às {formatDate(currentDrawer.date_open).split(' ')[1]} por {currentDrawer.opener_name || 'Usuário'}
                 </p>
+               
               </div>
               
               {/* Mini Stats */}
@@ -1747,7 +1750,7 @@ export default function FinancePage() {
                 </div>
                 <div>
                   <DialogTitle className="text-xl font-bold text-gray-900">
-                    Gaveta de {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleDateString('pt-BR') : ''} às {selectedDrawerForDetails?.opened_at ? new Date(selectedDrawerForDetails.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                    Gaveta de {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleDateString('pt-BR') : ''} às {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                   </DialogTitle>
                   <p className="text-sm text-gray-600">
                     Visualização completa de todas as transações e pagamentos da gaveta.
@@ -1784,7 +1787,7 @@ export default function FinancePage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Data de abertura:</span>
                     <span className="font-medium">
-                      {selectedDrawerForDetails?.opened_at ? new Date(selectedDrawerForDetails.opened_at).toLocaleDateString('pt-BR') + ' às ' + new Date(selectedDrawerForDetails.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                      {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleDateString('pt-BR') + ' às ' + new Date(selectedDrawerForDetails.date_open).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                     </span>
                   </div>
                 </div>

@@ -203,7 +203,11 @@ function generateTimeSlots(
 export default function AgendaPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(() => {
+    // Garantir que a data seja criada no timezone local
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  });
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -1076,9 +1080,8 @@ export default function AgendaPage() {
       day: "numeric",
       month: "long",
       year: "numeric",
-      timeZone: "UTC",
     };
-    return new Date(date).toLocaleDateString("pt-BR", options);
+    return date.toLocaleDateString("pt-BR", options);
   };
 
   // Obtém horas disponíveis (que têm pelo menos um slot livre)

@@ -1058,18 +1058,18 @@ export default function AjustesPage() {
 
                 {/* Services Dialog */}
                 <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
-                  <DialogContent className="sm:max-w-3xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm w-[90vw] rounded-3xl max-h-[85vh] overflow-y-auto">
-                    <DialogHeader className="pb-6 border-b border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-orange-100 rounded-2xl">
-                            <ScissorsIcon className="h-6 w-6 text-orange-600" />
+                  <DialogContent className="w-[95vw] sm:w-[90vw] max-w-3xl border border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-4 sm:pb-6 border-b border-gray-100">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="p-2 sm:p-3 bg-orange-100 rounded-2xl flex-shrink-0">
+                            <ScissorsIcon className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
                           </div>
-                          <div>
-                            <DialogTitle className="text-2xl font-bold text-gray-900">
+                          <div className="min-w-0">
+                            <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                               Serviços e Preços
                             </DialogTitle>
-                            <DialogDescription className="text-gray-600 mt-1">
+                            <DialogDescription className="text-sm sm:text-base text-gray-600 mt-1">
                               Gerencie seus serviços oferecidos
                             </DialogDescription>
                           </div>
@@ -1077,7 +1077,7 @@ export default function AjustesPage() {
                         <Button
                           onClick={() => setIsCreateServiceDialogOpen(true)}
                           size="sm"
-                          className="bg-orange-500 text-white hover:bg-orange-600 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-4 py-2"
+                          className="bg-orange-500 text-white hover:bg-orange-600 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-3 sm:px-4 py-2 w-full sm:w-auto text-sm"
                         >
                           <PlusIcon className="h-4 w-4 mr-2" />
                           Novo Serviço
@@ -1085,36 +1085,36 @@ export default function AjustesPage() {
                       </div>
                     </DialogHeader>
 
-                    <div className="flex-1 overflow-y-auto py-6">
+                    <div className="flex-1 overflow-y-auto py-4 sm:py-6">
                       {servicesLoading ? (
-                        <div className="flex flex-col items-center justify-center py-16">
-                          <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin mb-4"></div>
-                          <p className="text-gray-600">Carregando serviços...</p>
+                        <div className="flex flex-col items-center justify-center py-12 sm:py-16">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin mb-4"></div>
+                          <p className="text-gray-600 text-sm sm:text-base">Carregando serviços...</p>
                         </div>
                       ) : services.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                           {services.map((service, index) => (
                             <div key={service.id || index} className="group">
-                              <div className="bg-white border border-gray-100 rounded-2xl p-6 hover:shadow-md transition-all duration-300 hover:border-orange-200">
-                                <div className="flex items-start gap-4">
-                                  <div className="w-3 h-3 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                              <div className="bg-white border border-gray-100 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:shadow-md transition-all duration-300 hover:border-orange-200">
+                                <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                                  <div className="w-3 h-3 bg-orange-500 rounded-full mt-1 sm:mt-2 flex-shrink-0"></div>
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                                    <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
                                       {service.service_name}
                                     </h3>
                                     {service.service_description && (
-                                      <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                                      <p className="text-gray-600 mb-3 sm:mb-4 text-xs sm:text-sm leading-relaxed">
                                         {service.service_description}
                                       </p>
                                     )}
-                                    <div className="flex flex-wrap gap-3">
-                                      <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg">
-                                        <span className="text-emerald-600 font-medium text-sm">
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                                      <div className="flex items-center gap-2 bg-emerald-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
+                                        <span className="text-emerald-600 font-medium text-xs sm:text-sm">
                                           {formatPrice(service.base_price)}
                                         </span>
                                       </div>
-                                      <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
-                                        <span className="text-blue-600 font-medium text-sm">
+                                      <div className="flex items-center gap-2 bg-blue-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
+                                        <span className="text-blue-600 font-medium text-xs sm:text-sm">
                                           {formatDuration(service.base_duration)}
                                         </span>
                                       </div>
@@ -1123,7 +1123,7 @@ export default function AjustesPage() {
                                   <Button
                                     onClick={() => handleEditServiceClick(service)}
                                     size="sm"
-                                    className="bg-orange-500 text-white hover:bg-orange-600 transition-all duration-300 shadow-sm hover:shadow-md"
+                                    className="bg-orange-500 text-white hover:bg-orange-600 transition-all duration-300 shadow-sm hover:shadow-md w-full sm:w-auto mt-2 sm:mt-0 text-xs sm:text-sm"
                                   >
                                     <PencilIcon className="h-4 w-4 mr-1" />
                                     Editar
@@ -1165,7 +1165,7 @@ export default function AjustesPage() {
 
                 {/* Edit Service Dialog */}
                 <Dialog open={isEditServiceDialogOpen} onOpenChange={setIsEditServiceDialogOpen}>
-                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
+                  <DialogContent className="w-[95vw] sm:w-[90vw] max-w-md border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                         <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg">
@@ -1206,7 +1206,7 @@ export default function AjustesPage() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="edit-service-price" className="text-sm font-medium text-gray-700 mb-2 block">
                               Preço (R$) *
@@ -1241,7 +1241,7 @@ export default function AjustesPage() {
                       </div>
                     </div>
 
-                    <DialogFooter className="pt-6 border-t border-gray-100">
+                    <DialogFooter className="pt-4 sm:pt-6 border-t border-gray-100 flex-col sm:flex-row gap-2 sm:gap-0">
                       <Button
                         type="button"
                         variant="outline"
@@ -1250,13 +1250,14 @@ export default function AjustesPage() {
                           setSelectedService(null);
                         }}
                         disabled={isUpdatingService}
+                        className="w-full sm:w-auto"
                       >
                         Cancelar
                       </Button>
                       <Button
                         onClick={handleUpdateService}
                         disabled={isUpdatingService}
-                        className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
                       >
                         {isUpdatingService ? (
                           <>
@@ -1276,7 +1277,7 @@ export default function AjustesPage() {
 
                 {/* Create Service Dialog */}
                 <Dialog open={isCreateServiceDialogOpen} onOpenChange={setIsCreateServiceDialogOpen}>
-                  <DialogContent className="sm:max-w-md border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
+                  <DialogContent className="w-[95vw] sm:w-[90vw] max-w-md border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                         <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
@@ -1316,7 +1317,7 @@ export default function AjustesPage() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="service-price" className="text-sm font-medium text-gray-700 mb-2 block">
                               Preço (R$) *
@@ -1351,7 +1352,7 @@ export default function AjustesPage() {
                       </div>
                     </div>
 
-                    <DialogFooter className="pt-6 border-t border-gray-100">
+                    <DialogFooter className="pt-4 sm:pt-6 border-t border-gray-100 flex-col sm:flex-row gap-2 sm:gap-0">
                       <Button
                         type="button"
                         variant="outline"
@@ -1360,13 +1361,14 @@ export default function AjustesPage() {
                           setNewServiceForm({ name: "", description: "", price: "", duration: "" });
                         }}
                         disabled={isCreatingService}
+                        className="w-full sm:w-auto"
                       >
                         Cancelar
                       </Button>
                       <Button
                         onClick={handleCreateService}
                         disabled={isCreatingService}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
                       >
                         {isCreatingService ? (
                           <>
@@ -2014,7 +2016,7 @@ export default function AjustesPage() {
 
                 {/* Company Details Dialog */}
                 <Dialog open={isCompanyDetailsDialogOpen} onOpenChange={setIsCompanyDetailsDialogOpen}>
-                  <DialogContent className="sm:max-w-lg border-none shadow-2xl bg-white w-[48vh] rounded-2xl h-[80vh]">
+                  <DialogContent className="w-[95vw] sm:w-[90vw] max-w-lg border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                         <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
@@ -2034,44 +2036,44 @@ export default function AjustesPage() {
                           <p className="text-gray-500 font-medium">Carregando detalhes...</p>
                         </div>
                       ) : companyDetails ? (
-                        <div className="bg-gray-50 rounded-xl p-6">
-                          <div className="grid grid-cols-1 gap-4">
+                        <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
+                          <div className="grid grid-cols-1 gap-3 sm:gap-4">
                             {/* Nome da Empresa */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Nome da Empresa</span>
-                              <span className="text-sm font-semibold text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 sm:py-3 border-b border-gray-200 gap-1 sm:gap-0">
+                              <span className="text-xs sm:text-sm font-medium text-gray-600">Nome da Empresa</span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                                 {companyDetails.name || 'Não informado'}
                               </span>
                             </div>
 
                             {/* Telefone */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Telefone</span>
-                              <span className="text-sm font-semibold text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 sm:py-3 border-b border-gray-200 gap-1 sm:gap-0">
+                              <span className="text-xs sm:text-sm font-medium text-gray-600">Telefone</span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                                 {companyDetails.phone_number || 'Não informado'}
                               </span>
                             </div>
 
                             {/* Endereço */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Endereço</span>
-                              <span className="text-sm font-semibold text-gray-900 text-right">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between py-2 sm:py-3 border-b border-gray-200 gap-1 sm:gap-0">
+                              <span className="text-xs sm:text-sm font-medium text-gray-600 flex-shrink-0">Endereço</span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words sm:text-right sm:max-w-[60%]">
                                 {companyDetails.address || 'Não informado'}
                               </span>
                             </div>
 
                             {/* Documento */}
-                            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                              <span className="text-sm font-medium text-gray-600">Documento</span>
-                              <span className="text-sm font-semibold text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 sm:py-3 border-b border-gray-200 gap-1 sm:gap-0">
+                              <span className="text-xs sm:text-sm font-medium text-gray-600">Documento</span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                                 {companyDetails.document || 'Não informado'}
                               </span>
                             </div>
 
                             {/* Data de Criação */}
-                            <div className="flex items-center justify-between py-3">
-                              <span className="text-sm font-medium text-gray-600">Empresa desde</span>
-                              <span className="text-sm font-semibold text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 sm:py-3 gap-1 sm:gap-0">
+                              <span className="text-xs sm:text-sm font-medium text-gray-600">Empresa desde</span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                                 {companyDetails.created_at
                                   ? new Date(companyDetails.created_at).toLocaleDateString('pt-BR')
                                   : 'Não informado'
@@ -2178,24 +2180,24 @@ export default function AjustesPage() {
           </div>
 
           {/* Settings Buttons - Vertical Stack */}
-          <div className="flex flex-col gap-4 w-full max-w-lg mx-auto mt-6 px-4 sm:px-0 pb-24">
+          <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-lg mx-auto mt-6 px-3 sm:px-4 pb-24">
           {settingButtons.map((setting, index) => (
             <Card
               key={setting.id}
               className="border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer overflow-hidden bg-white/70 backdrop-blur-sm"
             >
               <CardContent className="p-0">
-                <div className={`${setting.bgColor} p-4 sm:p-6 h-full`}>
-                  <div className="flex items-center gap-4">
+                <div className={`${setting.bgColor} p-3 sm:p-4 md:p-6 h-full`}>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     {/* Glass effect icon container */}
-                    <div className="inline-flex p-3 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 shadow-lg flex-shrink-0 hover:bg-white/30 transition-all duration-300">
-                      <setting.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${setting.iconColor}`} />
+                    <div className="inline-flex p-2 sm:p-3 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 shadow-lg flex-shrink-0 hover:bg-white/30 transition-all duration-300">
+                      <setting.icon className={`h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 ${setting.iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg sm:text-xl mb-1 text-gray-800">
+                      <h3 className="font-semibold text-base sm:text-lg md:text-xl mb-1 text-gray-800">
                         {setting.title}
                       </h3>
-                      <p className="text-sm sm:text-base text-gray-500 leading-relaxed">
+                      <p className="text-xs sm:text-sm md:text-base text-gray-500 leading-relaxed">
                         {setting.description}
                       </p>
                     </div>
@@ -2210,7 +2212,7 @@ export default function AjustesPage() {
                               ? handleCompanyDetailsClick
                               : undefined
                       }
-                      className="bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg transition-all duration-300 text-white font-medium px-4 py-2 rounded-xl text-sm flex-shrink-0"
+                      className="bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg transition-all duration-300 text-white font-medium px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0"
                     >
                       {setting.id === 'services'
                         ? 'Ver Serviços'

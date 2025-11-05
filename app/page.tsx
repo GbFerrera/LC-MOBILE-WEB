@@ -336,8 +336,35 @@ export default function Home() {
               <p className="text-xs text-gray-500 mt-1">Configurações</p>
             </div>
           </Link>
+          <Link href="/equipe" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <UsersIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-green-600 transition-colors">Equipe</span>
+              <p className="text-xs text-gray-500 mt-1">Gestão de equipe</p>
+            </div>
+          </Link>
+          <Link href="/remuneration" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <HandCoinsIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-purple-600 transition-colors">Remunerações</span>
+              <p className="text-xs text-gray-500 mt-1">Gestão de pagamentos</p>
+            </div>
+          </Link>
+          
+          <Link href="/transactions" className="group">
+            <div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-emerald-100/50">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                <ActivityIcon className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">Despesas</span>
+              <p className="text-xs text-gray-500 mt-1">Gerencie suas despesas</p>
+            </div>
+          </Link>
         </div>
-
 
         {/* Upcoming Appointments */}
         <div className="mb-8">

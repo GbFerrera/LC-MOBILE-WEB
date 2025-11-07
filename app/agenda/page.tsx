@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation"
@@ -251,6 +251,15 @@ export default function AgendaPage() {
   // Estado para dropdown de serviços
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
+  // Referência para scroll automático e horário atual
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Estados para seleção de profissionais
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>(user?.id?.toString() || "");
+  const [loadingProfessionals, setLoadingProfessionals] = useState(false);
+
   // Filtrar clientes com base na busca
   const filteredClients = clients.filter((client) => {
     if (!clientSearch.trim()) return false; // Se não houver texto de busca, não mostra nenhum cliente
@@ -325,11 +334,19 @@ export default function AgendaPage() {
   };
 
   // Buscar agendamentos do dia
-  const fetchAppointments = async (userId: string, date: Date) => {
+  const fetchAppointments = async (userId?: string, dateParam?: Date) => {
     try {
-      const formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+      const professionalId = userId || selectedProfessionalId || user?.id;
+      const targetDate = dateParam || date;
+      
+      if (!professionalId) {
+        console.error("ID do profissional não encontrado");
+        return;
+      }
+      
+      const formattedDate = targetDate.toISOString().split("T")[0]; // Formato YYYY-MM-DD
       const response = await api.get(
-        `/schedules/${userId}/date/${formattedDate}`,
+        `/schedules/${professionalId}/date/${formattedDate}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -609,7 +626,7 @@ export default function AgendaPage() {
         }
 
         const intervalData = {
-          professional_id: user.id,
+          professional_id: selectedProfessionalId || user.id,
           appointment_date: date.toISOString().split("T")[0],
           start_time: selectedSlot,
           end_time: selectedEndTime,
@@ -672,7 +689,7 @@ export default function AgendaPage() {
       // Criar o payload do agendamento
       const appointmentData = {
         client_id: parseInt(formData.client_id),
-        professional_id: user.id,
+        professional_id: selectedProfessionalId || user.id,
         appointment_date: formattedDate,
         start_time: selectedSlot,
         end_time: formattedEndTime,
@@ -681,7 +698,7 @@ export default function AgendaPage() {
         isEncaixe: isEncaixe, // Flag para indicar que é um encaixe
         services: selectedServices.map(service => ({
           service_id: parseInt(service.service_id?.toString() || service.service_id?.toString() || "0"),
-          professional_id: user.id,
+          professional_id: selectedProfessionalId || user.id,
           quantity: quantity, // Adicionando a quantidade fixa como 1
         })),
       };
@@ -720,13 +737,48 @@ export default function AgendaPage() {
     }
   };
 
-  const fetchSchedules = async () => {
+  // Função para buscar profissionais da empresa
+  const fetchProfessionals = async () => {
+    if (!user?.company_id) return;
+    
+    try {
+      setLoadingProfessionals(true);
+      const response = await api.get('/teams', {
+        headers: {
+          'company_id': user.company_id.toString(),
+          'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      const formattedProfessionals = (response.data || []).map((professional: any) => ({
+        id: professional.id.toString(),
+        name: professional.name,
+        position: professional.position,
+        email: professional.email
+      }));
+      
+      setProfessionals(formattedProfessionals);
+      
+      // Se não há profissional selecionado, selecionar o usuário atual
+      if (!selectedProfessionalId && user?.id) {
+        setSelectedProfessionalId(user.id.toString());
+      }
+    } catch (error) {
+      console.error('Erro ao buscar profissionais:', error);
+      toast.error('Erro ao carregar profissionais');
+    } finally {
+      setLoadingProfessionals(false);
+    }
+  };
+
+  // Função para buscar horários disponíveis
+  const fetchAvailableSlots = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Buscar o ID do profissional do contexto de autenticação
-      const professionalId = user?.id;
+      // Usar o profissional selecionado ou o usuário atual
+      const professionalId = selectedProfessionalId || user?.id;
       if (!professionalId) {
         throw new Error("ID do profissional não encontrado");
       }
@@ -777,10 +829,18 @@ export default function AgendaPage() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchSchedules();
+    if (user?.company_id) {
+      fetchProfessionals();
     }
-  }, [date, user]);
+  }, [user?.company_id]);
+
+  // Carregar dados quando a data ou profissional mudar
+  useEffect(() => {
+    if (selectedProfessionalId) {
+      fetchAvailableSlots();
+      fetchAppointments();
+    }
+  }, [date, selectedProfessionalId]);
 
   // Verifica se um horário está ocupado
   const isTimeSlotBooked = (time: string) => {
@@ -1234,6 +1294,94 @@ export default function AgendaPage() {
     }
   };
 
+  // Função para calcular horário de término baseado na duração dos serviços
+  const calculateEndTime = (startTime: string, appointment?: any) => {
+    if (appointment && appointment.end_time) {
+      return appointment.end_time.slice(0, 5);
+    }
+    
+    // Para slots disponíveis, calcular baseado na duração padrão de 15 minutos
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + 15; // 15 minutos padrão
+    const endHours = Math.floor(totalMinutes / 60);
+    const endMinutes = totalMinutes % 60;
+    
+    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+  };
+
+  // Função para fazer scroll automático para o horário atual
+  const scrollToCurrentTime = useCallback(() => {
+    // Só executa se a data atual for hoje
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    if (!isToday) return;
+    
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Arredondar para o slot de 15 minutos mais próximo
+    const roundedMinute = Math.floor(currentMinute / 15) * 15;
+    const timeString = `${currentHour.toString().padStart(2, '0')}:${roundedMinute.toString().padStart(2, '0')}`;
+    
+    // Tentar encontrar o elemento com o ID do slot atual
+    const targetSlotId = `slot-${timeString.replace(':', '-')}`;
+    const targetElement = scrollContainer.querySelector(`#${targetSlotId}`);
+    
+    if (targetElement) {
+      // Usar scrollIntoView para scroll preciso
+      targetElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+      });
+      console.log(`Scroll para horário atual: ${timeString} (ID: ${targetSlotId})`);
+    } else {
+      console.log(`Slot não encontrado para horário: ${timeString} (ID: ${targetSlotId})`);
+      
+      // Fallback: tentar alguns minutos antes ou depois
+      const fallbackTimes = [
+        `${currentHour.toString().padStart(2, '0')}:${(roundedMinute - 15).toString().padStart(2, '0')}`,
+        `${currentHour.toString().padStart(2, '0')}:${(roundedMinute + 15).toString().padStart(2, '0')}`,
+      ];
+      
+      for (const fallbackTime of fallbackTimes) {
+        const fallbackId = `slot-${fallbackTime.replace(':', '-')}`;
+        const fallbackElement = scrollContainer.querySelector(`#${fallbackId}`);
+        if (fallbackElement) {
+          fallbackElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+          console.log(`Scroll para horário próximo: ${fallbackTime} (ID: ${fallbackId})`);
+          break;
+        }
+      }
+    }
+  }, [date]);
+
+  // Atualiza o horário atual a cada minuto
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Atualiza a cada minuto
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Fazer scroll automático para o horário atual quando carregar os dados
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      setTimeout(() => {
+        scrollToCurrentTime();
+      }, 500); // Delay para garantir que os elementos foram renderizados
+    }
+  }, [availableSlots, scrollToCurrentTime]);
+
   // Função para abrir WhatsApp do cliente
   const openWhatsApp = (phoneNumber: string, clientName: string) => {
     if (!phoneNumber) {
@@ -1360,7 +1508,7 @@ export default function AgendaPage() {
               onClick={async () => {
                 if (user?.id) {
                   await fetchAppointments(user.id.toString(), date);
-                  await fetchSchedules();
+        
                 }
               }}
               disabled={loading}
@@ -1552,6 +1700,37 @@ export default function AgendaPage() {
                     : "Nenhum horário encontrado"}
                 </p>
               </div>
+
+              {/* Seleção de Profissional */}
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+                <div className="flex flex-col space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Profissional
+                  </label>
+                  <select
+                    value={selectedProfessionalId}
+                    onChange={(e) => setSelectedProfessionalId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-700 text-sm"
+                    disabled={loadingProfessionals}
+                  >
+                    {loadingProfessionals ? (
+                      <option>Carregando profissionais...</option>
+                    ) : (
+                      <>
+                        {professionals.map((professional) => (
+                          <option key={professional.id} value={professional.id}>
+                            {professional.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
               <div className="p-6">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -1607,7 +1786,7 @@ export default function AgendaPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div ref={scrollContainerRef} className="space-y-3 max-h-[70vh] overflow-y-auto">
                     {/* Renderizar slots disponíveis, encaixes e horário de almoço */}
                     {(() => {
                       // Combinar slots disponíveis com slots de encaixe
@@ -1677,6 +1856,7 @@ export default function AgendaPage() {
                       return (
                         <div
                           key={slot}
+                          id={`slot-${slot.replace(':', '-')}`}
                           className={`flex items-center justify-between w-full p-4 rounded-xl transition-all duration-200 ${
                             isLunch
                               ? "bg-amber-50 border-2 border-dashed border-amber-400 text-amber-800 opacity-80"
@@ -1782,11 +1962,13 @@ export default function AgendaPage() {
                                   : "text-gray-700"
                               }`}>
                                 {isLunch && lunchEndTime 
-                                  ? `${slot} - ${lunchEndTime}` 
+                                  ? `${slot} às ${lunchEndTime}` 
                                   : isFree && freeEndTime
-                                  ? `${slot} - ${freeEndTime}`
+                                  ? `${slot} às ${freeEndTime}`
                                   : isEncaixe && fitSlotDetails 
-                                  ? `${slot} até ${fitSlotDetails.endTime}` 
+                                  ? `${slot} às ${fitSlotDetails.endTime}` 
+                                  : isBooked && appointment && appointment.status !== 'canceled'
+                                  ? `${slot} às ${calculateEndTime(slot, appointment)}`
                                   : slot
                                 }
                               </div>
@@ -2841,7 +3023,11 @@ export default function AgendaPage() {
                   <Input
                     id="professional_id"
                     type="text"
-                    value={user?.name || "Usuário atual"}
+                    value={
+                      professionals.find(p => p.id === selectedProfessionalId)?.name || 
+                      user?.name || 
+                      "Usuário atual"
+                    }
                     disabled
                     className="bg-gray-100 border-gray-300 text-gray-600 cursor-not-allowed transition-all duration-200"
                   />

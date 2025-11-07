@@ -205,14 +205,21 @@ function AuthProvider({ children }: AuthProviderProps) {
       
       let errorMessage = "Ocorreu um erro ao tentar fazer login. Tente novamente.";
       
-      if (error.response?.data?.message) {
+      if (error.response?.status === 401) {
+        errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
+      } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message.includes("Network Error")) {
         errorMessage = "Não foi possível conectar ao servidor. Verifique sua conexão.";
+      } else if (error.message.includes("401")) {
+        errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
       }
       
+      // Exibir toast de erro
       toast.error(errorMessage);
-      throw error;
+      
+      // Re-throw do erro para que o componente possa tratar
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }

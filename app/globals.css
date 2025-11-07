@@ -225,3 +225,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sonner Toast Styles */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+[data-sonner-toast] {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  border-color: #ef4444 !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  border-color: #10b981 !important;
+}

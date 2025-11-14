@@ -251,6 +251,16 @@ export default function AgendaPage() {
   // Estado para dropdown de serviços
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
+  // Estados para Cliente Regular (is_constant)
+  const [isRegularClient, setIsRegularClient] = useState(false);
+  const [isRegularClientDialogOpen, setIsRegularClientDialogOpen] = useState(false);
+  const [regularClientConfig, setRegularClientConfig] = useState({
+    dayOfWeek: "",
+    time: "",
+    startDate: "",
+    endDate: ""
+  });
+
   // Referência para scroll automático e horário atual
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -576,6 +586,152 @@ export default function AgendaPage() {
     setIsFreeIntervalMode(false);
     setIsEncaixe(false);
     setEncaixeEndTime("");
+    setIsRegularClient(false);
+    setRegularClientConfig({
+      dayOfWeek: "",
+      time: "",
+      startDate: "",
+      endDate: ""
+    });
+  };
+
+  // Função para criar múltiplos agendamentos para cliente regular
+  const handleCreateRegularClientAppointments = async () => {
+    if (!user || !selectedSlot) return;
+
+    if (!regularClientConfig.dayOfWeek || !regularClientConfig.time || 
+        !regularClientConfig.startDate || !regularClientConfig.endDate) {
+      toast.error("Configure todos os campos do cliente regular");
+      return;
+    }
+
+    try {
+      // Validar dados do formulário
+      if (!formData.client_id || formData.service_ids.length === 0) {
+        throw new Error("Por favor, selecione o cliente e pelo menos um serviço");
+      }
+
+      const selectedServices = services.filter(
+        (s) => s.service_id && formData.service_ids.includes(s.service_id.toString())
+      );
+      if (selectedServices.length === 0) {
+        throw new Error("Serviços não encontrados");
+      }
+
+      const appointmentServices = selectedServices.map(service => ({
+        service_id: parseInt(service.service_id?.toString() || "0"),
+        professional_id: selectedProfessionalId || user.id,
+        quantity: 1,
+      }));
+
+      // Calcular todas as datas que correspondem ao dia da semana no período
+      const startDate = new Date(regularClientConfig.startDate + 'T00:00:00');
+      const endDate = new Date(regularClientConfig.endDate + 'T00:00:00');
+      
+      // Validar se as datas são válidas
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        toast.error("Datas inválidas. Verifique a configuração do cliente regular.");
+        return;
+      }
+      
+      if (startDate >= endDate) {
+        toast.error("A data de início deve ser anterior à data de fim.");
+        return;
+      }
+
+      const dayOfWeek = regularClientConfig.dayOfWeek;
+      const [hour, minute] = regularClientConfig.time.split(':').map(Number);
+      
+      // Mapear dias da semana para números (0 = Domingo, 1 = Segunda, etc.)
+      const dayMap: { [key: string]: number } = {
+        'Sunday': 0,
+        'Monday': 1,
+        'Tuesday': 2,
+        'Wednesday': 3,
+        'Thursday': 4,
+        'Friday': 5,
+        'Saturday': 6
+      };
+
+      const targetDayNumber = dayMap[dayOfWeek];
+      const appointmentDates: Date[] = [];
+
+      // Encontrar todas as datas que correspondem ao dia da semana
+      let currentDate = new Date(startDate);
+      
+      // Ajustar para o primeiro dia da semana desejado
+      while (currentDate.getDay() !== targetDayNumber) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Coletar todas as datas válidas
+      while (currentDate <= endDate) {
+        appointmentDates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 7); // Próxima semana
+      }
+
+      if (appointmentDates.length === 0) {
+        toast.error("Nenhuma data encontrada para o período selecionado");
+        return;
+      }
+
+      // Calcular duração total de todos os serviços
+      const totalDuration = selectedServices.reduce((total, service) => total + (service.service_duration || 0), 0);
+
+      // Criar agendamentos para cada data
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const appointmentDate of appointmentDates) {
+        try {
+          // Calcular end_time baseado na duração total
+          const endTime = new Date(appointmentDate);
+          endTime.setHours(hour, minute + totalDuration);
+          const formattedEndTime = endTime.toTimeString().slice(0, 5);
+
+          const appointmentPayload = {
+            client_id: parseInt(formData.client_id),
+            professional_id: selectedProfessionalId || user.id,
+            appointment_date: appointmentDate.toISOString().split("T")[0],
+            start_time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+            end_time: formattedEndTime,
+            status: "confirmed",
+            notes: formData.notes || "",
+            is_constant: true, // Marcar como agendamento constante
+            services: appointmentServices,
+          };
+
+          await api.post("/appointments", appointmentPayload, {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              company_id: user.company_id?.toString() || "0",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Erro ao criar agendamento para ${appointmentDate.toLocaleDateString()}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Atualizar a lista de agendamentos
+      await fetchAppointments(user.id, date);
+
+      // Limpar estados
+      closeAppointmentDialog();
+
+      if (successCount > 0) {
+        toast.success(`${successCount} agendamento(s) criado(s) com sucesso!${errorCount > 0 ? ` (${errorCount} erro(s))` : ''}`);
+      } else {
+        toast.error("Não foi possível criar nenhum agendamento");
+      }
+
+    } catch (error) {
+      console.error("Erro ao criar agendamentos regulares:", error);
+      toast.error("Erro ao criar agendamentos regulares");
+    }
   };
 
   const openAppointmentDialog = (slot: string, isEncaixeSlot = false, encaixeEnd?: string) => {
@@ -617,6 +773,12 @@ export default function AgendaPage() {
 
     try {
       setIsSubmitting(true);
+
+      // Se for cliente regular, usar função específica
+      if (isRegularClient) {
+        await handleCreateRegularClientAppointments();
+        return;
+      }
 
       // Se estiver no modo Intervalo Livre, usar lógica diferente
       if (isFreeIntervalMode) {
@@ -2062,7 +2224,7 @@ export default function AgendaPage() {
 
       {/* Diálogo de Agendamento */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-2xl border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmitAppointment}>
             <DialogHeader className="text-center pb-6">
               <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
@@ -2117,6 +2279,62 @@ export default function AgendaPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Switch para Cliente Regular - apenas para agendamento normal */}
+              {!isFreeIntervalMode && (
+                <div className="flex items-center justify-center mb-4">
+                  <div className="flex items-center space-x-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                    <input
+                      type="checkbox"
+                      id="regular-client-switch"
+                      checked={isRegularClient}
+                      onChange={(e) => {
+                        setIsRegularClient(e.target.checked);
+                        if (e.target.checked) {
+                          setIsRegularClientDialogOpen(true);
+                        } else {
+                          setRegularClientConfig({
+                            dayOfWeek: "",
+                            time: "",
+                            startDate: "",
+                            endDate: ""
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="regular-client-switch" className="text-sm font-medium text-blue-700">
+                      Cliente Regular
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Mostrar configuração quando cliente regular ativado e configurado */}
+              {!isFreeIntervalMode && isRegularClient && regularClientConfig.dayOfWeek && regularClientConfig.time && regularClientConfig.startDate && regularClientConfig.endDate && (
+                <div className="mb-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="text-sm text-blue-700 font-medium mb-1">Configuração:</div>
+                  <div className="text-xs text-blue-600 space-y-1">
+                    <div>📅 {
+                      regularClientConfig.dayOfWeek === 'Monday' ? 'Segunda-feira' :
+                      regularClientConfig.dayOfWeek === 'Tuesday' ? 'Terça-feira' :
+                      regularClientConfig.dayOfWeek === 'Wednesday' ? 'Quarta-feira' :
+                      regularClientConfig.dayOfWeek === 'Thursday' ? 'Quinta-feira' :
+                      regularClientConfig.dayOfWeek === 'Friday' ? 'Sexta-feira' :
+                      regularClientConfig.dayOfWeek === 'Saturday' ? 'Sábado' :
+                      regularClientConfig.dayOfWeek === 'Sunday' ? 'Domingo' : ''
+                    } às {regularClientConfig.time}</div>
+                    <div>📆 De {regularClientConfig.startDate ? new Date(regularClientConfig.startDate + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'} até {regularClientConfig.endDate ? new Date(regularClientConfig.endDate + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}</div>
+                    <button 
+                      type="button"
+                      onClick={() => setIsRegularClientDialogOpen(true)}
+                      className="mt-2 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                    >
+                      Alterar Configuração
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <DialogTitle className={`text-2xl font-bold ${
                 isFreeIntervalMode ? "text-emerald-800" : "text-gray-800"
@@ -2547,7 +2765,10 @@ export default function AgendaPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting || 
+                  (isRegularClient && (!regularClientConfig.dayOfWeek || !regularClientConfig.time || !regularClientConfig.startDate || !regularClientConfig.endDate))
+                }
                 className={`px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
                   isFreeIntervalMode
                     ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
@@ -2592,12 +2813,173 @@ export default function AgendaPage() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    {isFreeIntervalMode ? "Criar Intervalo" : "Agendar"}
+                    {isFreeIntervalMode ? "Criar Intervalo" : isRegularClient ? "Criar Agendamentos Regulares" : "Agendar"}
                   </span>
                 )}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Configuração do Cliente Regular */}
+      <Dialog open={isRegularClientDialogOpen} onOpenChange={setIsRegularClientDialogOpen}>
+        <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-bold text-blue-800">
+              Configurar Cliente Regular
+            </DialogTitle>
+            <DialogDescription className="text-blue-600">
+              Configure os horários recorrentes para este cliente
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Seleção do dia da semana */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Dia da Semana</Label>
+              <Select
+                value={regularClientConfig.dayOfWeek}
+                onValueChange={(value) => 
+                  setRegularClientConfig(prev => ({ ...prev, dayOfWeek: value }))
+                }
+              >
+                <SelectTrigger className="h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                  <SelectValue placeholder="Selecione o dia da semana" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Monday">Segunda-feira</SelectItem>
+                  <SelectItem value="Tuesday">Terça-feira</SelectItem>
+                  <SelectItem value="Wednesday">Quarta-feira</SelectItem>
+                  <SelectItem value="Thursday">Quinta-feira</SelectItem>
+                  <SelectItem value="Friday">Sexta-feira</SelectItem>
+                  <SelectItem value="Saturday">Sábado</SelectItem>
+                  <SelectItem value="Sunday">Domingo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Seleção do horário */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Horário</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={regularClientConfig.time.split(':')[0] || ''}
+                  onValueChange={(hour) => {
+                    const minutes = regularClientConfig.time.split(':')[1] || '00';
+                    setRegularClientConfig(prev => ({ 
+                      ...prev, 
+                      time: `${hour.padStart(2, '0')}:${minutes}` 
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="flex-1 h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                    <SelectValue placeholder="Hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={i.toString().padStart(2, '0')}>
+                        {i.toString().padStart(2, '0')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={regularClientConfig.time.split(':')[1] || '00'}
+                  onValueChange={(minutes) => {
+                    const hour = regularClientConfig.time.split(':')[0] || '00';
+                    setRegularClientConfig(prev => ({ 
+                      ...prev, 
+                      time: `${hour}:${minutes}` 
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="flex-1 h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="00">00</SelectItem>
+                    <SelectItem value="15">15</SelectItem>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="45">45</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Data de início */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Data de Início</Label>
+              <Input
+                type="date"
+                value={regularClientConfig.startDate}
+                onChange={(e) => 
+                  setRegularClientConfig(prev => ({ ...prev, startDate: e.target.value }))
+                }
+                min={new Date().toISOString().split('T')[0]}
+                className="h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg"
+              />
+            </div>
+
+            {/* Data de fim */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Data de Fim</Label>
+              <Input
+                type="date"
+                value={regularClientConfig.endDate}
+                onChange={(e) => 
+                  setRegularClientConfig(prev => ({ ...prev, endDate: e.target.value }))
+                }
+                min={regularClientConfig.startDate || new Date().toISOString().split('T')[0]}
+                className="h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              type="button"
+              variant="outline" 
+              onClick={() => {
+                setIsRegularClientDialogOpen(false);
+                setIsRegularClient(false);
+                setRegularClientConfig({
+                  dayOfWeek: "",
+                  time: "",
+                  startDate: "",
+                  endDate: ""
+                });
+              }}
+              className="flex-1 h-12 border-2 border-gray-300 hover:border-gray-400 rounded-lg"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="button"
+              onClick={() => {
+                // Validar se todos os campos estão preenchidos
+                if (!regularClientConfig.dayOfWeek || !regularClientConfig.time || 
+                    !regularClientConfig.startDate || !regularClientConfig.endDate) {
+                  toast.error("Preencha todos os campos para configurar o cliente regular");
+                  return;
+                }
+                
+                // Fechar dialog e manter configuração
+                setIsRegularClientDialogOpen(false);
+                toast.success("Configuração de cliente regular definida!");
+              }}
+              disabled={!regularClientConfig.dayOfWeek || !regularClientConfig.time || 
+                       !regularClientConfig.startDate || !regularClientConfig.endDate}
+              className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

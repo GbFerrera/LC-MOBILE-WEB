@@ -607,14 +607,31 @@ export default function AgendaPage() {
 
     try {
       // Validar dados do formulário
+      console.log("Validando formulário:", {
+        client_id: formData.client_id,
+        service_ids: formData.service_ids,
+        services_count: services.length,
+        services: services.map(s => ({ id: s.service_id, name: s.service_name }))
+      });
+
       if (!formData.client_id || formData.service_ids.length === 0) {
+        console.log("Erro: Cliente ou serviços não selecionados");
         throw new Error("Por favor, selecione o cliente e pelo menos um serviço");
       }
 
       const selectedServices = services.filter(
-        (s) => s.service_id && formData.service_ids.includes(s.service_id.toString())
+        (s) => {
+          const serviceId = s.service_id?.toString();
+          const isIncluded = formData.service_ids.includes(serviceId);
+          console.log(`Verificando serviço ${serviceId} (${s.service_name}): ${isIncluded}`);
+          return s.service_id && isIncluded;
+        }
       );
+      console.log("Serviços selecionados:", selectedServices);
+      console.log("IDs dos serviços selecionados:", selectedServices.map(s => s.service_id));
+      
       if (selectedServices.length === 0) {
+        console.log("Erro: Nenhum serviço encontrado com os IDs:", formData.service_ids);
         throw new Error("Serviços não encontrados");
       }
 
@@ -735,6 +752,14 @@ export default function AgendaPage() {
   };
 
   const openAppointmentDialog = (slot: string, isEncaixeSlot = false, encaixeEnd?: string) => {
+    console.log("Abrindo diálogo:", {
+      slot,
+      isEncaixeSlot,
+      encaixeEnd,
+      formDataAtual: formData,
+      isRegularClientAtual: isRegularClient
+    });
+    
     setSelectedSlot(slot);
     setIsEncaixe(isEncaixeSlot);
     
@@ -776,6 +801,12 @@ export default function AgendaPage() {
 
       // Se for cliente regular, usar função específica
       if (isRegularClient) {
+        console.log("Criando agendamento para cliente regular:", {
+          client_id: formData.client_id,
+          service_ids: formData.service_ids,
+          isRegularClient,
+          regularClientConfig
+        });
         await handleCreateRegularClientAppointments();
         return;
       }

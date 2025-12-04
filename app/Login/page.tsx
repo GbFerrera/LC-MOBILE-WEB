@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -97,35 +98,36 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen relative flex items-center justify-center p-4" style={{ backgroundColor: "#3D583F" }}>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <Image src="/favicon.png" alt="" width={160} height={160} className="absolute top-6 left-8 opacity-20 rotate-12" aria-hidden />
+        <Image src="/favicon.png" alt="" width={96} height={96} className="absolute top-14 right-16 opacity-15 -rotate-6" aria-hidden />
+        <Image src="/favicon.png" alt="" width={200} height={200} className="absolute bottom-16 right-10 opacity-25 rotate-3" aria-hidden />
+        <Image src="/favicon.png" alt="" width={120} height={120} className="absolute bottom-8 left-1/4 opacity-20 -rotate-3" aria-hidden />
+        <Image src="/favicon.png" alt="" width={80} height={80} className="absolute top-1/2 left-10 -translate-y-1/2 opacity-10 rotate-6" aria-hidden />
+        <Image src="/favicon.png" alt="" width={140} height={140} className="absolute top-24 right-1/4 opacity-20 rotate-12" aria-hidden />
+        <Image src="/favicon.png" alt="" width={64} height={64} className="absolute bottom-6 right-1/3 opacity-15 -rotate-12" aria-hidden />
+      </div>
+      <div className="w-full max-w-md -mt-1 sm:-mt-2 md:-mt-12">
+        <div className="flex items-center justify-center mb-6">
+          <Image src="/favicon.png" alt="Link Callendar" width={120} height={120} className="rounded-lg" />
+          <h1 className="text-3xl font-bold text-white">Link Callendar</h1>
+        </div>
 
-        {/* Card de Login */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          {/* Cabeçalho do Card */}
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-emerald-600 mb-2 flex items-center justify-center gap-2">
-              Bem-vindo de volta! 
-            </h2>
-            <p className="text-gray-600">
-              Entre com suas credenciais para ver seus agendamentos
-            </p>
-          </div>
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-[#3D583F]/20">
+          <div className="text-center mb-6"></div>
 
-          {/* Formulário */}
           <form onSubmit={handleLogin} className="space-y-6">
-            {/* Mensagem de erro */}
             {error && (
               <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                 <span className="font-medium">{error}</span>
               </div>
             )}
 
-            {/* Campo Email */}
             <div className="space-y-2">
               <Label
                 htmlFor="email"
-                className="text-sm font-semibold text-emerald-600 flex items-center gap-2"
+                className="text-sm font-semibold text-[#3D583F] flex items-center gap-2"
               >
                 <Mail className="h-4 w-4" /> Email
               </Label>
@@ -137,15 +139,14 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="h-12 border-2 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-lg"
+                className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] focus:ring-[#3D583F] rounded-lg"
               />
             </div>
 
-            {/* Campo Senha */}
             <div className="space-y-2">
               <Label
                 htmlFor="password"
-                className="text-sm font-semibold text-emerald-600 flex items-center gap-2"
+                className="text-sm font-semibold text-[#3D583F] flex items-center gap-2"
               >
                 <Lock className="h-4 w-4" /> Senha
               </Label>
@@ -158,11 +159,11 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   required
-                  className="h-12 pr-12 border-2 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-lg"
+                  className="h-12 pr-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] focus:ring-[#3D583F] rounded-lg"
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-emerald-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#3D583F]"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -174,12 +175,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-           
-
-            {/* Botão de Login */}
             <Button
               type="submit"
-              className="w-full h-12 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+              className="w-full h-12 text-base font-semibold bg-[#3D583F] hover:bg-[#365137] text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
               disabled={loading}
             >
               {loading ? (
@@ -210,7 +208,6 @@ export default function LoginPage() {
                 <>
                   <LogInIcon className="mr-2 h-5 w-5" />
                   Entrar no Sistema
-                  <Sparkles className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>

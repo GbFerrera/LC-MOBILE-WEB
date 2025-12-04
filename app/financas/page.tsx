@@ -771,9 +771,10 @@ export default function FinancePage() {
     selectedDrawerForDetails.payments.forEach(payment => {
       if (payment.payment_methods && Array.isArray(payment.payment_methods)) {
         payment.payment_methods.forEach(method => {
-          if (method && method.method && typeof method.amount === 'number') {
-            if (totals.hasOwnProperty(method.method)) {
-              totals[method.method] += method.amount;
+          if (method && method.method) {
+            const amt = parseFloat(String(method.amount || 0)) || 0;
+            if ((totals as any)[method.method] !== undefined) {
+              (totals as any)[method.method] += amt;
             }
           }
         });
@@ -1102,27 +1103,25 @@ export default function FinancePage() {
 
   if (user && !hasAccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="max-w-md mx-auto p-8">
-          <Card className="border-0 shadow-2xl">
+          <Card className="shadow-2xl border border-[#3D583F]/20">
             <CardContent className="p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <AlertCircle className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                Acesso Restrito
-              </h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Acesso Restrito</h3>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Desculpe, você não tem permissão para acessar a página de finanças. 
+                Desculpe, você não tem permissão para acessar a página de finanças.
                 Esta área é restrita para administradores e gerentes.
               </p>
               <div className="space-y-3">
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Seu perfil:</span> {
-                      user.position === 'employee' ? 'Funcionário' : 
+                      user.position === 'employee' ? 'Funcionário' :
                       user.position === 'admin' ? 'Administrador' :
-                      user.position === 'manager' ? 'Gerente' : 
+                      user.position === 'manager' ? 'Gerente' :
                       user.position || 'Não definido'
                     }
                   </p>
@@ -1130,9 +1129,9 @@ export default function FinancePage() {
                     <span className="font-semibold">Perfis com acesso:</span> Administrador, Gerente
                   </p>
                 </div>
-                <Button 
+                <Button
                   onClick={() => router.push('/')}
-                  className="w-full bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
+                  className="w-full bg-[#3D583F] hover:bg-[#365137] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
                 >
                   <ArrowLeft className="h-5 w-5 mr-2" />
                   Voltar ao Início
@@ -1146,9 +1145,9 @@ export default function FinancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+  <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
+  <header className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1162,11 +1161,10 @@ export default function FinancePage() {
               </Button>
               <div>
                 <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
-                  <Wallet className="h-6 w-6" />
                   Finanças
                 </h1>
-                <p className="text-emerald-100 text-sm mt-1">
-                  Gerencie gavetas e transações
+        <p className="text-[#3D583F] text-sm mt-1">
+                  Gavetas e transações
                 </p>
               </div>
             </div>
@@ -1205,7 +1203,7 @@ export default function FinancePage() {
         {!currentDrawer ? (
           <Card className="border-0 shadow-lg">
             <CardContent className="p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="w-20 h-20 bg-[#3D583F] rounded-full flex items-center justify-center mx-auto mb-6">
                 <Wallet className="h-10 w-10 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -1216,7 +1214,7 @@ export default function FinancePage() {
               </p>
               <Button 
                 onClick={() => setOpenDrawerDialog(true)}
-                className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
+        className="bg-[#3D583F] hover:bg-[#365137] text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
               >
                 <LockOpen className="h-5 w-5 mr-2" />
                 Abrir Gaveta
@@ -1226,24 +1224,24 @@ export default function FinancePage() {
         ) : (
           <>
             {/* Card Principal de Saldo */}
-            <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-2xl p-6 text-white shadow-xl">
+      <div className="rounded-2xl p-6 bg-white border border-[#3D583F]/20 shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[#3D583F]/10 text-[#3D583F] rounded-lg flex items-center justify-center">
                     <Wallet className="h-5 w-5" />
                   </div>
-                  <span className="text-white/80 text-sm font-medium">Saldo Atual</span>
+                  <span className="text-[#3D583F] text-sm font-medium">Saldo Atual</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-white/60 text-xs">Ativo</span>
+        <div className="w-2 h-2 bg-[#3D583F] rounded-full animate-pulse"></div>
+        <span className="text-gray-600 text-xs">Ativo</span>
                 </div>
               </div>
               <div className="mb-6">
-                <p className="text-3xl font-bold mb-1">
+                <p className="text-3xl font-bold mb-1 text-[#3D583F]">
                   {formatCurrency(balance.balance)}
                 </p>
-                <p className="text-white/70 text-sm">
+                <p className="text-gray-600 text-sm">
                   Aberta às {formatDate(currentDrawer.date_open).split(' ')[1]} por {currentDrawer.opener_name || 'Usuário'}
                 </p>
                
@@ -1252,16 +1250,16 @@ export default function FinancePage() {
               {/* Mini Stats */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <p className="text-white/60 text-xs mb-1">Entradas</p>
-                  <p className="text-white font-bold text-sm">{formatCurrency(balance.total_income)}</p>
+                  <p className="text-gray-500 text-xs mb-1">Entradas</p>
+                  <p className="text-[#3D583F] font-bold text-sm">{formatCurrency(balance.total_income)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-white/60 text-xs mb-1">Saídas</p>
-                  <p className="text-white font-bold text-sm">{formatCurrency(balance.total_expense)}</p>
+                  <p className="text-gray-500 text-xs mb-1">Saídas</p>
+                  <p className="text-[#3D583F] font-bold text-sm">{formatCurrency(balance.total_expense)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-white/60 text-xs mb-1">Sangrias</p>
-                  <p className="text-white font-bold text-sm">{formatCurrency(balance.total_cash_out)}</p>
+                  <p className="text-gray-500 text-xs mb-1">Sangrias</p>
+                  <p className="text-[#3D583F] font-bold text-sm">{formatCurrency(balance.total_cash_out)}</p>
                 </div>
               </div>
             </div>
@@ -1269,60 +1267,60 @@ export default function FinancePage() {
             {/* Cards de Estatísticas Detalhadas */}
             <div className="grid grid-cols-2 gap-4">
               <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-br from-green-500 to-green-600 p-4">
+        <div className="bg-white p-4 border border-[#3D583F]/20">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <TrendingUp className="h-5 w-5 text-white" />
-                    </div>
-                    <ArrowDownCircle className="h-6 w-6 text-white/70" />
+                  <div className="w-10 h-10 bg-[#3D583F]/10 text-[#3D583F] rounded-xl flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5" />
                   </div>
-                  <p className="text-white/80 text-xs font-medium mb-1">ENTRADAS</p>
-                  <p className="text-white text-xl font-bold">
+                    <ArrowDownCircle className="h-6 w-6 text-[#3D583F]" />
+                  </div>
+                  <p className="text-[#3D583F] text-xs font-medium mb-1">ENTRADAS</p>
+                  <p className="text-[#3D583F] text-xl font-bold">
                     {formatCurrency(balance.total_income)}
                   </p>
                 </div>
               </Card>
               
               <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-br from-red-500 to-red-600 p-4">
+        <div className="bg-white p-4 border border-[#3D583F]/20">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <TrendingDown className="h-5 w-5 text-white" />
-                    </div>
-                    <ArrowUpCircle className="h-6 w-6 text-white/70" />
+                  <div className="w-10 h-10 bg-[#3D583F]/10 text-[#3D583F] rounded-xl flex items-center justify-center">
+                      <TrendingDown className="h-5 w-5" />
                   </div>
-                  <p className="text-white/80 text-xs font-medium mb-1">SAÍDAS</p>
-                  <p className="text-white text-xl font-bold">
+                    <ArrowUpCircle className="h-6 w-6 text-[#3D583F]" />
+                  </div>
+                  <p className="text-[#3D583F] text-xs font-medium mb-1">SAÍDAS</p>
+                  <p className="text-[#3D583F] text-xl font-bold">
                     {formatCurrency(balance.total_expense)}
                   </p>
                 </div>
               </Card>
               
               <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-4">
+        <div className="bg-white p-4 border border-[#3D583F]/20">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <Minus className="h-5 w-5 text-white" />
-                    </div>
-                    <Wallet className="h-6 w-6 text-white/70" />
+                  <div className="w-10 h-10 bg-[#3D583F]/10 text-[#3D583F] rounded-xl flex items-center justify-center">
+                      <Minus className="h-5 w-5" />
                   </div>
-                  <p className="text-white/80 text-xs font-medium mb-1">SANGRIAS</p>
-                  <p className="text-white text-xl font-bold">
+                    <Wallet className="h-6 w-6 text-[#3D583F]" />
+                  </div>
+                  <p className="text-[#3D583F] text-xs font-medium mb-1">SANGRIAS</p>
+                  <p className="text-[#3D583F] text-xl font-bold">
                     {formatCurrency(balance.total_cash_out)}
                   </p>
                 </div>
               </Card>
               
               <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4">
+        <div className="bg-white p-4 border border-[#3D583F]/20">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <Receipt className="h-5 w-5 text-white" />
-                    </div>
-                    <Calendar className="h-6 w-6 text-white/70" />
+                  <div className="w-10 h-10 bg-[#3D583F]/10 text-[#3D583F] rounded-xl flex items-center justify-center">
+                      <Receipt className="h-5 w-5" />
                   </div>
-                  <p className="text-white/80 text-xs font-medium mb-1">TRANSAÇÕES</p>
-                  <p className="text-white text-xl font-bold">
+                    <Calendar className="h-6 w-6 text-[#3D583F]" />
+                  </div>
+                  <p className="text-[#3D583F] text-xs font-medium mb-1">TRANSAÇÕES</p>
+                  <p className="text-[#3D583F] text-xl font-bold">
                     {transactions.length}
                   </p>
                 </div>
@@ -1333,7 +1331,7 @@ export default function FinancePage() {
             <div className="grid grid-cols-2 gap-3">
               <Button 
                 onClick={() => setTransactionDialog(true)}
-                className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white py-4 rounded-xl font-semibold shadow-lg"
+        className="bg-[#3D583F] hover:bg-[#365137] text-white py-4 rounded-xl font-semibold shadow-lg"
               >
                 <Plus className="h-5 w-5 mr-2" />
                 Nova Transação
@@ -1353,20 +1351,20 @@ export default function FinancePage() {
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-[#3D583F] rounded-lg flex items-center justify-center text-white">
                       <Receipt className="h-4 w-4 text-white" />
                     </div>
-                    Transações Recentes
+                    Transações
                   </CardTitle>
                   {currentDrawer && (
                     <Button 
                       onClick={() => openDrawerDetails(currentDrawer)}
                       variant="outline"
                       size="sm"
-                      className="border-2 border-[#236F5D] text-[#236F5D] hover:bg-[#236F5D] hover:text-white font-semibold"
+                        className="border-2 border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F] hover:text-white font-semibold"
                     >
                       <Eye className="h-4 w-4 mr-2" />
-                      Ver Detalhes
+                        Detalhes
                     </Button>
                   )}
                 </div>
@@ -1397,7 +1395,7 @@ export default function FinancePage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                transaction.type === 'income' ? 'bg-green-100' :
+                transaction.type === 'income' ? 'bg-[#3D583F]/10' :
                                 transaction.type === 'expense' ? 'bg-red-100' : 'bg-orange-100'
                               }`}>
                                 {getTransactionIcon(transaction.type)}
@@ -1432,7 +1430,7 @@ export default function FinancePage() {
                               <Badge 
                                 variant="outline" 
                                 className={`text-xs font-medium ${
-                                  transaction.type === 'income' ? 'border-green-200 text-green-700 bg-green-50' :
+                  transaction.type === 'income' ? 'border-[#3D583F]/30 text-[#3D583F] bg-[#3D583F]/10' :
                                   transaction.type === 'expense' ? 'border-red-200 text-red-700 bg-red-50' :
                                   'border-orange-200 text-orange-700 bg-orange-50'
                                 }`}
@@ -1481,7 +1479,7 @@ export default function FinancePage() {
                               <div className="border-t pt-2">
                                 <div className="flex justify-between items-center font-semibold text-sm">
                                   <span>Total:</span>
-                                  <span className="text-green-600">
+                  <span className="text-[#3D583F]">
                                     {formatCurrency(commandDetails.total)}
                                   </span>
                                 </div>
@@ -1503,7 +1501,7 @@ export default function FinancePage() {
       <Dialog open={openDrawerDialog} onOpenChange={setOpenDrawerDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="text-center pb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-[#3D583F] rounded-full flex items-center justify-center mx-auto mb-4">
               <LockOpen className="h-8 w-8 text-white" />
             </div>
             <DialogTitle className="text-xl font-bold text-gray-900">Abrir Gaveta de Caixa</DialogTitle>
@@ -1535,7 +1533,7 @@ export default function FinancePage() {
               <Button 
                 onClick={openCashDrawer}
                 disabled={loading || !openValue}
-                className="py-3 rounded-xl font-semibold bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white shadow-lg"
+        className="py-3 rounded-xl font-semibold bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -1558,14 +1556,14 @@ export default function FinancePage() {
       <Dialog open={closeDrawerDialog} onOpenChange={setCloseDrawerDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="text-center pb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="h-8 w-8 text-white" />
             </div>
             <DialogTitle className="text-xl font-bold text-gray-900">Fechar Gaveta de Caixa</DialogTitle>
             <p className="text-sm text-gray-600 mt-2">Confirme o valor final para encerrar o controle</p>
           </DialogHeader>
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] p-4 rounded-xl text-white">
+    <div className="bg-[#3D583F]/10 p-4 rounded-xl text-[#3D583F] border border-[#3D583F]/30">
               <div className="flex items-center gap-2 mb-2">
                 <Wallet className="h-5 w-5" />
                 <span className="text-white/80 text-sm font-medium">Saldo Calculado</span>
@@ -1599,7 +1597,7 @@ export default function FinancePage() {
               <Button 
                 onClick={closeCashDrawer}
                 disabled={loading || !closeValue}
-                className="py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg"
+        className="py-3 rounded-xl font-semibold bg-red-600 hover:bg-red-700 text-white shadow-lg"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -1622,7 +1620,7 @@ export default function FinancePage() {
       <Dialog open={transactionDialog} onOpenChange={setTransactionDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="text-center pb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-[#3D583F] rounded-full flex items-center justify-center mx-auto mb-4">
               <Plus className="h-8 w-8 text-white" />
             </div>
             <DialogTitle className="text-xl font-bold text-gray-900">Nova Transação</DialogTitle>
@@ -1637,7 +1635,7 @@ export default function FinancePage() {
                   className={`p-3 rounded-xl border-2 transition-all ${
                     transactionForm.type === type
                       ? type === 'entrada' 
-                        ? 'border-green-500 bg-green-50 text-green-700'
+          ? 'border-[#3D583F] bg-[#3D583F]/10 text-[#3D583F]'
                         : type === 'saida'
                         ? 'border-red-500 bg-red-50 text-red-700'
                         : 'border-orange-500 bg-orange-50 text-orange-700'
@@ -1720,7 +1718,7 @@ export default function FinancePage() {
               <Button 
                 onClick={createTransaction}
                 disabled={loading || !transactionForm.category || !transactionForm.amount}
-                className="py-3 rounded-xl font-semibold bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white shadow-lg disabled:opacity-50"
+        className="py-3 rounded-xl font-semibold bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg disabled:opacity-50"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -1745,16 +1743,10 @@ export default function FinancePage() {
           <DialogHeader className="border-b pb-4 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
-                  <Eye className="h-5 w-5 text-white" />
-                </div>
                 <div>
                   <DialogTitle className="text-xl font-bold text-gray-900">
                     Gaveta de {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleDateString('pt-BR') : ''} às {selectedDrawerForDetails?.date_open ? new Date(selectedDrawerForDetails.date_open).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                   </DialogTitle>
-                  <p className="text-sm text-gray-600">
-                    Visualização completa de todas as transações e pagamentos da gaveta.
-                  </p>
                 </div>
               </div>
               <Button
@@ -1776,7 +1768,7 @@ export default function FinancePage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Status:</span>
-                    <Badge className={selectedDrawerForDetails?.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+            <Badge className={selectedDrawerForDetails?.status === 'open' ? 'bg-[#3D583F]/10 text-[#3D583F]' : 'bg-gray-100 text-gray-700'}>
                       {selectedDrawerForDetails?.status === 'open' ? 'Aberta' : 'Fechada'}
                     </Badge>
                   </div>
@@ -1798,7 +1790,7 @@ export default function FinancePage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Valor inicial:</span>
-                    <span className="font-medium text-green-600">
+            <span className="font-medium text-[#3D583F]">
                       R$ {parseFloat(selectedDrawerForDetails?.value_inicial || '0').toFixed(2).replace('.', ',')}
                     </span>
                   </div>
@@ -1825,7 +1817,7 @@ export default function FinancePage() {
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-2 rounded-full ${
-                        transaction.type === 'income' ? 'bg-green-500' : 
+              transaction.type === 'income' ? 'bg-[#3D583F]' : 
                         transaction.type === 'expense' ? 'bg-red-500' : 'bg-orange-500'
                       }`}></div>
                       <div>
@@ -1836,7 +1828,7 @@ export default function FinancePage() {
                       </div>
                     </div>
                     <span className={`font-bold text-sm ${
-                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+            transaction.type === 'income' ? 'text-[#3D583F]' : 'text-red-600'
                     }`}>
                       {transaction.type === 'income' ? '+' : '-'}R$ {Math.abs(parseFloat(transaction.amount)).toFixed(2).replace('.', ',')}
                     </span>
@@ -1911,7 +1903,7 @@ export default function FinancePage() {
                           {new Date(payment.paid_at).toLocaleDateString('pt-BR')} às {new Date(payment.paid_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                      <span className="font-bold text-green-600">
+          <span className="font-bold text-[#3D583F]">
                         R$ {parseFloat(payment.total_amount).toFixed(2).replace('.', ',')}
                       </span>
                     </div>

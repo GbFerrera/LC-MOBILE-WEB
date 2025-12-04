@@ -265,7 +265,7 @@ export default function Remuneration() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
+          <div className="w-12 h-12 border-4 border-[#3D583F]/30 border-t-[#3D583F] rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600">Carregando remunerações...</p>
         </div>
       </div>
@@ -273,21 +273,20 @@ export default function Remuneration() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
+      <header className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-white/80 hover:text-white transition-colors">
+            <Link href="/" className="p-2 rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10">
               <ChevronLeftIcon className="h-7 w-7" />
             </Link>
-            <h1 className="font-bold text-2xl tracking-wide">Remunerações</h1>
+            <h1 className="font-bold text-2xl tracking-wide text-gray-900">Remunerações</h1>
             <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 bg-transparent"
+                  className="bg-[#3D583F] hover:bg-[#365137] text-white"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Nova
@@ -298,8 +297,8 @@ export default function Remuneration() {
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-emerald-600" />
+                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-[#3D583F]" />
                     </div>
                     Nova Remuneração
                   </DialogTitle>
@@ -377,41 +376,41 @@ export default function Remuneration() {
                   </div>
                 </div>
 
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowCreateModal(false)}
-                    disabled={isSubmitting}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleCreateRemuneration}
-                    disabled={isSubmitting || !formData.professional_id || !formData.value}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                        Criando...
-                      </>
-                    ) : (
-                      <>
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Criar Remuneração
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreateRemuneration}
+                  disabled={isSubmitting || !formData.professional_id || !formData.value}
+                  className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Criar Remuneração
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* Main Content */}
-      <div className="bg-gray-50 min-h-screen">
+      <div className=" min-h-screen">
         <div className="max-w-6xl mx-auto px-4 py-6">
           {/* Cards de Estatísticas */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -485,7 +484,7 @@ export default function Remuneration() {
                 placeholder="Buscar por profissional..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white border-gray-200 focus:border-emerald-500 focus:ring-emerald-500"
+                className="pl-10 bg-white border-gray-200 focus:border-[#3D583F] focus:ring-[#3D583F]"
               />
             </div>
           </div>
@@ -524,7 +523,7 @@ export default function Remuneration() {
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <div className="flex items-center gap-1 text-emerald-600">
+                          <div className="flex items-center gap-1 text-[#3D583F]">
                             <Banknote className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span className="font-bold text-sm sm:text-lg whitespace-nowrap">{formatCurrency(remuneration.value)}</span>
                           </div>
@@ -556,7 +555,7 @@ export default function Remuneration() {
                           <Button
                             onClick={() => handleMarkAsPaid(remuneration.id)}
                             size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="bg-[#3D583F] hover:bg-[#365137] text-white"
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Confirmar
@@ -586,8 +585,8 @@ export default function Remuneration() {
                           <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-                                <div className="p-2 bg-emerald-100 rounded-lg">
-                                  <Edit className="h-5 w-5 text-emerald-600" />
+                                <div className="p-2 bg-[#3D583F]/10 rounded-lg">
+                                  <Edit className="h-5 w-5 text-[#3D583F]" />
                                 </div>
                                 Editar Remuneração
                               </DialogTitle>
@@ -704,7 +703,7 @@ export default function Remuneration() {
                               <Button
                                 onClick={handleEditRemuneration}
                                 disabled={isSubmitting}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                className="bg-[#3D583F] hover:bg-[#365137] text-white"
                               >
                                 {isSubmitting ? (
                                   <>

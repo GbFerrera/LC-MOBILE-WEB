@@ -170,24 +170,23 @@ export default function CommissionsPage() {
     return (
       <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
-        <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
-          <div className="max-w-6xl mx-auto px-4 py-6">
+        <header className="bg-white border-b">
+          <div className="max-w-6xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                   onClick={() => router.push('/')}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
-                    <HandCoins className="h-6 w-6" />
+                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2 text-gray-900">
                     Comissões
                   </h1>
-                  <p className="text-emerald-100 text-sm mt-1">
+                  <p className="text-[#3D583F] text-sm mt-1">
                     {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                   </p>
                 </div>
@@ -219,35 +218,35 @@ export default function CommissionsPage() {
     const isNoCommissionError = error.includes('ainda não possui comissões');
     
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      <div className="min-h-screen">
         {/* Header */}
-        <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
-          <div className="max-w-6xl mx-auto px-4 py-6">
+        <header className="bg-white border-b">
+          <div className="max-w-6xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                   onClick={() => router.push('/')}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
+                  <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2 text-gray-900">
                     <HandCoins className="h-6 w-6" />
                     Comissões
                   </h1>
-                  <p className="text-emerald-100 text-sm mt-1">
+                  <p className="text-[#3D583F] text-sm mt-1">
                     {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                  className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                   onClick={fetchCommissions}
                   disabled={isLoading}
                 >
@@ -261,7 +260,7 @@ export default function CommissionsPage() {
         <div className="px-4 py-6">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 bg-[#3D583F] rounded-full flex items-center justify-center mx-auto mb-6">
                 {isNoCommissionError ? (
                   <Settings className="h-10 w-10 text-white" />
                 ) : (
@@ -294,35 +293,34 @@ export default function CommissionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
-      <header className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] text-white shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+      <header className="bg-white border-b">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 onClick={() => router.push('/')}
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
-                  <HandCoins className="h-6 w-6" />
+                <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2 text-gray-900">
                   Comissões
                 </h1>
-                <p className="text-emerald-100 text-sm mt-1">
-                  {canViewAllCommissions ? 'Acompanhe os ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
+                <p className="text-[#3D583F] text-sm mt-1">
+                  {canViewAllCommissions ? 'Ganhos e comissões da equipe' : 'Acompanhe seus ganhos e comissões'}
                 </p>
               </div>
             </div>
             <div className="flex gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 onClick={fetchCommissions}
                 disabled={isLoading}
               >
@@ -339,7 +337,7 @@ export default function CommissionsPage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-[#3D583F] rounded-lg flex items-center justify-center">
                   <Users className="h-4 w-4 text-white" />
                 </div>
                 Selecionar Profissional
@@ -352,7 +350,7 @@ export default function CommissionsPage() {
                   <select
                     value={selectedProfessionalId || ''}
                     onChange={(e) => setSelectedProfessionalId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#3D583F] focus:ring-1 focus:ring-[#3D583F]"
                   >
                     <option value="">Selecione um profissional...</option>
                     {teamMembers.map((member) => (
@@ -382,7 +380,7 @@ export default function CommissionsPage() {
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-lg">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-[#3D583F] rounded-lg flex items-center justify-center">
                 <Calendar className="h-4 w-4 text-white" />
               </div>
               Filtros de Período
@@ -396,7 +394,7 @@ export default function CommissionsPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#3D583F] focus:ring-1 focus:ring-[#3D583F]"
                 />
               </div>
               <div className="flex-1">
@@ -405,7 +403,7 @@ export default function CommissionsPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#236F5D] focus:ring-1 focus:ring-[#236F5D]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#3D583F] focus:ring-1 focus:ring-[#3D583F]"
                 />
               </div>
               {(startDate || endDate) && (
@@ -449,13 +447,13 @@ export default function CommissionsPage() {
 
         {/* Ganhos do Período */}
         {earningsReport && (
-          <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-2xl p-6 text-white shadow-xl">
+          <div className="rounded-2xl p-6 bg-white border border-[#3D583F]/20 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-[#3D583F]/10 text-[#3D583F] rounded-lg flex items-center justify-center">
                   <DollarSign className="h-5 w-5" />
                 </div>
-                <span className="text-white/80 text-sm font-medium">
+                <span className="text-[#3D583F] text-sm font-medium">
                   {canViewAllCommissions && selectedProfessionalId 
                     ? `Ganhos de ${earningsReport.professional?.name || 'Profissional'} no Período` 
                     : 'Seus Ganhos no Período'
@@ -463,15 +461,15 @@ export default function CommissionsPage() {
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-white/60 text-xs">Ativo</span>
+                <div className="w-2 h-2 bg-[#3D583F] rounded-full animate-pulse"></div>
+                <span className="text-gray-500 text-xs">Ativo</span>
               </div>
             </div>
             <div className="mb-6">
-              <p className="text-3xl font-bold mb-1 break-words">
+              <p className="text-3xl font-bold mb-1 break-words text-[#3D583F]">
                 R$ {(earningsReport.summary?.total_commission || 0).toFixed(2).replace('.', ',')}
               </p>
-              <p className="text-white/70 text-sm">
+              <p className="text-gray-600 text-sm">
                 Total de comissões no período selecionado
               </p>
             </div>
@@ -479,12 +477,12 @@ export default function CommissionsPage() {
             {/* Mini Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <p className="text-white/60 text-xs mb-1">Agendamentos</p>
-                <p className="text-white font-bold text-sm">{earningsReport.summary?.total_appointments || 0}</p>
+                <p className="text-gray-500 text-xs mb-1">Agendamentos</p>
+                <p className="text-[#3D583F] font-bold text-sm">{earningsReport.summary?.total_appointments || 0}</p>
               </div>
               <div className="text-center">
-                <p className="text-white/60 text-xs mb-1">Serviços</p>
-                <p className="text-white font-bold text-sm">{earningsReport.summary?.total_services || 0}</p>
+                <p className="text-gray-500 text-xs mb-1">Serviços</p>
+                <p className="text-[#3D583F] font-bold text-sm">{earningsReport.summary?.total_services || 0}</p>
               </div>
               <div className="text-center">
                 <p className="text-white/60 text-xs mb-1">Faturamento</p>
@@ -498,54 +496,32 @@ export default function CommissionsPage() {
           </div>
         )}
 
-        {/* Cards de Estatísticas Detalhadas */}
+        {/* Resumo de Estatísticas */}
         {earningsReport && earningsReport.services && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <Card className="border-0 shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-br from-green-500 to-green-600 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-white" />
-                  </div>
-                  <Settings className="h-6 w-6 text-white/70" />
+          <Card className="border border-[#3D583F]/20 shadow-md">
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-[#3D583F] text-white rounded-lg flex items-center justify-center">
+                  <HandCoins className="h-4 w-4" />
                 </div>
-                <p className="text-white/80 text-xs font-medium mb-1">TOTAL</p>
-                <p className="text-white text-xl font-bold">
-                  {earningsReport.services.length}
-                </p>
+                <span className="text-[#3D583F] font-medium">Resumo de Comissões</span>
               </div>
-            </Card>
-            
-            <Card className="border-0 shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-white" />
-                  </div>
-                  <Settings className="h-6 w-6 text-white/70" />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-lg font-semibold text-[#3D583F]">{earningsReport.services.length}</p>
                 </div>
-                <p className="text-white/80 text-xs font-medium mb-1">GERAIS</p>
-                <p className="text-white text-xl font-bold">
-                  {earningsReport.services.filter(s => s.commission_config?.scope === 'general').length}
-                </p>
-              </div>
-            </Card>
-            
-            <Card className="border-0 shadow-lg overflow-hidden sm:col-span-2 md:col-span-1">
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <Wallet className="h-5 w-5 text-white" />
-                  </div>
-                  <Settings className="h-6 w-6 text-white/70" />
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Gerais</p>
+                  <p className="text-lg font-semibold text-[#3D583F]">{earningsReport.services.filter(s => s.commission_config?.scope === 'general').length}</p>
                 </div>
-                <p className="text-white/80 text-xs font-medium mb-1">ESPECÍFICAS</p>
-                <p className="text-white text-xl font-bold">
-                  {earningsReport.services.filter(s => s.commission_config?.scope === 'specific').length}
-                </p>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Específicas</p>
+                  <p className="text-lg font-semibold text-[#3D583F]">{earningsReport.services.filter(s => s.commission_config?.scope === 'specific').length}</p>
+                </div>
               </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
         )}
 
         {/* Lista de Comissões */}
@@ -553,7 +529,7 @@ export default function CommissionsPage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-[#3D583F] rounded-lg flex items-center justify-center">
                   <HandCoins className="h-4 w-4 text-white" />
                 </div>
                 {canViewAllCommissions && selectedProfessionalId 
@@ -582,7 +558,7 @@ export default function CommissionsPage() {
                     <div key={`${service.service_id}-${index}`} className={`p-4 hover:bg-gray-50 transition-colors ${index !== earningsReport.services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] flex items-center justify-center flex-shrink-0">
+                          <div className="w-12 h-12 rounded-xl bg-[#3D583F] flex items-center justify-center flex-shrink-0">
                             <HandCoins className="h-6 w-6 text-white" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -594,18 +570,14 @@ export default function CommissionsPage() {
                               <span className="hidden sm:inline">•</span>
                               <span>Qtd: {service.total_quantity}</span>
                               <span className="hidden sm:inline">•</span>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                service.commission_config?.scope === 'general' 
-                                  ? 'bg-blue-100 text-blue-700' 
-                                  : 'bg-purple-100 text-purple-700'
-                              }`}>
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-[#3D583F]/10 text-[#3D583F]">
                                 {service.commission_config?.scope === 'general' ? 'Geral' : 'Específica'}
                               </span>
                             </div>
                           </div>
                         </div>
                         <div className="text-left md:text-right flex-shrink-0">
-                          <p className="font-bold text-lg text-[#236F5D] mb-1">
+                          <p className="font-bold text-lg text-[#3D583F] mb-1">
                             {service.commission_config?.type === 'percentage' 
                               ? `${service.commission_config.value}%` 
                               : `R$ ${parseFloat(service.commission_config?.value || '0').toFixed(2).replace('.', ',')}`
@@ -613,7 +585,7 @@ export default function CommissionsPage() {
                           </p>
                           <div className="text-sm text-gray-600">
                             <div>Faturado: R$ {service.total_value.toFixed(2).replace('.', ',')}</div>
-                            <div className="font-semibold text-green-600">Comissão: R$ {service.total_commission.toFixed(2).replace('.', ',')}</div>
+                            <div className="font-semibold text-[#3D583F]">Comissão: R$ {service.total_commission.toFixed(2).replace('.', ',')}</div>
                           </div>
                         </div>
                       </div>

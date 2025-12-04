@@ -21,6 +21,7 @@ interface AuthContextData {
   signIn: (credentials: SignInCredentials) => Promise<void>;
   signOut: () => void;
   updateUser: (userData: Partial<User>) => void;
+  updateCompanyId: (companyId: number) => void;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -238,12 +239,29 @@ function AuthProvider({ children }: AuthProviderProps) {
     if (typeof window !== 'undefined') {
       localStorage.setItem("@linkCallendar:user", JSON.stringify(updatedUser));
     }
+
+    // Se houver mudança de company_id, atualizar interceptors
+    if (typeof userData.company_id === 'number') {
+      setupAPIInterceptors(userData.company_id);
+    }
+  };
+
+  const updateCompanyId = (companyId: number) => {
+    if (!data.user) return;
+    const updatedUser = { ...data.user, company_id: companyId };
+    setData({ ...data, user: updatedUser });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("@linkCallendar:user", JSON.stringify(updatedUser));
+    }
+    setupAPIInterceptors(companyId);
   };
 
   const signOut = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem("@linkCallendar:token");
       localStorage.removeItem("@linkCallendar:user");
+      localStorage.removeItem("@linkCallendar:navigation_context");
+      localStorage.removeItem("@linkCallendar:navigation_data");
     }
     setData({ user: null, token: null });
     // Removido o redirecionamento automático para a página de Login
@@ -290,6 +308,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     signIn,
     signOut,
     updateUser,
+    updateCompanyId,
     user: data.user,
     isAuthenticated: !!data.user,
     loading

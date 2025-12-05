@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
 import { 
   CalendarIcon, 
   CheckIcon,
@@ -192,11 +190,31 @@ export default function Home() {
   return (
     <div className="min-h-screen">
 
-      <header className="bg-gradient-to-tr from-white/10 via-[#3D583F]/80 to-[#3D583F] border-b">
+      <header className="relative bg-[#3D583F] border-b overflow-hidden min-h-[280px] sm:min-h-[540px] overflow-hidden">
+<Image
+  src="/favicon.png"
+  alt="BG"
+  fill
+  priority
+  sizes="100vw"
+  className="
+    absolute 
+    top-0 
+    left-0
+    object-left 
+    object-contain
+    opacity-10 
+    md:opacity-15 
+    pointer-events-none 
+    select-none 
+    origin-left 
+    scale-[2.8]
+  "
+/>
 
 
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/ajustes" className="cursor-pointer">

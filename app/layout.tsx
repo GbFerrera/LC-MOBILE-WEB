@@ -22,10 +22,10 @@ export const metadata: Metadata = {
   title: "Link Callendar - Barbeiro",
   description: "Aplicativo de agendamento para barbearias",
   manifest: "/manifest.json",
-  themeColor: "#000000",
+  themeColor: "#3D583F",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black",
     title: "LC Barbeiro",
   },
   icons: {
@@ -49,9 +49,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#3D583F" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <meta name="apple-mobile-web-app-title" content="LC Barbeiro" />
         <link rel="apple-touch-icon" href="/icon.png" />
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />

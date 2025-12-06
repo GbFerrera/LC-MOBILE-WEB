@@ -943,18 +943,46 @@ export default function AgendaPage() {
         },
       });
       
-      const formattedProfessionals = (response.data || []).map((professional: any) => ({
-        id: professional.id.toString(),
+      const rawProfessionals = (response.data || []).map((professional: any) => ({
+        id: professional.id,
         name: professional.name,
         position: professional.position,
         email: professional.email
       }));
-      
-      setProfessionals(formattedProfessionals);
+
+      const checks = await Promise.all(
+        rawProfessionals.map(async (p) => {
+          try {
+            const [scheduleRes, servicesRes] = await Promise.all([
+              api.get(`/schedules/${p.id}`, {
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                  company_id: user?.company_id?.toString() || "0",
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              }),
+              api.get(`/team-services/professional/${p.id}`, {
+                headers: { company_id: user?.company_id?.toString() || "0" },
+              }),
+            ]);
+
+            const hasSchedule = Array.isArray(scheduleRes.data?.schedules) && scheduleRes.data.schedules.length > 0;
+            const hasServices = Array.isArray(servicesRes.data) && servicesRes.data.length > 0;
+            return hasSchedule && hasServices ? { id: String(p.id), name: p.name } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const filteredProfessionals = checks.filter(Boolean) as { id: string; name: string }[];
+      setProfessionals(filteredProfessionals);
       
       // Se não há profissional selecionado, selecionar o usuário atual
-      if (!selectedProfessionalId && user?.id) {
-        setSelectedProfessionalId(user.id.toString());
+      if (!selectedProfessionalId) {
+        const fallback = filteredProfessionals.find((p) => p.id === String(user?.id)) || filteredProfessionals[0];
+        if (fallback) setSelectedProfessionalId(fallback.id);
       }
     } catch (error) {
       console.error('Erro ao buscar profissionais:', error);
@@ -1007,18 +1035,61 @@ export default function AgendaPage() {
         setAvailableSlots(slotsData.availableSlots);
         setLunchSlots(slotsData.lunchSlots);
         setScheduleData(slotsData.scheduleData);
+        // Se não há slots disponíveis neste profissional para o dia, tentar alternar automaticamente
+        if (!slotsData.availableSlots || slotsData.availableSlots.length === 0) {
+          await trySwitchToAvailableProfessional(formattedDate);
+        }
       } else {
-        // Se não houver horários, retornamos array vazio
-        setAvailableSlots([]);
-        setLunchSlots([]);
-        setScheduleData(null);
+        // Sem horários, tentar alternar automaticamente para outro profissional
+        const switched = await trySwitchToAvailableProfessional(formattedDate);
+        if (!switched) {
+          setAvailableSlots([]);
+          setLunchSlots([]);
+          setScheduleData(null);
+        }
       }
     } catch (err) {
       console.error("Erro ao buscar horários:", err);
-      setError(err instanceof Error ? err.message : "Erro ao buscar horários");
+      // Em erro 400/404 etc., tentar alternar automaticamente
+      const formattedDate = date.toISOString().split("T")[0];
+      const switched = await trySwitchToAvailableProfessional(formattedDate);
+      if (!switched) {
+        setError(err instanceof Error ? err.message : "Erro ao buscar horários");
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Tenta alternar para o primeiro profissional com disponibilidade no dia
+  const trySwitchToAvailableProfessional = async (formattedDate: string) => {
+    if (!professionals || professionals.length === 0) return false;
+    for (const p of professionals) {
+      // Evitar repetir o mesmo
+      if (String(p.id) === String(selectedProfessionalId)) continue;
+      try {
+        const res = await api.get(`/schedules/${p.id}/date/${formattedDate}`, {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user?.company_id?.toString() || "0",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const slotsData = generateTimeSlots(res.data, new Date(formattedDate));
+        if (slotsData.availableSlots && slotsData.availableSlots.length > 0) {
+          setSelectedProfessionalId(String(p.id));
+          setAvailableSlots(slotsData.availableSlots);
+          setLunchSlots(slotsData.lunchSlots);
+          setScheduleData(slotsData.scheduleData);
+          await fetchAppointments(String(p.id), new Date(formattedDate));
+          return true;
+        }
+      } catch {
+        // Ignorar e seguir para próximo
+      }
+    }
+    return false;
   };
 
   useEffect(() => {
@@ -1679,35 +1750,45 @@ export default function AgendaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+      <header className="bg-white border-b">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link
-              href="/"
-              className="text-white/80 hover:text-white transition-colors duration-200 p-2 rounded-lg hover:bg-white/10"
-            >
+            <Link href="/" className="text-[#3D583F] p-2 rounded hover:bg-[#3D583F]/10">
               <ChevronLeftIcon className="h-6 w-6" />
             </Link>
             <div className="text-center">
-              <h1 className="font-bold text-2xl tracking-wide">Agenda</h1>
-              <p className="text-emerald-100 text-sm mt-1">{formattedDate}</p>
+              <h1 className="font-semibold text-lg tracking-wide text-gray-900">Agenda</h1>
+              <p className="text-gray-600 text-sm mt-1">{formattedDate}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
-              onClick={async () => {
-                if (user?.id) {
-                  await fetchAppointments(user.id.toString(), date);
-        
-                }
-              }}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link href="/agenda/grade">
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-md border-[#3D583F]/30 bg-white hover:bg-[#3D583F]/5 hover:text-[#3D583F] px-3 text-xs font-medium shadow-sm"
+                >
+                  <svg className="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z" />
+                  </svg>
+                  Grade
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                onClick={async () => {
+                  if (user?.id) {
+                    await fetchAppointments(user.id.toString(), date);
+          
+                  }
+                }}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -1716,23 +1797,23 @@ export default function AgendaPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Date Selector Section */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-              <div className="flex justify-between bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
-                <h2 className="font-semibold text-white text-lg">
-                  Selecionar Data
+            <div className="bg-white rounded-xl shadow-sm border border-[#3D583F]/20 overflow-hidden">
+              <div className="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
+                <h2 className="font-semibold text-gray-800 text-base">
+                  Selecione a Data
                 </h2>
                 <Button
                   onClick={openIntervalDrawer}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white cursor-pointer hover:from-emerald-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="px-3 py-2 text-sm border border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 >
-                  Selecionar Intervalo
+                  Intervalo
                 </Button>
               </div>
-              <div className="p-6">
+              <div className="p-4">
                 {/* Custom Date Navigation */}
                 <div className="space-y-4">
                   {/* Horizontal Date Selector */}
-                  <div className="flex items-center justify-between bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200">
                     {/* Previous Day Button */}
                     <button
                       onClick={() => {
@@ -1740,10 +1821,10 @@ export default function AgendaPage() {
                         previousDay.setDate(date.getDate() - 1);
                         setDate(previousDay);
                       }}
-                      className="p-2 rounded-lg bg-white border border-gray-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                      className="p-2 rounded-md bg-white border border-gray-300 hover:border-[#3D583F]/40 hover:bg-[#3D583F]/10 transition"
                     >
                       <svg
-                        className="w-5 h-5 text-gray-600 hover:text-emerald-600"
+                        className="w-4 h-4 text-gray-600 hover:text-[#3D583F]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1759,23 +1840,8 @@ export default function AgendaPage() {
 
                     {/* Current Date Display */}
                     <div className="flex items-center space-x-3">
-                      <div className="bg-emerald-100 rounded-lg p-2">
-                        <svg
-                          className="w-5 h-5 text-emerald-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
                       <div className="text-center">
-                        <div className="font-bold text-lg text-gray-800">
+                        <div className="font-semibold text-base text-gray-800">
                           {date
                             .toLocaleDateString("pt-BR", {
                               day: "2-digit",
@@ -1784,7 +1850,7 @@ export default function AgendaPage() {
                             })
                             .replace(".", "")}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-xs text-gray-500">
                           {date.toLocaleDateString("pt-BR", {
                             weekday: "long",
                           })}
@@ -1799,10 +1865,10 @@ export default function AgendaPage() {
                         nextDay.setDate(date.getDate() + 1);
                         setDate(nextDay);
                       }}
-                      className="p-2 rounded-lg bg-white border border-gray-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                      className="p-2 rounded-md bg-white border border-gray-300 hover:border-[#3D583F]/40 hover:bg-[#3D583F]/10 transition"
                     >
                       <svg
-                        className="w-5 h-5 text-gray-600 hover:text-emerald-600"
+                        className="w-4 h-4 text-gray-600 hover:text-[#3D583F]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1817,31 +1883,10 @@ export default function AgendaPage() {
                     </button>
                   </div>
 
-                  {/* Today Button */}
-                  <button
-                    onClick={() => setDate(new Date())}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95"
-                  >
-                    <span className="flex items-center justify-center space-x-2">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>Hoje</span>
-                    </span>
-                  </button>
+                 
 
                   {/* Week Navigation */}
-                  <div className="grid grid-cols-7 gap-1 mt-6">
+                  <div className="grid grid-cols-7 gap-2 mt-4">
                     {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(
                       (day, index) => {
                         const currentWeekStart = new Date(date);
@@ -1860,16 +1905,16 @@ export default function AgendaPage() {
                           <button
                             key={index}
                             onClick={() => setDate(weekDay)}
-                            className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            className={`p-2 rounded-md text-sm transition ${
                               isSelected
-                                ? "bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg transform scale-105"
+                                ? "bg-[#3D583F] text-white"
                                 : isToday
-                                ? "bg-emerald-100 text-emerald-700 border-2 border-emerald-300"
-                                : "bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
+                                ? "bg-[#3D583F]/10 text-[#3D583F] border border-[#3D583F]/30"
+                                : "bg-gray-100 text-gray-700 hover:bg-[#3D583F]/10 hover:text-[#3D583F]"
                             }`}
                           >
-                            <div className="text-xs opacity-75 mb-1">{day}</div>
-                            <div className="font-bold">{weekDay.getDate()}</div>
+                            <div className="text-[11px] opacity-75">{day}</div>
+                            <div className="font-semibold">{weekDay.getDate()}</div>
                           </button>
                         );
                       }
@@ -1882,31 +1927,33 @@ export default function AgendaPage() {
 
           {/* Available Slots Section */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-xl border border-emerald-100/50 overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
-                <h2 className="font-semibold text-white text-lg">
-                  Horários Disponíveis
-                </h2>
-                <p className="text-emerald-100 text-sm mt-1">
-                  {availableSlots.length > 0
-                    ? `${availableSlots.length} horários disponíveis`
-                    : "Nenhum horário encontrado"}
-                </p>
+            <div className="bg-white rounded-xl shadow-sm border border-[#3D583F]/20 overflow-hidden">
+              <div className="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
+                <div>
+                  <h2 className="font-semibold text-gray-800 text-base">Horários Disponíveis</h2>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {availableSlots.length > 0
+                      ? `${availableSlots.length} horários`
+                      : "Nenhum horário encontrado"}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setDate(new Date())}
+                  variant="outline"
+                  className="px-3 py-2 text-sm border border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+                >
+                  Hoje
+                </Button>
               </div>
 
               {/* Seleção de Profissional */}
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Profissional
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Profissional</label>
                   <select
                     value={selectedProfessionalId}
                     onChange={(e) => setSelectedProfessionalId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-700 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3D583F] focus:border-[#3D583F] bg-white text-gray-700 text-sm"
                     disabled={loadingProfessionals}
                   >
                     {loadingProfessionals ? (
@@ -1924,62 +1971,22 @@ export default function AgendaPage() {
                 </div>
               </div>
 
-              <div className="p-6">
+              <div className="p-4">
                 {loading ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600 mb-4"></div>
-                    <p className="text-gray-600 font-medium">
-                      Carregando horários...
-                    </p>
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-3 border-[#3D583F]/30 border-t-[#3D583F] mb-3"></div>
+                    <p className="text-gray-600 text-sm">Carregando horários...</p>
                   </div>
                 ) : error ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="bg-red-100 rounded-full p-4 mb-4">
-                      <svg
-                        className="w-8 h-8 text-red-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-red-600 font-medium text-center">
-                      {error}
-                    </p>
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <p className="text-red-600 text-sm text-center">{error}</p>
                   </div>
                 ) : availableSlots.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="bg-gray-100 rounded-full p-4 mb-4">
-                      <svg
-                        className="w-8 h-8 text-gray-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-gray-600 font-medium text-center">
-                      Nenhum horário disponível para este dia
-                    </p>
-                    <p className="text-gray-500 text-sm mt-2 text-center">
-                      Selecione uma data diferente ou configure seus horários de
-                      trabalho
-                    </p>
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <p className="text-gray-600 text-sm text-center">Nenhum horário disponível para este dia</p>
                   </div>
                 ) : (
-                  <div ref={scrollContainerRef} className="space-y-3 max-h-[70vh] overflow-y-auto">
+                  <div ref={scrollContainerRef} className="space-y-2 max-h-[70vh] overflow-y-auto">
                     {/* Renderizar slots disponíveis, encaixes e horário de almoço */}
                     {(() => {
                       // Combinar slots disponíveis com slots de encaixe
@@ -2050,22 +2057,22 @@ export default function AgendaPage() {
                         <div
                           key={slot}
                           id={`slot-${slot.replace(':', '-')}`}
-                          className={`flex items-center justify-between w-full p-4 rounded-xl transition-all duration-200 ${
+                          className={`flex items-center justify-between w-full p-3 rounded-lg border transition ${
                             isLunch
-                              ? "bg-amber-50 border-2 border-dashed border-amber-400 text-amber-800 opacity-80"
-                              : isBooked && appointment && appointment.status !== 'canceled'
+                              ? "bg-amber-50 border-amber-300 text-amber-800"
+                            : isBooked && appointment && appointment.status !== 'canceled'
                               ? appointment.status === 'confirmed'
-                                ? "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
+                                ? "bg-[#3D583F]/10 border-[#3D583F]/30 text-gray-700"
                                 : appointment.status === 'pending'
-                                ? "bg-orange-200 border-2 border-orange-300 cursor-pointer hover:shadow-md text-gray-700"
-                                : appointment.status === 'completed'
-                                ? "bg-blue-200 border-2 border-blue-300 cursor-pointer hover:shadow-md text-gray-700"
-                                : "bg-green-200 border-2 border-green-300 cursor-pointer hover:shadow-md text-gray-700"
-                              : isFree
-                              ? "bg-gray-200 text-gray-700 border-2 border-dashed border-gray-400 cursor-pointer shadow-sm opacity-80 hover:opacity-100"
-                              : isEncaixe
-                              ? "bg-yellow-50 border-2 border-dashed border-yellow-300 cursor-pointer hover:shadow-md text-gray-700"
-                              : "bg-green-50 border-2 border-green-100 hover:border-green-200 cursor-pointer hover:shadow-md"
+                                  ? "bg-yellow-50 border-yellow-300 text-gray-700"
+                                  : appointment.status === 'completed'
+                                    ? "bg-[#3D583F]/10 border-[#3D583F]/30 text-gray-700"
+                                    : "bg-[#3D583F]/10 border-[#3D583F]/30 text-gray-700"
+                            : isFree
+                              ? "bg-gray-50 text-gray-700 border-gray-300"
+                            : isEncaixe
+                              ? "bg-yellow-50 border-yellow-300 text-gray-700"
+                              : "bg-white border-gray-200"
                           }`}
                           onClick={
                             isLunch
@@ -2108,26 +2115,26 @@ export default function AgendaPage() {
                             <div className={`p-2 rounded-full ${
                               isLunch
                                 ? "bg-amber-200"
-                                : isBooked && appointment && appointment.status !== 'canceled'
-                                ? "bg-white/60"
-                                : isFree
-                                ? "bg-gray-300"
-                                : isEncaixe
+                              : isBooked && appointment && appointment.status !== 'canceled'
+                                ? "bg-white"
+                              : isFree
+                                ? "bg-gray-200"
+                              : isEncaixe
                                 ? "bg-yellow-200"
                                 : "bg-green-100"
                             }`}>
                               {isLunch ? (
-                                <span className="text-lg">🍽️</span>
+                                <span className="text-base">🍽️</span>
                               ) : (
                                 <svg
-                                  className={`w-5 h-5 ${
+                                  className={`w-4 h-4 ${
                                     isBooked && appointment && appointment.status !== 'canceled'
-                                      ? "text-gray-600"
+                                      ? "text-[#3D583F]"
                                       : isFree
-                                      ? "text-gray-700"
+                                        ? "text-[#3D583F]"
                                       : isEncaixe
                                       ? "text-yellow-700"
-                                      : "text-green-600"
+                                      : "text-[#3D583F]"
                                   }`}
                                   fill="none"
                                   stroke="currentColor"
@@ -2143,16 +2150,16 @@ export default function AgendaPage() {
                               )}
                             </div>
                             <div>
-                              <div className={`font-bold text-lg ${
+                              <div className={`font-semibold text-base ${
                                 isLunch
                                   ? "text-amber-800"
                                   : isBooked && appointment && appointment.status !== 'canceled'
-                                  ? "text-gray-700"
+                                  ? "text-[#3D583F]"
                                   : isFree
-                                  ? "text-gray-700"
+                                  ? "text-[#3D583F]"
                                   : isEncaixe
                                   ? "text-yellow-800"
-                                  : "text-gray-700"
+                                  : "text-[#3D583F]"
                               }`}>
                                 {isLunch && lunchEndTime 
                                   ? `${slot} às ${lunchEndTime}` 
@@ -2165,16 +2172,16 @@ export default function AgendaPage() {
                                   : slot
                                 }
                               </div>
-                              <div className={`text-sm ${
+                              <div className={`text-xs ${
                                 isLunch
                                   ? "text-amber-700"
                                   : isBooked && appointment && appointment.status !== 'canceled'
-                                  ? "text-gray-600"
+                                  ? "text-[#3D583F]"
                                   : isFree
-                                  ? "text-gray-600"
+                                  ? "text-[#3D583F]"
                                   : isEncaixe
                                   ? "text-yellow-600"
-                                  : "text-green-600"
+                                  : "text-[#3D583F]"
                               }`}>
                                 {isLunch
                                   ? "Horário de Almoço"
@@ -2188,7 +2195,7 @@ export default function AgendaPage() {
                                 }
                               </div>
                               {isBooked && appointment && appointment.status !== 'canceled' && appointment.services?.[0] && (
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div className="text-[11px] text-gray-500 mt-1">
                                   {appointment.services.length > 1 
                                     ? `${appointment.services.length} serviços`
                                     : appointment.services[0].service_name || "Serviço"
@@ -2207,11 +2214,11 @@ export default function AgendaPage() {
                             ) : isBooked && appointment && appointment.status !== 'canceled' ? (
                               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                 appointment.status === 'confirmed'
-                                  ? "bg-green-600 text-white"
+                                  ? "bg-[#3D583F] text-white"
                                   : appointment.status === 'pending'
-                                  ? "bg-white text-gray-700 border border-gray-300"
+                                  ? "bg-white text-[#3D583F] border border-[#3D583F]/40"
                                   : appointment.status === 'completed'
-                                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                                  ? "bg-[#3D583F]/15 text-[#3D583F] border border-[#3D583F]/30"
                                   : "bg-gray-100 text-gray-700"
                               }`}>
                                 {getStatusText(appointment.status)}
@@ -2227,7 +2234,7 @@ export default function AgendaPage() {
                             ) : (
                               <div className="text-green-600">
                                 <svg
-                                  className="w-6 h-6"
+                                  className="w-5 h-5"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -2258,30 +2265,7 @@ export default function AgendaPage() {
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmitAppointment}>
             <DialogHeader className="text-center pb-6">
-              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                isFreeIntervalMode 
-                  ? "bg-gradient-to-br from-emerald-100 to-teal-100" 
-                  : "bg-gradient-to-br from-emerald-100 to-teal-100"
-              }`}>
-                <svg
-                  className={`w-8 h-8 ${
-                    isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d={isFreeIntervalMode 
-                      ? "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      : "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    }
-                  />
-                </svg>
-              </div>
+            
               
               {/* Toggle Switch Minimalista */}
               <div className="flex items-center justify-center mb-4">
@@ -2314,7 +2298,7 @@ export default function AgendaPage() {
               {/* Switch para Cliente Regular - apenas para agendamento normal */}
               {!isFreeIntervalMode && (
                 <div className="flex items-center justify-center mb-4">
-                  <div className="flex items-center space-x-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex items-center space-x-3 bg-[#3D583F]/10 rounded-lg p-3 border border-[#3D583F]/30">
                     <input
                       type="checkbox"
                       id="regular-client-switch"
@@ -2332,9 +2316,9 @@ export default function AgendaPage() {
                           });
                         }
                       }}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-[#3D583F] bg-gray-100 border-gray-300 rounded focus:ring-[#3D583F]"
                     />
-                    <label htmlFor="regular-client-switch" className="text-sm font-medium text-blue-700">
+                    <label htmlFor="regular-client-switch" className="text-sm font-medium text-[#3D583F]">
                       Cliente Regular
                     </label>
                   </div>
@@ -2343,9 +2327,9 @@ export default function AgendaPage() {
 
               {/* Mostrar configuração quando cliente regular ativado e configurado */}
               {!isFreeIntervalMode && isRegularClient && regularClientConfig.dayOfWeek && regularClientConfig.time && regularClientConfig.startDate && regularClientConfig.endDate && (
-                <div className="mb-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <div className="text-sm text-blue-700 font-medium mb-1">Configuração:</div>
-                  <div className="text-xs text-blue-600 space-y-1">
+                <div className="mb-4 bg-[#3D583F]/10 p-3 rounded-lg border border-[#3D583F]/30">
+                  <div className="text-sm text-[#3D583F] font-medium mb-1">Configuração:</div>
+                  <div className="text-xs text-[#3D583F] space-y-1">
                     <div>📅 {
                       regularClientConfig.dayOfWeek === 'Monday' ? 'Segunda-feira' :
                       regularClientConfig.dayOfWeek === 'Tuesday' ? 'Terça-feira' :
@@ -2359,7 +2343,7 @@ export default function AgendaPage() {
                     <button 
                       type="button"
                       onClick={() => setIsRegularClientDialogOpen(true)}
-                      className="mt-2 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                      className="mt-2 px-2 py-1 bg-[#3D583F]/10 hover:bg-[#3D583F]/20 text-[#3D583F] text-xs rounded transition-colors"
                     >
                       Alterar Configuração
                     </button>
@@ -2367,9 +2351,7 @@ export default function AgendaPage() {
                 </div>
               )}
 
-              <DialogTitle className={`text-2xl font-bold ${
-                isFreeIntervalMode ? "text-emerald-800" : "text-gray-800"
-              }`}>
+              <DialogTitle className="text-2xl font-bold text-[#3D583F]">
                 <div className="flex items-center justify-center gap-2">
                   {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
                   {isEncaixe && !isFreeIntervalMode && (
@@ -2379,12 +2361,12 @@ export default function AgendaPage() {
                   )}
                 </div>
               </DialogTitle>
-              <DialogDescription className="text-gray-600 mt-2">
+              <DialogDescription className="text-[#3D583F] mt-2">
                 {isFreeIntervalMode 
                   ? (
                     <>
                       Criar um intervalo livre para{" "}
-                      <span className="font-semibold text-emerald-600">
+                      <span className="font-semibold text-[#3D583F]">
                         {selectedSlot}
                       </span>
                     </>
@@ -2398,7 +2380,7 @@ export default function AgendaPage() {
                   ) : (
                     <>
                       Preencha os dados para criar um novo agendamento para{" "}
-                      <span className="font-semibold text-emerald-600">
+                      <span className="font-semibold text-[#3D583F]">
                         {selectedSlot}
                       </span>
                     </>
@@ -2409,20 +2391,12 @@ export default function AgendaPage() {
 
             <div className="space-y-6 py-6">
               {/* Data e Horário - Destacado */}
-              <div className={`rounded-xl p-4 border-2 ${
-                isFreeIntervalMode 
-                  ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200" 
-                  : "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200"
-              }`}>
+              <div className="rounded-xl p-4 border-2 bg-[#3D583F]/5 border-[#3D583F]/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`rounded-lg p-2 ${
-                      isFreeIntervalMode ? "bg-emerald-100" : "bg-emerald-100"
-                    }`}>
+                    <div className="rounded-lg p-2 bg-[#3D583F]/10">
                       <svg
-                        className={`w-5 h-5 ${
-                          isFreeIntervalMode ? "text-emerald-600" : "text-emerald-600"
-                        }`}
+                        className="w-5 h-5 text-[#3D583F]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -2436,13 +2410,11 @@ export default function AgendaPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className={`font-semibold ${
-                        isFreeIntervalMode ? "text-emerald-800" : "text-emerald-800"
-                      }`}>
+                      <p className="font-semibold text-[#3D583F]">
                         Data e Horário
                       </p>
                       <p className={`${
-                        isFreeIntervalMode ? "text-emerald-700" : isEncaixe ? "text-yellow-700" : "text-emerald-700"
+                        isFreeIntervalMode ? "text-[#3D583F]" : isEncaixe ? "text-yellow-700" : "text-[#3D583F]"
                       }`}>
                         {date.toLocaleDateString("pt-BR")} às {selectedSlot}
                         {isFreeIntervalMode && selectedEndTime && ` - ${selectedEndTime}`}
@@ -2456,9 +2428,9 @@ export default function AgendaPage() {
               {/* Horário Final - Apenas para Intervalo Livre */}
               {isFreeIntervalMode && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-emerald-700 flex items-center">
+                  <Label className="text-sm font-semibold text-[#3D583F] flex items-center">
                     <svg
-                      className="w-4 h-4 mr-2 text-emerald-500"
+                      className="w-4 h-4 mr-2 text-[#3D583F]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -2476,7 +2448,7 @@ export default function AgendaPage() {
                     value={selectedEndTime}
                     onValueChange={setSelectedEndTime}
                   >
-                    <SelectTrigger className="h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-lg">
+                    <SelectTrigger className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg">
                       <SelectValue placeholder="Selecione o horário final" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2487,7 +2459,7 @@ export default function AgendaPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-emerald-600">
+                  <p className="text-xs text-[#3D583F]">
                     Horários disponíveis em intervalos de 15 minutos
                   </p>
                 </div>
@@ -2516,10 +2488,10 @@ export default function AgendaPage() {
                   Cliente *
                 </Label>
                 <div className="relative">
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Search size={18} />
-                    </div>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3D583F]">
+                        <Search size={18} />
+                      </div>
                     <Input
                       id="client_search"
                       name="client_id"
@@ -2800,11 +2772,7 @@ export default function AgendaPage() {
                   isSubmitting || 
                   (isRegularClient && (!regularClientConfig.dayOfWeek || !regularClientConfig.time || !regularClientConfig.startDate || !regularClientConfig.endDate))
                 }
-                className={`px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isFreeIntervalMode
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                    : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                }`}
+                className="px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-[#3D583F] hover:bg-[#365137]"
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
@@ -2880,7 +2848,7 @@ export default function AgendaPage() {
                   setRegularClientConfig(prev => ({ ...prev, dayOfWeek: value }))
                 }
               >
-                <SelectTrigger className="h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                  <SelectTrigger className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg">
                   <SelectValue placeholder="Selecione o dia da semana" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2909,7 +2877,7 @@ export default function AgendaPage() {
                     }));
                   }}
                 >
-                  <SelectTrigger className="flex-1 h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                  <SelectTrigger className="flex-1 h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg">
                     <SelectValue placeholder="Hora" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2930,7 +2898,7 @@ export default function AgendaPage() {
                     }));
                   }}
                 >
-                  <SelectTrigger className="flex-1 h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg">
+                  <SelectTrigger className="flex-1 h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg">
                     <SelectValue placeholder="Min" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2953,7 +2921,7 @@ export default function AgendaPage() {
                   setRegularClientConfig(prev => ({ ...prev, startDate: e.target.value }))
                 }
                 min={new Date().toISOString().split('T')[0]}
-                className="h-12 border-2 border-blue-200 focus:border-blue-400 rounded-lg"
+                      className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg"
               />
             </div>
 
@@ -3006,7 +2974,7 @@ export default function AgendaPage() {
               }}
               disabled={!regularClientConfig.dayOfWeek || !regularClientConfig.time || 
                        !regularClientConfig.startDate || !regularClientConfig.endDate}
-              className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              className="flex-1 h-12 bg-[#3D583F] hover:bg-[#365137] text-white rounded-lg"
             >
               Confirmar
             </Button>
@@ -3289,7 +3257,7 @@ export default function AgendaPage() {
             )}
           </div>
 
-          <DrawerFooter className="pt-4 border-t border-gray-100 space-y-3">
+          <DrawerFooter className="pt-4 border-t border-[#3D583F]/20 space-y-3">
             {/* Botão WhatsApp - apenas para agendamentos normais */}
             {selectedAppointment?.status !== "free" && selectedAppointment?.client?.phone_number && (
               <Button
@@ -3297,7 +3265,7 @@ export default function AgendaPage() {
                   selectedAppointment.client.phone_number,
                   selectedAppointment.client.name || "Cliente"
                 )}
-                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
+                className="w-full py-3 bg-[#3D583F] hover:bg-[#365137] text-white font-semibold rounded-lg transition-all duration-200 shadow-sm"
               >
                 <span className="flex items-center justify-center space-x-2">
                   <svg
@@ -3355,7 +3323,7 @@ export default function AgendaPage() {
             <DrawerClose asChild>
               <Button
                 variant="outline"
-                className="w-full py-3 border-2 border-gray-300 hover:border-gray-400 rounded-lg transition-all duration-200"
+                className="w-full py-3 border-2 border-[#3D583F]/30 hover:border-[#3D583F]/50 text-[#3D583F] hover:text-[#365137] rounded-lg transition-all duration-200"
               >
                 <span className="flex items-center justify-center space-x-2">
                   <svg
@@ -3386,10 +3354,10 @@ export default function AgendaPage() {
       >
         <DrawerContent className="max-h-[90vh] bg-white">
           {/* Header Modernizado */}
-          <div className="text-center pb-6 pt-8 px-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200">
-            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-emerald-100 to-teal-100">
+          <div className="text-center pb-6 pt-8 px-6 bg-white border-b border-[#3D583F]/20">
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-[#3D583F]/10">
               <svg
-                className="w-8 h-8 text-emerald-600"
+                className="w-8 h-8 text-[#3D583F]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -3402,8 +3370,8 @@ export default function AgendaPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-emerald-800">Intervalo Livre</h2>
-            <p className="text-emerald-700 mt-2">Crie um intervalo livre em uma data específica</p>
+            <h2 className="text-2xl font-bold text-[#3D583F]">Intervalo Livre</h2>
+            <p className="text-[#3D583F] mt-2">Crie um intervalo livre em uma data específica</p>
           </div>
           
           <div className="flex-1 overflow-y-auto max-h-[70vh]">
@@ -3416,10 +3384,10 @@ export default function AgendaPage() {
                 <div className="md:col-span-2">
                   <Label
                     htmlFor="professional_id"
-                    className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center"
+                    className="text-sm font-semibold text-[#3D583F] mb-2 block flex items-center"
                   >
                     <svg
-                      className="w-4 h-4 mr-2 text-emerald-500"
+                      className="w-4 h-4 mr-2 text-[#3D583F]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3448,12 +3416,12 @@ export default function AgendaPage() {
 
                 {/* Data Destacada */}
                 <div className="md:col-span-2">
-                  <div className="rounded-xl p-4 border-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+                  <div className="rounded-xl p-4 border-2 bg-[#3D583F]/5 border-[#3D583F]/30">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="rounded-lg p-2 bg-emerald-100">
+                        <div className="rounded-lg p-2 bg-[#3D583F]/10">
                           <svg
-                            className="w-5 h-5 text-emerald-600"
+                            className="w-5 h-5 text-[#3D583F]"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -3467,7 +3435,7 @@ export default function AgendaPage() {
                           </svg>
                         </div>
                         <div className="flex-1">
-                          <p className="font-semibold text-emerald-800 mb-2">
+                          <p className="font-semibold text-[#3D583F] mb-2">
                             Data do Intervalo Livre
                           </p>
                           <Input
@@ -3480,7 +3448,7 @@ export default function AgendaPage() {
                                 e.target.value
                               )
                             }
-                            className="border-2 border-emerald-200 focus:border-emerald-400 rounded-lg bg-white shadow-sm"
+                            className="border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg bg-white shadow-sm"
                             required
                           />
                         </div>
@@ -3491,9 +3459,9 @@ export default function AgendaPage() {
 
                 {/* Start Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                  <Label className="text-sm font-semibold text-[#3D583F] mb-2 block flex items-center">
                     <svg
-                      className="w-4 h-4 mr-2 text-emerald-500"
+                      className="w-4 h-4 mr-2 text-[#3D583F]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3531,7 +3499,7 @@ export default function AgendaPage() {
                           );
                         }}
                       >
-                        <SelectTrigger className="w-20 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm">
+                        <SelectTrigger className="w-20 border-[#3D583F]/40 focus:border-[#3D583F] focus:ring-[#3D583F] transition-all duration-300 hover:border-[#3D583F]/60 bg-white shadow-sm">
                           <SelectValue placeholder="13" />
                         </SelectTrigger>
                         <SelectContent>
@@ -3554,7 +3522,7 @@ export default function AgendaPage() {
                         );
                       }}
                     >
-                      <SelectTrigger className="w-20 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm">
+                      <SelectTrigger className="w-20 border-[#3D583F]/40 focus:border-[#3D583F] focus:ring-[#3D583F] transition-all duration-300 hover:border-[#3D583F]/60 bg-white shadow-sm">
                         <SelectValue placeholder="00" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3569,9 +3537,9 @@ export default function AgendaPage() {
 
                 {/* End Time */}
                 <div>
-                  <Label className="text-sm font-semibold text-emerald-700 mb-2 block flex items-center">
+                  <Label className="text-sm font-semibold text-[#3D583F] mb-2 block flex items-center">
                     <svg
-                      className="w-4 h-4 mr-2 text-emerald-500"
+                      className="w-4 h-4 mr-2 text-[#3D583F]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3609,7 +3577,7 @@ export default function AgendaPage() {
                           );
                         }}
                       >
-                        <SelectTrigger className="w-20 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400 bg-white shadow-sm">
+                        <SelectTrigger className="w-20 border-[#3D583F]/40 focus:border-[#3D583F] focus:ring-[#3D583F] transition-all duration-300 hover:border-[#3D583F]/60 bg-white shadow-sm">
                           <SelectValue placeholder="17" />
                         </SelectTrigger>
                         <SelectContent>
@@ -3673,7 +3641,7 @@ export default function AgendaPage() {
                     onChange={(e) =>
                       handleIntervalFormChange("notes", e.target.value)
                     }
-                    className="min-h-[80px] border-2 rounded-lg resize-none border-emerald-200 focus:border-emerald-400"
+                  className="min-h-[80px] border-2 rounded-lg resize-none border-[#3D583F]/30 focus:border-[#3D583F]"
                   />
                 </div>
               </div>
@@ -3681,12 +3649,12 @@ export default function AgendaPage() {
           </div>
 
           {/* Action Buttons */}
-          <DrawerFooter className="pt-6 border-t border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-b-lg">
+          <DrawerFooter className="pt-6 border-t border-[#3D583F]/20 bg-[#3D583F]/5 rounded-b-lg">
             <div className="flex flex-col sm:flex-row gap-3 w-full">
               <Button
                 onClick={handleIntervalSubmit}
                 disabled={isLoadingButton}
-                className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                className="flex-1 bg-[#3D583F] hover:bg-[#365137] text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 <span className="flex items-center justify-center space-x-2">
                   <svg
@@ -3710,7 +3678,7 @@ export default function AgendaPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="flex-1 border-2 border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 bg-white hover:bg-gray-50 shadow-sm hover:shadow-md"
+                  className="flex-1 border-2 border-[#3D583F]/30 hover:border-[#3D583F]/50 text-[#3D583F] hover:text-[#365137] font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 bg-white hover:bg-[#3D583F]/5 shadow-sm hover:shadow-md"
                 >
                   <span className="flex items-center justify-center space-x-2">
                     <svg

@@ -487,13 +487,13 @@ export default function Metas() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen">
       {/* Header com Gradiente */}
-      <div className="bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] text-white px-4 pt-6 pb-8 shadow-xl">
+      <div className="bg-white border-b px-4 pt-6 pb-8">
         <div className="flex items-center justify-between mb-6">
           <button 
             onClick={() => router.push('/')}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -501,13 +501,13 @@ export default function Metas() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+              className="p-2 rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 disabled:opacity-50"
             >
               <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center gap-2 text-sm shadow-lg"
+              className="bg-[#3D583F] hover:bg-[#365137] text-white px-4 py-2 rounded-md font-semibold transition-all flex items-center gap-2 text-sm shadow"
             >
               <Plus className="h-4 w-4" />
               Nova Meta
@@ -516,34 +516,34 @@ export default function Metas() {
         </div>
         
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-            <Target className="h-6 w-6 text-white" />
+          <div className="w-12 h-12 bg-[#3D583F]/10 rounded-2xl flex items-center justify-center">
+            <Target className="h-6 w-6 text-[#3D583F]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Metas</h1>
-            <p className="text-white/80 text-sm">Acompanhe suas metas de vendas</p>
+            <h1 className="text-2xl font-bold text-gray-900">Metas</h1>
+            <p className="text-gray-600 text-sm">Acompanhe suas metas de vendas</p>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+          <div className="bg-white rounded-xl p-4 border border-[#3D583F]/20">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <Award className="h-4 w-4 text-white" />
+              <div className="w-8 h-8 bg-[#3D583F]/10 rounded-lg flex items-center justify-center">
+                <Award className="h-4 w-4 text-[#3D583F]" />
               </div>
-              <span className="text-white/70 text-xs font-medium">METAS ATIVAS</span>
+              <span className="text-[#3D583F] text-xs font-medium">METAS ATIVAS</span>
             </div>
-            <p className="text-2xl font-bold">{goals.length}</p>
+            <p className="text-2xl font-bold text-[#3D583F]">{goals.length}</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+          <div className="bg-white rounded-xl p-4 border border-[#3D583F]/20">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <Package className="h-4 w-4 text-white" />
+              <div className="w-8 h-8 bg-[#3D583F]/10 rounded-lg flex items-center justify-center">
+                <Package className="h-4 w-4 text-[#3D583F]" />
               </div>
-              <span className="text-white/70 text-xs font-medium">ITENS TOTAIS</span>
+              <span className="text-[#3D583F] text-xs font-medium">ITENS TOTAIS</span>
             </div>
-            <p className="text-2xl font-bold">{goals.reduce((total, goal) => total + goal.items_count, 0)}</p>
+            <p className="text-2xl font-bold text-[#3D583F]">{goals.reduce((total, goal) => total + goal.items_count, 0)}</p>
           </div>
         </div>
       </div>
@@ -553,14 +553,14 @@ export default function Metas() {
         {/* Goals List */}
         {goals.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 bg-[#3D583F] rounded-full flex items-center justify-center mx-auto mb-6">
               <Target className="h-10 w-10 text-white" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-3">Nenhuma meta encontrada</h3>
             <p className="text-gray-600 mb-6 max-w-sm mx-auto">Comece criando sua primeira meta de vendas para acompanhar o desempenho</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] hover:from-[#1e5d4f] hover:to-[#236F5D] text-white px-8 py-3 rounded-xl font-semibold shadow-lg transition-all flex items-center gap-2 mx-auto"
+              className="bg-[#3D583F] hover:bg-[#365137] text-white px-8 py-3 rounded-xl font-semibold shadow-lg transition-all flex items-center gap-2 mx-auto"
             >
               <Plus className="h-5 w-5" />
               Criar Primeira Meta
@@ -570,10 +570,10 @@ export default function Metas() {
           <div className="space-y-4">
             {goals.map((goal) => (
               <div key={goal.id} className="bg-white rounded-xl shadow-lg overflow-hidden border-0 hover:shadow-xl transition-shadow">
-                <div className="bg-gradient-to-br from-[#236F5D]/10 to-[#2d8a6b]/10 p-4">
+                <div className="bg-[#3D583F]/5 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-[#236F5D] to-[#2d8a6b] rounded-xl flex items-center justify-center shadow-lg">
+                      <div className="w-12 h-12 bg-[#3D583F] rounded-xl flex items-center justify-center shadow-lg">
                         <Target className="h-6 w-6 text-white" />
                       </div>
                       <div>
@@ -590,7 +590,7 @@ export default function Metas() {
                         className="p-2 bg-white/60 backdrop-blur-sm hover:bg-white rounded-lg transition-colors disabled:opacity-50 shadow-sm"
                         title="Ver Progresso"
                       >
-                        <TrendingUp className="h-4 w-4 text-[#236F5D]" />
+                        <TrendingUp className="h-4 w-4 text-[#3D583F]" />
                       </button>
                       <button
                         onClick={() => openEditModal(goal)}
@@ -656,7 +656,7 @@ export default function Metas() {
                               </div>
                               <span className="text-gray-700 text-xs font-medium truncate">{item.name}</span>
                             </div>
-                            <span className="text-[#236F5D] font-bold text-xs ml-2">{formatCurrency(item.price)}</span>
+                            <span className="text-[#3D583F] font-bold text-xs ml-2">{formatCurrency(item.price)}</span>
                           </div>
                         ))}
                         {goal.items.length > 2 && (
@@ -678,7 +678,7 @@ export default function Metas() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
-            <div className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] p-6 sticky top-0">
+            <div className="bg-[#3D583F] p-6 sticky top-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -715,7 +715,7 @@ export default function Metas() {
                       <button
                         type="button"
                         onClick={toggleAllProducts}
-                        className="text-xs text-[#236F5D] hover:text-[#1e5d4f] font-semibold px-3 py-1 rounded-lg hover:bg-[#236F5D]/10 transition-colors"
+                        className="text-xs text-[#3D583F] hover:text-[#365137] font-semibold px-3 py-1 rounded-lg hover:bg-[#3D583F]/10 transition-colors"
                       >
                         {selectedItems.products.length === products.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                       </button>
@@ -723,7 +723,7 @@ export default function Metas() {
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-3 space-y-2">
                       {products.map(product => (
                         <label key={product.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                          <input type="checkbox" checked={selectedItems.products.includes(product.id)} onChange={() => toggleProductSelection(product.id)} className="rounded border-gray-300 text-[#236F5D] focus:ring-[#236F5D]" />
+                          <input type="checkbox" checked={selectedItems.products.includes(product.id)} onChange={() => toggleProductSelection(product.id)} className="rounded border-gray-300 text-[#3D583F] focus:ring-[#3D583F]" />
                           <Package className="h-4 w-4 text-blue-500" />
                           <span className="flex-1 text-sm">{product.name}</span>
                           <span className="text-xs text-gray-500">{formatCurrency(parseFloat(product.price))}</span>
@@ -740,7 +740,7 @@ export default function Metas() {
                       <button
                         type="button"
                         onClick={toggleAllServices}
-                        className="text-xs text-[#236F5D] hover:text-[#1e5d4f] font-semibold px-3 py-1 rounded-lg hover:bg-[#236F5D]/10 transition-colors"
+                        className="text-xs text-[#3D583F] hover:text-[#365137] font-semibold px-3 py-1 rounded-lg hover:bg-[#3D583F]/10 transition-colors"
                       >
                         {selectedItems.services.length === services.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                       </button>
@@ -748,7 +748,7 @@ export default function Metas() {
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-3 space-y-2">
                       {services.map(service => (
                         <label key={service.service_id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                          <input type="checkbox" checked={selectedItems.services.includes(service.service_id)} onChange={() => toggleServiceSelection(service.service_id)} className="rounded border-gray-300 text-[#236F5D] focus:ring-[#236F5D]" />
+                          <input type="checkbox" checked={selectedItems.services.includes(service.service_id)} onChange={() => toggleServiceSelection(service.service_id)} className="rounded border-gray-300 text-[#3D583F] focus:ring-[#3D583F]" />
                           <Briefcase className="h-4 w-4 text-orange-500" />
                           <span className="flex-1 text-sm">{service.service_name}</span>
                           <span className="text-xs text-gray-500">{formatCurrency(parseFloat(service.service_price))}</span>
@@ -760,7 +760,7 @@ export default function Metas() {
                 
                 <div className="flex gap-3 pt-4 border-t">
                   <button type="button" onClick={() => { setShowCreateModal(false); resetForm(); }} className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
-                  <button type="submit" disabled={isCreating} className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={isCreating} className="flex-1 bg-[#3D583F] text-white px-4 py-2 rounded-lg hover:bg-[#365137] disabled:opacity-50 flex items-center justify-center gap-2">
                     {isCreating ? <><Loader2 className="h-4 w-4 animate-spin" />Criando...</> : <><Target className="h-4 w-4" />Criar</>}
                   </button>
                 </div>
@@ -774,7 +774,7 @@ export default function Metas() {
       {editingGoal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+            <div className="bg-[#3D583F] p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -800,12 +800,12 @@ export default function Metas() {
                   <input type="date" value={editFormData.start_date} onChange={(e) => setEditFormData(prev => ({ ...prev, start_date: e.target.value }))} className="px-4 py-2 border rounded-lg" required />
                   <input type="date" value={editFormData.end_date} onChange={(e) => setEditFormData(prev => ({ ...prev, end_date: e.target.value }))} className="px-4 py-2 border rounded-lg" required />
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-700">Esta meta possui {editingGoal.items_count} itens. Para modificar, exclua e crie uma nova.</p>
+                <div className="bg-[#3D583F]/10 border border-[#3D583F]/20 rounded-lg p-3">
+                  <p className="text-sm text-[#3D583F]">Esta meta possui {editingGoal.items_count} itens. Para modificar, exclua e crie uma nova.</p>
                 </div>
                 <div className="flex gap-3 pt-4 border-t">
                   <button type="button" onClick={() => setEditingGoal(null)} className="flex-1 px-4 py-2 border rounded-lg">Cancelar</button>
-                  <button type="submit" disabled={isUpdating} className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={isUpdating} className="flex-1 bg-[#3D583F] text-white px-4 py-2 rounded-lg hover:bg-[#365137] disabled:opacity-50 flex items-center justify-center gap-2">
                     {isUpdating ? <><Loader2 className="h-4 w-4 animate-spin" />Atualizando...</> : <>Atualizar</>}
                   </button>
                 </div>
@@ -853,7 +853,7 @@ export default function Metas() {
       {showProgressModal && selectedGoalProgress && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
-            <div className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] p-6">
+            <div className="bg-[#3D583F] p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center"><TrendingUp className="h-5 w-5 text-white" /></div>
@@ -867,10 +867,10 @@ export default function Metas() {
             </div>
             
             <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
-              <div className="bg-gradient-to-br from-[#236F5D]/10 to-[#2d8a6b]/10 rounded-xl p-5 mb-6">
+              <div className="bg-[#3D583F]/10 rounded-xl p-5 mb-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center bg-white/50 backdrop-blur-sm rounded-lg p-3">
-                    <div className="text-2xl font-bold text-[#236F5D] mb-1">{selectedGoalProgress.progress.current_quantity}</div>
+                    <div className="text-2xl font-bold text-[#3D583F] mb-1">{selectedGoalProgress.progress.current_quantity}</div>
                     <div className="text-xs text-gray-600 font-medium">Vendido</div>
                   </div>
                   <div className="text-center bg-white/50 backdrop-blur-sm rounded-lg p-3">
@@ -882,7 +882,7 @@ export default function Metas() {
                     <div className="text-xs text-gray-600 font-medium">Faltam</div>
                   </div>
                   <div className="text-center bg-white/50 backdrop-blur-sm rounded-lg p-3">
-                    <div className="text-xl font-bold text-blue-600 mb-1">{formatCurrency(selectedGoalProgress.progress.current_value)}</div>
+                    <div className="text-xl font-bold text-[#3D583F] mb-1">{formatCurrency(selectedGoalProgress.progress.current_value)}</div>
                     <div className="text-xs text-gray-600 font-medium">Valor</div>
                   </div>
                 </div>
@@ -891,10 +891,10 @@ export default function Metas() {
               <div className="mb-6 bg-gray-50 rounded-xl p-5">
                 <div className="flex justify-between mb-3 text-sm">
                   <span className="font-bold text-gray-700">Progresso</span>
-                  <span className="font-bold text-[#236F5D] text-lg">{selectedGoalProgress.progress.percentage.toFixed(1)}%</span>
+                  <span className="font-bold text-[#3D583F] text-lg">{selectedGoalProgress.progress.percentage.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-                  <div className="bg-gradient-to-r from-[#236F5D] to-[#2d8a6b] h-4 rounded-full transition-all duration-500 shadow-lg" style={{ width: `${Math.min(selectedGoalProgress.progress.percentage, 100)}%` }} />
+                  <div className="bg-[#3D583F] h-4 rounded-full transition-all duration-500 shadow-lg" style={{ width: `${Math.min(selectedGoalProgress.progress.percentage, 100)}%` }} />
                 </div>
                 <div className="mt-3 text-center">
                   <span className={`inline-block px-4 py-2 rounded-full text-xs font-bold border-2 ${getStatusColor(selectedGoalProgress.progress.status)}`}>
@@ -914,10 +914,10 @@ export default function Metas() {
                             {item.item_type === 'product' ? <Package className="h-4 w-4 text-blue-500" /> : <Briefcase className="h-4 w-4 text-orange-500" />}
                             <span className="font-medium text-sm">{item.item_name}</span>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-emerald-600">{item.quantity} un</div>
-                            <div className="text-xs text-gray-500">{formatCurrency(item.value)}</div>
-                          </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-[#3D583F]">{item.quantity} un</div>
+                              <div className="text-xs text-gray-500">{formatCurrency(item.value)}</div>
+                            </div>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div className={`h-2 rounded-full ${item.item_type === 'product' ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${item.quantity > 0 ? Math.min((item.quantity / selectedGoalProgress.goal.meta_quantity) * 100, 100) : 0}%` }} />

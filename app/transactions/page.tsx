@@ -321,19 +321,19 @@ export default function Transactions() {
     const filteredExpenses = getFilteredExpenses();
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+        <div className="min-h-screen">
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+            <div className="bg-white border-b">
                 <div className="px-4 py-6 sm:px-6">
                     <div className="flex items-center gap-3 mb-4">
                         <Link href="/">
-                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                            <Button variant="outline" size="icon" className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10">
                                 <ChevronLeftIcon className="h-5 w-5" />
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-xl sm:text-2xl font-bold">Despesas Fixas</h1>
-                            <p className="text-emerald-100 text-sm">Gerencie suas despesas recorrentes</p>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Despesas Fixas</h1>
+                            <p className="text-gray-600 text-sm">Gerencie suas despesas recorrentes</p>
                         </div>
                     </div>
 
@@ -351,7 +351,7 @@ export default function Transactions() {
                             setCategory('other');
                             setIsDialogOpen(true);
                         }}
-                        className="w-full sm:w-auto bg-white text-emerald-600 hover:bg-emerald-50"
+                        className="w-full sm:w-auto bg-[#3D583F] text-white hover:bg-[#365137]"
                     >
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Despesa
@@ -365,12 +365,12 @@ export default function Transactions() {
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">
                         Resumo de {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                     </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                    <div className="flex flex-col gap-3 sm:grid sm:grid-cols-4 sm:gap-4">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                            <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-100 rounded-lg">
-                                        <TrendingDown className="h-5 w-5 text-blue-600" />
+                                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
+                                        <TrendingDown className="h-5 w-5 text-[#3D583F]" />
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Total Mensal</p>
@@ -382,11 +382,11 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                            <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-100 rounded-lg">
-                                        <TrendingUp className="h-5 w-5 text-emerald-600" />
+                                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
+                                        <TrendingUp className="h-5 w-5 text-[#3D583F]" />
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Ativas</p>
@@ -396,8 +396,8 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                            <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-yellow-100 rounded-lg">
                                         <Clock className="h-5 w-5 text-yellow-600" />
@@ -410,8 +410,8 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                            <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-red-100 rounded-lg">
                                         <AlertCircle className="h-5 w-5 text-red-600" />
@@ -452,14 +452,14 @@ export default function Transactions() {
 
 
                 {/* Próximos Vencimentos */}
-                <Card className="bg-white shadow-sm">
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-emerald-600" />
-                            Próximos Vencimentos
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
+                    <Card className="bg-white shadow-sm border border-[#3D583F]/20">
+                        <CardHeader>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-[#3D583F]" />
+                                Próximos Vencimentos
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
                         <div className="space-y-2">
                             {fixedExpenses
                                 .filter(expense => {
@@ -480,7 +480,7 @@ export default function Transactions() {
                                     const isDueSoon = daysUntilDue > 0 && daysUntilDue <= 7;
 
                                     return (
-                                        <div key={expense.id} className={`p-3 rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : isDueSoon ? 'bg-yellow-50 border-yellow-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                        <div key={expense.id} className={`p-3 rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : isDueSoon ? 'bg-yellow-50 border-yellow-200' : 'bg-[#3D583F]/10 border-[#3D583F]/20'}`}>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <p className="font-medium text-gray-900">{expense.name}</p>
@@ -489,7 +489,7 @@ export default function Transactions() {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-emerald-600'}`}>
+                                                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-[#3D583F]'}`}>
                                                         {isOverdue ? `${Math.abs(daysUntilDue)} dias atrás` :
                                                             isDueToday ? 'Hoje' :
                                                                 `${daysUntilDue} dias`}
@@ -516,44 +516,44 @@ export default function Transactions() {
                 </Card>
 
                 {/* Filtros */}
-                <Card className="bg-white shadow-sm">
-                    <CardContent className="p-4">
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant={selectedFilter === 'all' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedFilter('all')}
-                                className={selectedFilter === 'all' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                            >
-                                Todas ({stats.totalExpenses})
-                            </Button>
-                            <Button
-                                variant={selectedFilter === 'active' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedFilter('active')}
-                                className={selectedFilter === 'active' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                            >
-                                Ativas ({stats.activeExpenses})
-                            </Button>
-                            <Button
-                                variant={selectedFilter === 'upcoming' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedFilter('upcoming')}
-                                className={selectedFilter === 'upcoming' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                            >
-                                Vencimentos ({stats.upcomingExpenses})
-                            </Button>
-                            <Button
-                                variant={selectedFilter === 'overdue' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedFilter('overdue')}
-                                className={selectedFilter === 'overdue' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                            >
-                                Em Atraso ({stats.overdueExpenses})
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                    <Card className="bg-white shadow-sm border border-[#3D583F]/20">
+                        <CardContent className="p-4">
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant={selectedFilter === 'all' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedFilter('all')}
+                                    className={selectedFilter === 'all' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                >
+                                    Todas ({stats.totalExpenses})
+                                </Button>
+                                <Button
+                                    variant={selectedFilter === 'active' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedFilter('active')}
+                                    className={selectedFilter === 'active' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                >
+                                    Ativas ({stats.activeExpenses})
+                                </Button>
+                                <Button
+                                    variant={selectedFilter === 'upcoming' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedFilter('upcoming')}
+                                    className={selectedFilter === 'upcoming' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                >
+                                    Vencimentos ({stats.upcomingExpenses})
+                                </Button>
+                                <Button
+                                    variant={selectedFilter === 'overdue' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedFilter('overdue')}
+                                    className={selectedFilter === 'overdue' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                >
+                                    Em Atraso ({stats.overdueExpenses})
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                 {/* Lista de Despesas Filtradas */}
                 <div>
@@ -598,12 +598,12 @@ export default function Transactions() {
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <h3 className="font-semibold text-gray-900">{expense.name}</h3>
-                                                        <Badge variant={expense.is_active ? 'default' : 'secondary'} className={expense.is_active ? 'bg-emerald-100 text-emerald-700' : ''}>
-                                                            {expense.is_active ? 'Ativa' : 'Inativa'}
-                                                        </Badge>
-                                                    </div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <h3 className="font-semibold text-gray-900">{expense.name}</h3>
+                                                    <Badge variant={expense.is_active ? 'default' : 'secondary'} className={expense.is_active ? 'bg-[#3D583F]/10 text-[#3D583F]' : ''}>
+                                                        {expense.is_active ? 'Ativa' : 'Inativa'}
+                                                    </Badge>
+                                                </div>
                                                     <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                                                         <span className="flex items-center gap-1">
                                                             <Calendar className="h-3 w-3" />
@@ -653,35 +653,35 @@ export default function Transactions() {
                                                 <p className="text-sm text-gray-600 mb-3">{expense.description}</p>
                                             )}
 
-                                            <div className="flex flex-wrap gap-2 pt-3 border-t">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleViewExpenseDetails(expense)}
-                                                    className="flex-1 sm:flex-none"
-                                                >
-                                                    <Eye className="h-3 w-3 mr-1" />
-                                                    Detalhes
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleEditFixedExpense(expense)}
-                                                    className="flex-1 sm:flex-none"
-                                                >
-                                                    <Edit className="h-3 w-3 mr-1" />
-                                                    Editar
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleDeleteFixedExpense(expense.id)}
-                                                    className="flex-1 sm:flex-none text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                >
-                                                    <Trash2 className="h-3 w-3 mr-1" />
-                                                    Excluir
-                                                </Button>
-                                            </div>
+                                                <div className="flex flex-wrap gap-2 pt-3 border-t">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleViewExpenseDetails(expense)}
+                                                        className="flex-1 sm:flex-none border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                                                    >
+                                                        <Eye className="h-3 w-3 mr-1" />
+                                                        Detalhes
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleEditFixedExpense(expense)}
+                                                        className="flex-1 sm:flex-none border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                                                    >
+                                                        <Edit className="h-3 w-3 mr-1" />
+                                                        Editar
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleDeleteFixedExpense(expense.id)}
+                                                        className="flex-1 sm:flex-none text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 className="h-3 w-3 mr-1" />
+                                                        Excluir
+                                                    </Button>
+                                                </div>
                                         </CardContent>
                                     </Card>
                                 );
@@ -856,7 +856,7 @@ export default function Transactions() {
                         <Button
                             onClick={handleCreateFixedExpense}
                             disabled={isLoading}
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="bg-[#3D583F] hover:bg-[#365137]"
                         >
                             {isLoading ? 'Processando...' : 'Salvar Despesa'}
                         </Button>
@@ -975,7 +975,7 @@ export default function Transactions() {
                                         setIsDetailsDialogOpen(false);
                                         handleEditFixedExpense(selectedExpenseForDetails);
                                     }}
-                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    className="bg-[#3D583F] hover:bg-[#365137]"
                                 >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Editar Despesa

@@ -395,16 +395,16 @@ export default function ClientesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="w-full mx-auto px-4 py-4">
+    <div className="min-h-screen">
+      <div className="w-full mx-auto">
         {/* Cabeçalho Compacto */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 bg-white w-full border-b px-4 py-2">
           <div className="flex items-center gap-3">
             <Link 
               href="/" 
-              className="p-2 rounded-full bg-emerald-600 hover:bg-emerald-700 transition-colors"
+              className="p-2 rounded-full border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 transition-colors"
             >
-              <ChevronLeftIcon className="h-4 w-4 text-white" />
+              <ChevronLeftIcon className="h-4 w-4" />
             </Link>
             <div>
               <h1 className="text-xl font-bold text-gray-900">Clientes</h1>
@@ -417,13 +417,9 @@ export default function ClientesPage() {
             {/* Botão Filtro */}
             <Button
               size="sm"
-              variant={showFilters ? "default" : "outline"}
+              variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className={`h-9 px-3 ${
-                showFilters 
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-              }`}
+              className="h-9 px-3 border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
             >
               <FilterIcon className="h-4 w-4" />
             </Button>
@@ -433,7 +429,8 @@ export default function ClientesPage() {
               <DrawerTrigger asChild>
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 px-3"
+                  variant="outline"
+                  className="h-9 px-3 border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>
@@ -445,7 +442,7 @@ export default function ClientesPage() {
 
         {/* Filtros - Aparece apenas quando showFilters é true */}
         {showFilters && (
-          <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 rounded-xl p-3 mb-3 shadow-md border border-white/20">
+          <div className="bg-[#3D583F] rounded-xl p-3 mb-3 shadow-md border border-white/20">
             <div className="space-y-2">
               {/* Filtro por Status */}
               <div className="flex items-center gap-2">
@@ -519,7 +516,7 @@ export default function ClientesPage() {
                 <Button
                   onClick={clearAllFilters}
                   variant="outline"
-                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
+                  className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 hover:border-[#3D583F]/40"
                 >
                   <XIcon className="h-4 w-4 mr-2" />
                   Limpar filtros
@@ -530,7 +527,7 @@ export default function ClientesPage() {
         )}
 
         {/* Lista de clientes */}
-        <div className="space-y-4 w-full">
+        <div className="space-y-4 w-full px-4">
           {loading ? (
             <div className="space-y-3">
               {[...Array(6)].map((_, i) => (
@@ -564,7 +561,7 @@ export default function ClientesPage() {
                     <Button 
                       onClick={() => setSearchTerm('')}
                       variant="outline" 
-                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
                     >
                       Limpar Busca
                     </Button>
@@ -575,7 +572,7 @@ export default function ClientesPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Cliente</h3>
                     <p className="text-gray-600 mb-4">Você ainda não possui clientes cadastrados</p>
                     <Link href="/clientes/novo">
-                      <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white">
+                      <Button className="bg-[#3D583F] hover:bg-[#365137] text-white">
                         <PlusIcon className="h-4 w-4 mr-2" />
                         Cadastrar Primeiro Cliente
                       </Button>
@@ -632,7 +629,7 @@ export default function ClientesPage() {
                                     appointment.status === 'completed' ? 'secondary' : 
                                     appointment.status === 'cancelled' ? 'destructive' : 'outline'}
                             className={
-                              appointment.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
+                              appointment.status === 'confirmed' ? 'bg-[#3D583F]/10 text-[#3D583F] border-[#3D583F]/30' :
                               appointment.status === 'completed' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                               appointment.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-200' :
                               'bg-gray-100 text-gray-800 border-gray-200'
@@ -644,7 +641,7 @@ export default function ClientesPage() {
                              appointment.status || 'Pendente'}
                           </Badge>
                           {appointment.professional_name && (
-                            <span className="text-sm font-medium text-emerald-600">
+                            <span className="text-sm font-medium text-[#3D583F]">
                               {appointment.professional_name}
                             </span>
                           )}
@@ -1178,7 +1175,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
           {/* Header com avatar e info básica */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 ring-2 ring-emerald-100">
+              <Avatar className="h-12 w-12 ring-2 ring-[#3D583F]/20">
                 {client.profile_photo ? (
                   <AvatarImage 
                     src={client.profile_photo} 
@@ -1186,13 +1183,13 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                     className="object-cover"
                   />
                 ) : null}
-                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold text-sm">
+                <AvatarFallback className="bg-[#3D583F] text-white font-semibold text-sm">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-gray-900 truncate">
-                  {client.name}
+                  {client.name && client.name.length > 18 ? `${client.name.slice(0, 10)}...` : client.name}
                 </h3>
                 <div className="flex items-center gap-1 text-sm text-gray-500">
                   <PhoneIcon className="h-3 w-3" />
@@ -1227,7 +1224,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
             <div className="mb-3">
               <Badge 
                 variant="secondary" 
-                className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer transition-colors"
+                className="bg-[#3D583F]/10 text-[#3D583F] hover:bg-[#3D583F]/20 cursor-pointer transition-colors"
                 onClick={handleShowAppointments}
               >
                 <ClockIcon className="h-3 w-3 mr-1" />
@@ -1241,7 +1238,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
             <Button
               size="sm"
               onClick={handleSchedule}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm font-medium"
+              className="flex-1 bg-[#3D583F] hover:bg-[#365137] text-white h-9 text-sm font-medium"
             >
               <CalendarIcon className="h-4 w-4 mr-1" />
               Agendar
@@ -1270,7 +1267,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                 <div className="mx-auto w-full max-w-sm">
                   <DrawerHeader className="text-center pb-4">
                     <div className="mx-auto mb-4">
-                      <Avatar className="h-16 w-16 ring-4 ring-emerald-100">
+                      <Avatar className="h-16 w-16 ring-4 ring-[#3D583F]/20">
                         {client.profile_photo ? (
                           <AvatarImage 
                             src={client.profile_photo} 
@@ -1278,15 +1275,15 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                             className="object-cover"
                           />
                         ) : null}
-                        <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-bold text-lg">
+                        <AvatarFallback className="bg-[#3D583F] text-white font-bold text-lg">
                           {initials}
                         </AvatarFallback>
                       </Avatar>
                     </div>
                     <DrawerTitle className="text-xl font-bold text-gray-900">
-                      {client.name}
+                      {client.name && client.name.length > 10 ? `${client.name.slice(0, 10)}...` : client.name}
                     </DrawerTitle>
-                    <DrawerDescription className="text-emerald-600">
+                    <DrawerDescription className="text-[#3D583F]">
                       Informações completas
                     </DrawerDescription>
                   </DrawerHeader>
@@ -1331,8 +1328,8 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                     
                     {/* Data de Cadastro */}
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className="p-2 bg-green-100 rounded-full">
-                        <CalendarIcon className="h-4 w-4 text-green-600" />
+                      <div className="p-2 bg-[#3D583F]/10 rounded-full">
+                        <CalendarIcon className="h-4 w-4 text-[#3D583F]" />
                       </div>
                       <div className="flex-1">
                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente desde</p>
@@ -1353,7 +1350,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                   <DrawerFooter className="pt-6">
                     <Button 
                       onClick={handleSchedule}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12"
+                      className="w-full bg-[#3D583F] hover:bg-[#365137] text-white h-12"
                     >
                       <CalendarIcon className="h-4 w-4 mr-2" />
                       Agendar Serviço

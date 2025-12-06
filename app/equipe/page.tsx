@@ -553,46 +553,52 @@ export default function Equipe() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white p-4 shadow-lg">
+      <div className="bg-white border-b p-4">
         <div className="flex items-center justify-between mb-4">
           <Link href="/">
-            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+            <Button variant="outline" size="sm" className="border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10">
               <ChevronLeftIcon className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold">Gestão de Equipe</h1>
+          <h1 className="text-xl font-bold text-gray-900">Gestão de Equipe</h1>
           <div className="w-8" />
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-            <UserSquare2Icon className="h-6 w-6 mx-auto mb-1" />
-            <p className="text-xs opacity-90">Admins</p>
-            <p className="text-lg font-bold">{teamSummary.admin}</p>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-            <Users2Icon className="h-6 w-6 mx-auto mb-1" />
-            <p className="text-xs opacity-90">Gerentes</p>
-            <p className="text-lg font-bold">{teamSummary.manager}</p>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-            <UserIcon className="h-6 w-6 mx-auto mb-1" />
-            <p className="text-xs opacity-90">Funcionários</p>
-            <p className="text-lg font-bold">{teamSummary.employee}</p>
-          </div>
+          <Card className="border border-[#3D583F]/20">
+            <CardContent className="p-3 text-center">
+              <UserSquare2Icon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <p className="text-xs text-gray-500">Admins</p>
+              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.admin}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-[#3D583F]/20">
+            <CardContent className="p-3 text-center">
+              <Users2Icon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <p className="text-xs text-gray-500">Gerentes</p>
+              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.manager}</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-[#3D583F]/20">
+            <CardContent className="p-3 text-center">
+              <UserIcon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <p className="text-xs text-gray-500">Funcionários</p>
+              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.employee}</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search Bar */}
         <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#3D583F]" />
           <Input
             placeholder="Buscar membros da equipe..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/90 border-0 text-gray-800 placeholder-gray-500"
+            className="pl-10 bg-white border border-[#3D583F]/20 text-gray-800 placeholder-[#3D583F]"
           />
         </div>
       </div>
@@ -602,7 +608,7 @@ export default function Equipe() {
         {/* Add Member Button */}
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
-            <Button className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg">
+            <Button className="w-full bg-[#3D583F] hover:bg-[#365137] shadow-lg">
               <PlusIcon className="h-5 w-5 mr-2" />
               Novo Integrante
             </Button>
@@ -639,7 +645,7 @@ export default function Equipe() {
                         <img 
                           src={imagePreview} 
                           alt="Preview" 
-                          className="w-20 h-20 rounded-full object-cover border-2 border-emerald-200"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-[#3D583F]/30"
                           style={{ objectFit: 'cover' }}
                         />
                         <button 
@@ -738,11 +744,11 @@ export default function Equipe() {
               </div>
 
               <DrawerFooter>
-                <Button 
-                  onClick={handleSubmit}
-                  disabled={uploading}
-                  className="bg-emerald-500 hover:bg-emerald-600"
-                >
+              <Button 
+                onClick={handleSubmit}
+                disabled={uploading}
+                className="bg-[#3D583F] hover:bg-[#365137]"
+              >
                   {uploading ? (
                     <div className="flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -781,7 +787,7 @@ export default function Equipe() {
                       {member.photo_url ? (
                         <AvatarImage src={member.photo_url} alt={member.name} className="object-cover" />
                       ) : (
-                        <AvatarFallback className="bg-emerald-100 text-emerald-600">
+                        <AvatarFallback className="bg-[#3D583F]/10 text-[#3D583F]">
                           {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       )}
@@ -838,11 +844,11 @@ export default function Equipe() {
                       </div>
 
                       <div className="flex flex-wrap gap-2 mb-2">
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                        <Badge variant="secondary" className="bg-[#3D583F]/10 text-[#3D583F]">
                           {getPositionLabel(member.position)}
                         </Badge>
                         {member.can_schedule && (
-                          <Badge variant="outline" className="border-emerald-200 text-emerald-600">
+                          <Badge variant="outline" className="border-[#3D583F]/30 text-[#3D583F]">
                             <CalendarIcon className="h-3 w-3 mr-1" />
                             Agenda
                           </Badge>
@@ -851,17 +857,17 @@ export default function Equipe() {
 
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center">
-                          <MailIcon className="h-3 w-3 mr-2 text-emerald-500" />
+                          <MailIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
                           <span className="truncate">{member.email}</span>
                         </div>
                         {member.phone_number && (
                           <div className="flex items-center">
-                            <PhoneIcon className="h-3 w-3 mr-2 text-emerald-500" />
+                            <PhoneIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
                             <span>{member.phone_number}</span>
                           </div>
                         )}
                         <div className="flex items-center">
-                          <CalendarIcon className="h-3 w-3 mr-2 text-emerald-500" />
+                          <CalendarIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
                           <span>Desde {formatDate(member.created_at)}</span>
                         </div>
                       </div>
@@ -954,7 +960,7 @@ export default function Equipe() {
               <Button 
                 onClick={handleEditMember}
                 disabled={editLoading}
-                className="bg-emerald-500 hover:bg-emerald-600"
+                className="bg-[#3D583F] hover:bg-[#365137]"
               >
                 {editLoading ? (
                   <div className="flex items-center gap-2">
@@ -992,7 +998,7 @@ export default function Equipe() {
                       <img
                         src={photoPreview}
                         alt="Preview"
-                        className="w-24 h-24 rounded-full object-cover border-2 border-emerald-200"
+                      className="w-24 h-24 rounded-full object-cover border-2 border-[#3D583F]/30"
                         style={{ objectFit: 'cover' }}
                       />
                       <button
@@ -1045,7 +1051,7 @@ export default function Equipe() {
               <Button 
                 onClick={handlePhotoUpload}
                 disabled={photoLoading || !photoFile}
-                className="bg-emerald-500 hover:bg-emerald-600"
+                className="bg-[#3D583F] hover:bg-[#365137]"
               >
                 {photoLoading ? (
                   <div className="flex items-center gap-2">

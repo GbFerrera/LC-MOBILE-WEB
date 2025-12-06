@@ -971,7 +971,7 @@ export default function CommandsPage() {
   return (
     <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
-        <header className="bg-gradient-to-tr from-white/10 via-[#3D583F]/80 to-[#3D583F] border-b">
+        <header className="bg-[#3D583F]">
         <div className="w-full mx-auto ">
           <div className="flex items-center justify-between bg-white border-b px-4 py-2">
             <div className="flex items-center gap-4">

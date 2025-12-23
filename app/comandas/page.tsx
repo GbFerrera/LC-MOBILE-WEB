@@ -971,50 +971,38 @@ export default function CommandsPage() {
   return (
     <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-2xl">
-        <div className="w-full mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+        <header className="bg-gradient-to-tr from-white/10 via-[#3D583F]/80 to-[#3D583F] border-b">
+        <div className="w-full mx-auto ">
+          <div className="flex items-center justify-between bg-white border-b px-4 py-2">
             <div className="flex items-center gap-4">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 onClick={() => router.push('/')}
               >
                 <ArrowLeftIcon className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2">
-                  <ShoppingCartIcon className="h-6 w-6" />
-                  Comandas
-                </h1>
-                <p className="text-emerald-100 text-sm mt-1">
-                  Gerencie comandas e pagamentos
-                </p>
+                <h1 className="text-xl font-bold text-gray-900">Comandas</h1>
+                <p className="text-gray-500 text-xs">Gerencie suas comandas</p>
               </div>
             </div>
             <div className="flex gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <FilterIcon className="h-5 w-5" />
               </Button>
+             
+               
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
-                onClick={onRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCwIcon className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20"
+                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
                 onClick={openCreateCommandModal}
               >
                 <PlusIcon className="h-5 w-5" />
@@ -1023,9 +1011,9 @@ export default function CommandsPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-2 gap-4 mt-6 px-4 py-4">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-              <div className="text-emerald-100 text-sm font-medium">Comandas Hoje</div>
+              <div className="text-white/80 text-sm font-medium">Comandas Hoje</div>
               <div className="text-3xl font-bold text-white mt-1">
                 {loading ? (
                   <div className="animate-pulse bg-white/20 h-8 w-12 rounded"></div>
@@ -1033,14 +1021,26 @@ export default function CommandsPage() {
               </div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-              <div className="text-emerald-100 text-sm font-medium">Comandas Abertas</div>
+              <div className="text-white/80 text-sm font-medium">Comandas Abertas</div>
               <div className="text-lg font-bold text-white mt-1">
                 {loading ? (
                   <div className="animate-pulse bg-white/20 h-6 w-16 rounded"></div>
                 ) : commands.filter(c => c.status === 'open').length}
               </div>
             </div>
+
+           
           </div>
+
+            <div className="relative flex-1 w-full px-4">
+              <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 h-4 w-4" />
+              <Input
+                placeholder="Buscar por nome do cliente..."
+                value={clientNameFilter}
+                onChange={(e) => setClientNameFilter(e.target.value)}
+                className="pl-10 bg-white/20 w-full border-white/30 text-white placeholder:text-white/70"
+              />
+            </div>
 
           {/* Filters */}
           {showFilters && (
@@ -1111,15 +1111,7 @@ export default function CommandsPage() {
           )}
 
           <div className="flex items-center gap-4 justify-between mt-6">
-            <div className="relative flex-1 max-w-md">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70 h-4 w-4" />
-              <Input
-                placeholder="Buscar por nome do cliente..."
-                value={clientNameFilter}
-                onChange={(e) => setClientNameFilter(e.target.value)}
-                className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70"
-              />
-            </div>
+            
             
             <div className="flex items-center gap-2">
               {(statusFilter !== 'all' || clientNameFilter !== '' || selectedDate !== '') && (
@@ -1136,7 +1128,7 @@ export default function CommandsPage() {
             </div>
             
             {filteredCommands.length !== commands.length && (
-              <div className="mt-3 text-emerald-100 text-sm">
+              <div className="mt-3 text-white/80 text-sm">
                 Mostrando {filteredCommands.length} de {commands.length} comandas
               </div>
             )}
@@ -1290,8 +1282,8 @@ export default function CommandsPage() {
                   {/* Total e ações */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-2xl font-bold text-gray-800">
-                        Total: <span className="text-emerald-600">R$ {command.total.toFixed(2)}</span>
+                      <span className="text-xl font-bold text-gray-800">
+                        Total: <span className="text-#3D583F">R$ {command.total.toFixed(2)}</span>
                       </span>
                     </div>
                     
@@ -1305,7 +1297,7 @@ export default function CommandsPage() {
                               e.stopPropagation();
                               openAddItemModal(command.id.toString());
                             }}
-                            className="w-12 h-12 rounded-full border-2 border-emerald-500 text-emerald-500 hover:bg-emerald-50"
+                            className="w-12 h-12 rounded-full border-2 border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
                           >
                             <PlusIcon className="w-5 h-5" />
                           </Button>
@@ -1314,7 +1306,7 @@ export default function CommandsPage() {
                               e.stopPropagation();
                               openPaymentModal(command);
                             }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2"
+                            className="bg-[#3D583F] hover:bg-[#365137] text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2"
                           >
                             <CreditCardIcon className="w-5 h-5" />
                             Fechar Comanda
@@ -1326,11 +1318,11 @@ export default function CommandsPage() {
 
                   {/* Informações de pagamento para comandas fechadas */}
                   {command.status === 'closed' && command.payment?.payment_methods && (
-                    <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200">
-                      <p className="text-sm font-medium text-green-800 mb-2">Pagamento processado:</p>
+                    <div className="mt-4 p-4 bg-[#3D583F]/10 rounded-xl border border-[#3D583F]/30">
+                      <p className="text-sm font-medium text-[#3D583F] mb-2">Pagamento processado:</p>
                       <div className="space-y-1">
                         {command.payment.payment_methods.map((method, index) => (
-                          <div key={index} className="flex justify-between text-sm text-green-700">
+                          <div key={index} className="flex justify-between text-sm text-[#3D583F]">
                             <span>{getPaymentMethodLabel(method.method)}</span>
                             <span className="font-medium">{formatCurrency(parseFloat(method.amount))}</span>
                           </div>
@@ -1619,20 +1611,20 @@ export default function CommandsPage() {
                         
                         return (
                           <Card key={serviceId} className={`p-5 border-2 transition-all duration-300 hover:shadow-lg ${
-                            isInCart ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-emerald-200 hover:border-emerald-400'
+                            isInCart ? 'border-[#3D583F] bg-[#3D583F]/10 shadow-md' : 'border-[#3D583F]/30 hover:border-[#3D583F]/50'
                           }`}>
                             <div className="space-y-4">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
                                     <div className={`p-1.5 rounded-full ${
-                                      isInCart ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-600'
+                                      isInCart ? 'bg-[#3D583F] text-white' : 'bg-[#3D583F]/10 text-[#3D583F]'
                                     }`}>
                                       <ClockIcon className="h-3 w-3" />
                                     </div>
                                     <h4 className="font-semibold text-gray-900 text-sm">{serviceName}</h4>
                                   </div>
-                                  <p className="text-xl font-bold text-emerald-600 mb-2">
+                                  <p className="text-xl font-bold text-[#3D583F] mb-2">
                                     {formatCurrency(servicePrice)}
                                   </p>
                                   {service.service_description && (
@@ -1641,35 +1633,35 @@ export default function CommandsPage() {
                                     </p>
                                   )}
                                   {service.service_duration && (
-                                    <p className="text-xs text-emerald-600 mt-1">
+                                    <p className="text-xs text-[#3D583F] mt-1">
                                       Duração: {service.service_duration} min
                                     </p>
                                   )}
                                 </div>
                                 {isInCart && (
-                                  <div className="p-1 bg-emerald-600 text-white rounded-full">
+                                  <div className="p-1 bg-[#3D583F] text-white rounded-full">
                                     <CheckIcon className="h-3 w-3" />
                                   </div>
                                 )}
                               </div>
                               
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 bg-emerald-100 rounded-full px-3 py-1">
+                                <div className="flex items-center gap-2 bg-[#3D583F]/10 rounded-full px-3 py-1">
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 text-emerald-600 hover:bg-emerald-200"
+                                    className="h-6 w-6 text-[#3D583F] hover:bg-[#3D583F]/20"
                                     onClick={() => updateItemQuantity(serviceId, quantity - 1)}
                                   >
                                     <MinusCircleIcon className="h-3 w-3" />
                                   </Button>
-                                  <span className="font-bold text-emerald-700 w-6 text-center text-sm">
+                                  <span className="font-bold text-[#3D583F] w-6 text-center text-sm">
                                     {quantity}
                                   </span>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 text-emerald-600 hover:bg-emerald-200"
+                                    className="h-6 w-6 text-[#3D583F] hover:bg-[#3D583F]/20"
                                     onClick={() => updateItemQuantity(serviceId, quantity + 1)}
                                   >
                                     <PlusCircleIcon className="h-3 w-3" />
@@ -1680,8 +1672,8 @@ export default function CommandsPage() {
                                   onClick={() => addToCart(service, 'service')}
                                   className={`transition-all ${
                                     isInCart 
-                                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white' 
-                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                      ? 'bg-[#365137] hover:bg-[#2f472f] text-white' 
+                                      : 'bg-[#3D583F] hover:bg-[#365137] text-white'
                                   }`}
                                 >
                                   {isInCart ? (
@@ -2116,8 +2108,8 @@ export default function CommandsPage() {
       {/* Modal de Detalhes da Comanda */}
       <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
         <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <DialogHeader className="border-b border-[#3D583F]/20">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-[#3D583F]">
               <EyeIcon className="h-5 w-5 flex-shrink-0" />
               Detalhes da Comanda
             </DialogTitle>
@@ -2126,9 +2118,9 @@ export default function CommandsPage() {
           {selectedCommandForDetails && (
             <div className="space-y-4 sm:space-y-6">
               {/* Informações da Comanda */}
-              <Card className="p-3 sm:p-4">
+              <Card className="p-3 sm:p-4 border border-[#3D583F]/20">
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3">Informações da Comanda</h3>
+                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">Informações da Comanda</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Cliente:</Label>
@@ -2146,7 +2138,7 @@ export default function CommandsPage() {
                     </div>
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Total:</Label>
-                      <p className="text-xl sm:text-2xl font-bold text-emerald-600">
+                      <p className="text-xl sm:text-2xl font-bold text-[#3D583F]">
                         {formatCurrency(selectedCommandForDetails.total)}
                       </p>
                     </div>
@@ -2154,20 +2146,20 @@ export default function CommandsPage() {
                   {selectedCommandForDetails.professional_name && (
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Profissional:</Label>
-                      <p className="font-medium text-emerald-600 text-sm sm:text-base">{selectedCommandForDetails.professional_name}</p>
+                      <p className="font-medium text-[#3D583F] text-sm sm:text-base">{selectedCommandForDetails.professional_name}</p>
                     </div>
                   )}
                 </div>
               </Card>
 
               {/* Lista de Itens */}
-              <Card className="p-3 sm:p-4">
-                <h3 className="font-semibold text-base sm:text-lg mb-3">
+              <Card className="p-3 sm:p-4 border border-[#3D583F]/20">
+                <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">
                   Itens da Comanda ({selectedCommandForDetails.items.length})
                 </h3>
                 <div className="space-y-2 sm:space-y-3">
                   {selectedCommandForDetails.items.map((item, index) => (
-                    <Card key={index} className="p-2 sm:p-3 bg-gray-50">
+                    <Card key={index} className="p-2 sm:p-3 bg-[#3D583F]/5 border border-[#3D583F]/20">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm sm:text-base truncate">{item.name}</h4>
@@ -2176,7 +2168,7 @@ export default function CommandsPage() {
                           </p>
                         </div>
                         <div className="text-left sm:text-right flex-shrink-0">
-                          <p className="font-semibold text-emerald-600 text-sm sm:text-base">
+                          <p className="font-semibold text-[#3D583F] text-sm sm:text-base">
                             {formatCurrency(parseFloat(item.price) * item.quantity)}
                           </p>
                         </div>
@@ -2188,20 +2180,20 @@ export default function CommandsPage() {
 
               {/* Informações de Pagamento */}
               {selectedCommandForDetails.status === 'closed' && selectedCommandForDetails.payment?.payment_methods && (
-                <Card className="p-3 sm:p-4 bg-green-50 border-green-200">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-green-800">Detalhes do Pagamento</h3>
+                <Card className="p-3 sm:p-4 bg-[#3D583F]/10 border-[#3D583F]/30">
+                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">Detalhes do Pagamento</h3>
                   <div className="space-y-2">
                     {selectedCommandForDetails.payment.paid_at && (
-                      <p className="text-xs sm:text-sm text-green-700">
+                      <p className="text-xs sm:text-sm text-[#3D583F]">
                         Pago em: {formatDate(selectedCommandForDetails.payment.paid_at)}
                       </p>
                     )}
                     {selectedCommandForDetails.payment.payment_methods.map((method, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-green-700 text-xs sm:text-sm">
+                        <span className="text-[#3D583F] text-xs sm:text-sm">
                           {getPaymentMethodLabel(method.method)}
                         </span>
-                        <span className="font-semibold text-green-800 text-xs sm:text-sm">
+                        <span className="font-semibold text-[#3D583F] text-xs sm:text-sm">
                           {formatCurrency(parseFloat(method.amount))}
                         </span>
                       </div>
@@ -2221,7 +2213,7 @@ export default function CommandsPage() {
                 </Button>
                 <Button 
                   onClick={() => setDetailsModalOpen(false)}
-                  className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto text-sm"
+                  className="bg-[#3D583F] hover:bg-[#365137] w-full sm:w-auto text-sm"
                 >
                   Fechar
                 </Button>

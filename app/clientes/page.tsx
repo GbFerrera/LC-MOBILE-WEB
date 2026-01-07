@@ -71,6 +71,11 @@ export default function ClientesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedClientAppointments, setSelectedClientAppointments] = useState<any[]>([]);
   const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(false);
+  const [totalClients, setTotalClients] = useState<number>(0);
+  const [limit, setLimit] = useState<number>(50);
+  const [offset, setOffset] = useState<number>(0);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [profilePhotosMap, setProfilePhotosMap] = useState<Record<number, string | null>>({});
 
   // Photo gallery states
   const [clientPhotos, setClientPhotos] = useState<any[]>([]);
@@ -102,7 +107,9 @@ export default function ClientesPage() {
         setupAPIInterceptors(user?.company_id ?? 0);
         
         const [clientsResponse, appointmentsResponse, clientPhotosResponse] = await Promise.all([
-          api.get('/clients'),
+          api.get('/clients', {
+            params: { limit, offset: 0 }
+          }),
           api.get('/appointments'),
           api.get('/client-photos/all') // Buscar primeira foto de cada cliente
         ]);
@@ -111,28 +118,29 @@ export default function ClientesPage() {
         const appointmentsData = appointmentsResponse.data;
         const clientPhotosData = clientPhotosResponse.data || [];
         
-        if (!Array.isArray(clientsData)) {
-          throw new Error('Formato de dados de clientes inválido');
-        }
-        
+        const normalizedClients: Client[] = Array.isArray(clientsData) ? clientsData : (Array.isArray(clientsData?.clients) ? clientsData.clients : []);
+        const normalizedTotal: number = Array.isArray(clientsData) ? normalizedClients.length : (typeof clientsData?.total === 'number' ? clientsData.total : normalizedClients.length);
+        const initialOffset = normalizedClients.length;
+
         if (!Array.isArray(appointmentsData)) {
           throw new Error('Formato de dados de agendamentos inválido');
         }
         
-        // Criar um mapa das fotos de perfil por client_id
-        const profilePhotosMap = clientPhotosData.reduce((acc: any, photo: any) => {
+        const mapPhotos = clientPhotosData.reduce((acc: Record<number, string | null>, photo: any) => {
           acc[photo.client_id] = photo.photo_url;
           return acc;
         }, {});
+        setProfilePhotosMap(mapPhotos);
         
-        // Adicionar a foto de perfil aos dados dos clientes
-        const clientsWithPhotos = clientsData.map((client: Client) => ({
+        const clientsWithPhotos = normalizedClients.map((client: Client) => ({
           ...client,
-          profile_photo: profilePhotosMap[client.id] || null
+          profile_photo: mapPhotos[client.id] || null
         }));
         
         setClients(clientsWithPhotos);
         setAppointments(appointmentsData);
+        setTotalClients(normalizedTotal);
+        setOffset(initialOffset);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
         setError('Não foi possível carregar os dados');
@@ -145,6 +153,31 @@ export default function ClientesPage() {
 
     fetchClients();
   }, []);
+
+  const loadMoreClients = async () => {
+    if (isLoadingMore) return;
+    if (clients.length >= totalClients) return;
+    try {
+      setIsLoadingMore(true);
+      setupAPIInterceptors(user?.company_id ?? 0);
+      const response = await api.get('/clients', {
+        params: { limit, offset }
+      });
+      const data = response.data;
+      const moreClients: Client[] = Array.isArray(data) ? data : (Array.isArray(data?.clients) ? data.clients : []);
+      const clientsWithPhotos = moreClients.map((client: Client) => ({
+        ...client,
+        profile_photo: profilePhotosMap[client.id] || null
+      }));
+      setClients(prev => [...prev, ...clientsWithPhotos]);
+      const newOffset = offset + moreClients.length;
+      setOffset(newOffset);
+    } catch (error) {
+      console.error('Erro ao carregar mais clientes:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   // Função para determinar o status do cliente baseado no last_appointment
   const getClientStatus = (client: Client): {
@@ -596,6 +629,17 @@ export default function ClientesPage() {
                   onOpenPhotoGallery={openPhotoGallery}
                 />
               ))}
+              {clients.length < totalClients && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    onClick={loadMoreClients}
+                    disabled={isLoadingMore}
+                    className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                  >
+                    {isLoadingMore ? 'Carregando...' : 'Carregar mais'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

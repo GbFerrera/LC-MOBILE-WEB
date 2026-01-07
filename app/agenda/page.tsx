@@ -398,8 +398,19 @@ export default function AgendaPage() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        // Filtrar apenas clientes válidos com id definido
-        const validClients = (clientsResponse.data || []).filter(client => client && client.id);
+   
+        let clientsData = clientsResponse.data;
+        
+        if (clientsData && clientsData.clients && Array.isArray(clientsData.clients)) {
+          clientsData = clientsData.clients;
+        } else if (clientsData && typeof clientsData === 'object' && !Array.isArray(clientsData)) {
+          clientsData = Object.values(clientsData);
+        } else if (!clientsData) {
+          clientsData = [];
+        }
+        
+        const validClients = clientsData.filter(client => client && client.id);
+        
         setClients(validClients);
 
         // Buscar serviços - tentar diferentes endpoints

@@ -7,10 +7,11 @@ import AppSidebar from "@/components/app-sidebar";
 import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { useCompanyContext } from "@/contexts/CompanyContext";
 import { io, Socket } from "socket.io-client";
+import { useNotifications } from "@/hooks/use-notifications";
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -20,14 +21,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
   const socketRef = useRef<Socket | null>(null);
   const handledAppointmentsRef = useRef<Set<number | string>>(new Set());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [notifications, setNotifications] = useState<{
-    title: string;
-    time: string;
-    profName?: string;
-    clientName?: string;
-  }[]>([]);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const { permission, isSupported, requestPermission, showNotification } = useNotifications();
 
   function HeaderCompanyName() {
     const { currentCompanyName } = useCompanyContext();
@@ -43,26 +37,18 @@ function LayoutContent({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated, loading, isLoginRoute, router]);
 
-  // Solicitar permissão de notificação
+  // Solicitar permissão de notificação ao autenticar
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) return;
     if (isLoginRoute) return;
-    if (typeof window === 'undefined') return;
+    
+    if (isSupported && permission === 'default') {
+      requestPermission();
+    }
+  }, [loading, isAuthenticated, isLoginRoute, isSupported, permission, requestPermission]);
 
-    const requestNotificationPermission = async () => {
-      if ('Notification' in window && Notification.permission === 'default') {
-        const permission = await Notification.requestPermission();
-        setNotificationPermission(permission);
-      } else if ('Notification' in window) {
-        setNotificationPermission(Notification.permission);
-      }
-    };
-
-    requestNotificationPermission();
-  }, [loading, isAuthenticated, isLoginRoute]);
-
-  // Conectar ao Socket para notificações
+  // Conectar ao Socket para notificações de novos agendamentos
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) return;
@@ -70,25 +56,15 @@ function LayoutContent({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     try {
-      // Inicializar áudio
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/notification-sound.mp3');
-        audioRef.current.preload = 'auto';
-        audioRef.current.volume = 0.7;
-      }
-
       const token = localStorage.getItem("@linkCallendar:token");
       const storedUserStr = localStorage.getItem("@linkCallendar:user");
 
-      let professionalId: string | undefined;
       let companyId: string | undefined;
 
       try {
         const parsed = storedUserStr ? JSON.parse(storedUserStr) : null;
-        professionalId = parsed?.id ? String(parsed.id) : undefined;
         companyId = parsed?.company_id ? String(parsed.company_id) : undefined;
       } catch {
-        professionalId = user?.id ? String(user.id) : undefined;
         companyId = user?.company_id ? String(user.company_id) : undefined;
       }
 
@@ -97,7 +73,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
       }
 
       const baseURL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.linkcallendar.com';
-      console.log('[socket] connecting to', baseURL, 'company', companyId);
+      console.log('[Socket] Conectando ao servidor:', baseURL, 'Empresa:', companyId);
 
       const socket = io(baseURL, {
         transports: ["websocket"],
@@ -108,59 +84,32 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
       socketRef.current = socket;
 
+      socket.on('connect', () => {
+        console.log('[Socket] Conectado com sucesso');
+      });
 
-      const showNativeNotification = async (title: string, body: string, tag?: string) => {
-        if (typeof window === 'undefined') return;
-        if (!('Notification' in window)) return;
-        if (Notification.permission !== 'granted') return;
-
-        try {
-          // Tentar usar Service Worker para notificação nativa
-          if ('serviceWorker' in navigator) {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.showNotification(title, {
-              body,
-              icon: '/logo.png',
-              badge: '/logo.png',
-              tag: tag || 'lc-appointment',
-              requireInteraction: false,
-              silent: false,
-              data: {
-                url: '/agenda',
-                appointmentId: tag
-              }
-            });
-            return;
-          }
-
-          // Fallback: notificação direta
-          new Notification(title, {
-            body,
-            icon: '/logo.png',
-            tag: tag || 'lc-appointment',
-            requireInteraction: false,
-            silent: false
-          });
-        } catch (error) {
-          console.log('[Notificação] Erro ao mostrar notificação nativa:', error);
-        }
-      };
+      socket.on('connect_error', (error) => {
+        console.error('[Socket] Erro de conexão:', error);
+      });
 
       const handleNewAppointment = async (payload: any) => {
+        console.log('[Socket] Novo agendamento recebido:', payload);
+
         const id = payload?.appointment?.id;
+        
+        // Evitar duplicatas
         if (id && handledAppointmentsRef.current.has(id)) {
+          console.log('[Socket] Agendamento já processado, ignorando');
           return;
         }
         if (id) handledAppointmentsRef.current.add(id);
 
-        // Tocar som
-        audioRef.current?.play().catch(() => {});
-
+        // Extrair dados do agendamento
         const profName = payload?.professional?.name;
         const clientName = payload?.client?.name;
         const start = payload?.appointment?.start_time;
         const date = payload?.appointment?.appointment_date;
-        const hour = typeof start === 'string' ? start.substring(0,5) : '';
+        const hour = typeof start === 'string' ? start.substring(0, 5) : '';
         const d = typeof date === 'string' ? date.split('-').reverse().join('/') : '';
         
         const title = clientName
@@ -171,21 +120,28 @@ function LayoutContent({ children }: { children: ReactNode }) {
           ? `${profName} • ${d} às ${hour}`
           : 'Novo agendamento';
         
-        const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        setNotifications((list) => [{ title, time, profName, clientName }, ...list].slice(0, 20));
-        
-        // Mostrar notificação nativa do sistema (iOS/Android)
-        await showNativeNotification(title, body, id ? String(id) : undefined);
-        
-        // Toast como backup
-        toast(title, {
-          description: body,
+        // Mostrar notificação nativa usando o hook
+        await showNotification({
+          title,
+          body,
+          tag: id ? String(id) : undefined,
+          data: {
+            url: '/agenda',
+            appointmentId: id,
+            professional: profName,
+            client: clientName,
+            date: d,
+            time: hour
+          }
         });
+
+        console.log('[Socket] Notificação enviada com sucesso');
       };
 
       socket.on("appointments:new", handleNewAppointment);
 
       return () => {
+        console.log('[Socket] Desconectando...');
         socket.off('connect');
         socket.off('connect_error');
         socket.off('error');
@@ -194,9 +150,9 @@ function LayoutContent({ children }: { children: ReactNode }) {
         socket.disconnect();
       };
     } catch (e) {
-      console.error('Erro ao inicializar socket de notificações:', e);
+      console.error('[Socket] Erro ao inicializar socket de notificações:', e);
     }
-  }, [loading, user?.company_id]);
+  }, [loading, isAuthenticated, isLoginRoute, user?.company_id, showNotification]);
 
   if (!isAuthenticated && !isLoginRoute) {
     return null;

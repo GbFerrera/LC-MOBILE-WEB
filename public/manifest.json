@@ -1,7 +1,7 @@
 {
   "name": "Link Callendar - Barbeiro",
   "short_name": "Link Callendar",
-  "description": "Aplicativo de agendamento para barbearias",
+  "description": "Aplicativo de agendamento para barbearias com notificações em tempo real",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -37,8 +37,9 @@
   "categories": ["business", "productivity"],
   "lang": "pt-BR",
   "dir": "ltr",
-  "permissions": [
-    "notifications"
-  ],
-  "gcm_sender_id": "103953800507"
+  "prefer_related_applications": false,
+  "serviceworker": {
+    "src": "/notification-sw.js",
+    "scope": "/"
+  }
 }

@@ -11,22 +11,6 @@ import { useEffect, useRef, useState } from "react";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { useCompanyContext } from "@/contexts/CompanyContext";
 import { io, Socket } from "socket.io-client";
-import { api } from "@/services/api";
-import { useNotificationSound } from "@/hooks/useNotificationSound";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -36,17 +20,13 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
   const socketRef = useRef<Socket | null>(null);
   const handledAppointmentsRef = useRef<Set<number | string>>(new Set());
-  const [notificationPermission, setNotificationPermission] = useState<string>(
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
-  );
-  const [, setNotifications] = useState<{
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [notifications, setNotifications] = useState<{
     title: string;
     time: string;
     profName?: string;
     clientName?: string;
   }[]>([]);
-  
-  const { playNotificationSound } = useNotificationSound();
 
   function HeaderCompanyName() {
     const { currentCompanyName } = useCompanyContext();
@@ -62,41 +42,19 @@ function LayoutContent({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated, loading, isLoginRoute, router]);
 
+  // Conectar ao Socket para notificações (seguindo padrão do Link-Front)
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) return;
     if (isLoginRoute) return;
-    if (typeof window === "undefined") return;
-
-    // Listener para mensagens do service worker (push notifications)
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'PLAY_NOTIFICATION_SOUND') {
-        playNotificationSound();
-      }
-    };
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-    }
+    if (typeof window === 'undefined') return;
 
     try {
-      const alreadyRequested = localStorage.getItem("@linkCallendar:notifications_permission_requested");
-      const isSupported = "Notification" in window;
-      if (isSupported && Notification.permission === "default" && !alreadyRequested) {
-        localStorage.setItem("@linkCallendar:notifications_permission_requested", "1");
-        Notification.requestPermission()
-          .then((p) => setNotificationPermission(p))
-          .catch(() => {});
-      } else if (isSupported) {
-        setNotificationPermission(Notification.permission);
-      }
-    } catch {
-    }
-
-    try {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
+      // Inicializar áudio (igual ao Link-Front)
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/notification-sound.mp3');
+        audioRef.current.preload = 'auto';
+        audioRef.current.volume = 0.7;
       }
 
       const token = localStorage.getItem("@linkCallendar:token");
@@ -118,19 +76,8 @@ function LayoutContent({ children }: { children: ReactNode }) {
         companyId = user?.company_id ? String(user.company_id) : undefined;
       }
 
-      const baseURL =
-        process.env.NEXT_PUBLIC_SOCKET_URL ||
-        process.env.NEXT_PUBLIC_API_URL ||
-        "http://localhost:3131";
-
-      // Debug logs para produção
-      console.log('[DEBUG] Environment:', {
-        NODE_ENV: process.env.NODE_ENV,
-        SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
-        API_URL: process.env.NEXT_PUBLIC_API_URL,
-        baseURL,
-        isHTTPS: typeof window !== 'undefined' ? window.location.protocol === 'https:' : false
-      });
+      const baseURL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3131';
+      console.log('[socket] connecting to', baseURL, 'company', companyId);
 
       const socket = io(baseURL, {
         transports: ["websocket"],
@@ -141,257 +88,47 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
       socketRef.current = socket;
 
-      // Debug logs para conexão WebSocket
-      socket.on('connect', () => {
-        console.log('[DEBUG] WebSocket conectado com sucesso');
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('[DEBUG] Erro de conexão WebSocket:', error);
-      });
-
-      socket.on('disconnect', (reason) => {
-        console.log('[DEBUG] WebSocket desconectado:', reason);
-      });
-
-      const showSystemNotification = async (title: string, body: string, tag?: string) => {
-        if (typeof window === "undefined") return;
-        if (!("Notification" in window)) return;
-        if (Notification.permission !== "granted") return;
-
-        try {
-          if ("serviceWorker" in navigator) {
-            const reg = await navigator.serviceWorker.ready;
-            await reg.showNotification(title, {
-              body,
-              icon: "/logo.png",
-              badge: "/logo.png",
-              tag: tag || "lc-appointment",
-              requireInteraction: false,
-              silent: false,
-              data: {
-                url: '/agenda',
-                appointmentId: tag
-              }
-            });
-            return;
-          }
-
-          // Fallback para notificação direta (caso SW não esteja disponível)
-          new Notification(title, {
-            body,
-            icon: "/logo.png",
-            tag: tag || "lc-appointment",
-            requireInteraction: false,
-            silent: false
-          });
-        } catch (error) {
-          console.log('[DEBUG] Erro ao mostrar notificação:', error);
-        }
-      };
 
       const handleNewAppointment = (payload: any) => {
-        const appointment = payload?.appointment;
-        if (!appointment) return;
-
-        const appointmentId = appointment?.id;
-        if (
-          appointmentId !== undefined &&
-          handledAppointmentsRef.current.has(appointmentId)
-        ) {
+        const id = payload?.appointment?.id;
+        if (id && handledAppointmentsRef.current.has(id)) {
           return;
         }
-        if (appointmentId !== undefined) {
-          handledAppointmentsRef.current.add(appointmentId);
-        }
+        if (id) handledAppointmentsRef.current.add(id);
 
-        const payloadProfessionalId = appointment?.professional_id;
-        if (
-          professionalId &&
-          payloadProfessionalId !== undefined &&
-          String(payloadProfessionalId) !== String(professionalId)
-        ) {
-          return;
-        }
+        audioRef.current?.play().catch(() => {});
 
         const profName = payload?.professional?.name;
         const clientName = payload?.client?.name;
+        const start = payload?.appointment?.start_time;
+        const date = payload?.appointment?.appointment_date;
+        const hour = typeof start === 'string' ? start.substring(0,5) : '';
+        const d = typeof date === 'string' ? date.split('-').reverse().join('/') : '';
+        const title = profName && clientName
+          ? `Novo agendamento do profissional ${profName} com o cliente ${clientName}`
+          : `Novo agendamento criado`;
+        const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        setNotifications((list) => [{ title, time, profName, clientName }, ...list].slice(0, 20));
         
-        // Extrair horário e data do agendamento (não horário atual)
-        const startTime = appointment?.start_time;
-        const appointmentDate = appointment?.appointment_date;
-        
-        // Formatar horário do agendamento (HH:MM)
-        const appointmentTime = typeof startTime === 'string' ? startTime.substring(0, 5) : '';
-        
-        // Formatar data do agendamento (DD/MM/YYYY)
-        const formattedDate = typeof appointmentDate === 'string' 
-          ? appointmentDate.split('-').reverse().join('/') 
-          : '';
-
-        const title =
-          profName && clientName
-            ? `Novo agendamento com ${clientName}`
-            : "Novo agendamento criado";
-
-        // Usar horário do agendamento na descrição
-        const appointmentInfo = appointmentTime && formattedDate
-          ? `${formattedDate} às ${appointmentTime}`
-          : appointmentTime
-          ? `Horário: ${appointmentTime}`
-          : 'Novo agendamento';
-
-        const systemBody =
-          profName && clientName
-            ? `${profName} • ${appointmentInfo}`
-            : appointmentInfo;
-
-        // Salvar horário atual para timestamp da notificação
-        const notificationTime = new Date().toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-        setNotifications((list) =>
-          [{ title, time: notificationTime, profName, clientName }, ...list].slice(0, 20)
-        );
-
-        // Reproduzir som da notificação
-        playNotificationSound();
-
-        // Mostrar notificação nativa do sistema (iOS/Android)
-        showSystemNotification(title, systemBody, appointmentId !== undefined ? String(appointmentId) : undefined);
-
-        // Manter toast apenas como backup/feedback visual adicional
         toast(title, {
-          description: systemBody,
+          description: `${profName} • ${d} às ${hour}`,
         });
       };
 
       socket.on("appointments:new", handleNewAppointment);
 
       return () => {
-        socket.off("appointments:new", handleNewAppointment);
+        socket.off('connect');
+        socket.off('connect_error');
+        socket.off('error');
+        socket.off('disconnect');
+        socket.off('appointments:new', handleNewAppointment);
         socket.disconnect();
-        socketRef.current = null;
-        
-        // Cleanup do listener do service worker
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-        }
       };
-    } catch {
-      return;
+    } catch (e) {
+      console.error('Erro ao inicializar socket de notificações:', e);
     }
-  }, [isAuthenticated, isLoginRoute, loading, user?.company_id, user?.id]);
-
-  useEffect(() => {
-    if (loading) return;
-    if (!isAuthenticated) return;
-    if (isLoginRoute) return;
-    if (typeof window === 'undefined') return;
-
-    const initPush = async () => {
-      console.log('[DEBUG] Iniciando Push Notification setup...');
-      
-      if (!('serviceWorker' in navigator)) {
-        console.error('[DEBUG] Service Worker não suportado');
-        return;
-      }
-      if (!('PushManager' in window)) {
-        console.error('[DEBUG] PushManager não suportado');
-        return;
-      }
-      if (!('Notification' in window)) {
-        console.error('[DEBUG] Notifications não suportadas');
-        return;
-      }
-      if (notificationPermission !== 'granted') {
-        console.log('[DEBUG] Permissão de notificação não concedida:', notificationPermission);
-        return;
-      }
-
-      console.log('[DEBUG] Todos os pré-requisitos atendidos, continuando...');
-
-      const storedUserStr = localStorage.getItem('@linkCallendar:user');
-      if (!storedUserStr) return;
-
-      let professionalId: string | undefined;
-      let companyId: string | undefined;
-
-      try {
-        const parsed = JSON.parse(storedUserStr);
-        professionalId = parsed?.id ? String(parsed.id) : undefined;
-        companyId = parsed?.company_id ? String(parsed.company_id) : undefined;
-      } catch {
-        professionalId = user?.id ? String(user.id) : undefined;
-        companyId = user?.company_id ? String(user.company_id) : undefined;
-      }
-
-      if (!professionalId || !companyId) return;
-
-      try {
-        console.log('[DEBUG] Buscando VAPID public key...');
-        const response = await api.get('/push/vapid-public-key');
-        const publicKey = response.data?.publicKey;
-        
-        if (!publicKey) {
-          console.error('[DEBUG] VAPID public key não encontrada na resposta:', response.data);
-          throw new Error('VAPID public key não encontrada');
-        }
-        
-        console.log('[DEBUG] VAPID public key obtida:', publicKey.substring(0, 20) + '...');
-
-        console.log('[DEBUG] Aguardando service worker...');
-        const reg = await navigator.serviceWorker.ready;
-        console.log('[DEBUG] Service worker pronto:', !!reg);
-
-        console.log('[DEBUG] Verificando subscription existente...');
-        let subscription = await reg.pushManager.getSubscription();
-        
-        if (!subscription) {
-          console.log('[DEBUG] Criando nova subscription...');
-          subscription = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey),
-          });
-          console.log('[DEBUG] Subscription criada com sucesso');
-        } else {
-          console.log('[DEBUG] Subscription existente encontrada');
-        }
-
-        console.log('[DEBUG] Enviando subscription para backend...');
-        await api.post(
-          '/push/subscribe',
-          {
-            professional_id: parseInt(professionalId),
-            subscription,
-            user_agent: navigator.userAgent,
-          },
-          {
-            headers: {
-              company_id: companyId,
-            },
-          }
-        );
-        
-        console.log('[DEBUG] Push notification configurado com sucesso!');
-      } catch (error) {
-        console.error('[DEBUG] Erro ao configurar push notifications:', error);
-        
-        // Log detalhado do erro
-        if (error instanceof Error) {
-          console.error('[DEBUG] Erro detalhado:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-          });
-        }
-      }
-    };
-
-    initPush().catch(() => {});
-  }, [isAuthenticated, isLoginRoute, loading, user?.company_id, user?.id, notificationPermission]);
+  }, [loading, user?.company_id]);
 
   if (!isAuthenticated && !isLoginRoute) {
     return null;

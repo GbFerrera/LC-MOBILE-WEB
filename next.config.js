@@ -4,6 +4,7 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development' || process.env.TURBOPACK,
   sw: 'custom-sw.js',
+  importScripts: ['/push-sw.js'],
   fallbacks: {
     document: '/offline'
   },

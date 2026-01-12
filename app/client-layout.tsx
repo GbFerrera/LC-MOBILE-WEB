@@ -27,6 +27,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
     profName?: string;
     clientName?: string;
   }[]>([]);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   function HeaderCompanyName() {
     const { currentCompanyName } = useCompanyContext();
@@ -42,7 +43,26 @@ function LayoutContent({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated, loading, isLoginRoute, router]);
 
-  // Conectar ao Socket para notificações (seguindo padrão do Link-Front)
+  // Solicitar permissão de notificação
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) return;
+    if (isLoginRoute) return;
+    if (typeof window === 'undefined') return;
+
+    const requestNotificationPermission = async () => {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+      } else if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+    };
+
+    requestNotificationPermission();
+  }, [loading, isAuthenticated, isLoginRoute]);
+
+  // Conectar ao Socket para notificações
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) return;
@@ -50,7 +70,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     try {
-      // Inicializar áudio (igual ao Link-Front)
+      // Inicializar áudio
       if (!audioRef.current) {
         audioRef.current = new Audio('/notification-sound.mp3');
         audioRef.current.preload = 'auto';
@@ -89,13 +109,51 @@ function LayoutContent({ children }: { children: ReactNode }) {
       socketRef.current = socket;
 
 
-      const handleNewAppointment = (payload: any) => {
+      const showNativeNotification = async (title: string, body: string, tag?: string) => {
+        if (typeof window === 'undefined') return;
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+
+        try {
+          // Tentar usar Service Worker para notificação nativa
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification(title, {
+              body,
+              icon: '/logo.png',
+              badge: '/logo.png',
+              tag: tag || 'lc-appointment',
+              requireInteraction: false,
+              silent: false,
+              data: {
+                url: '/agenda',
+                appointmentId: tag
+              }
+            });
+            return;
+          }
+
+          // Fallback: notificação direta
+          new Notification(title, {
+            body,
+            icon: '/logo.png',
+            tag: tag || 'lc-appointment',
+            requireInteraction: false,
+            silent: false
+          });
+        } catch (error) {
+          console.log('[Notificação] Erro ao mostrar notificação nativa:', error);
+        }
+      };
+
+      const handleNewAppointment = async (payload: any) => {
         const id = payload?.appointment?.id;
         if (id && handledAppointmentsRef.current.has(id)) {
           return;
         }
         if (id) handledAppointmentsRef.current.add(id);
 
+        // Tocar som
         audioRef.current?.play().catch(() => {});
 
         const profName = payload?.professional?.name;
@@ -104,14 +162,24 @@ function LayoutContent({ children }: { children: ReactNode }) {
         const date = payload?.appointment?.appointment_date;
         const hour = typeof start === 'string' ? start.substring(0,5) : '';
         const d = typeof date === 'string' ? date.split('-').reverse().join('/') : '';
-        const title = profName && clientName
-          ? `Novo agendamento do profissional ${profName} com o cliente ${clientName}`
-          : `Novo agendamento criado`;
+        
+        const title = clientName
+          ? `Novo agendamento com ${clientName}`
+          : 'Novo agendamento criado';
+        
+        const body = profName && hour && d
+          ? `${profName} • ${d} às ${hour}`
+          : 'Novo agendamento';
+        
         const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         setNotifications((list) => [{ title, time, profName, clientName }, ...list].slice(0, 20));
         
+        // Mostrar notificação nativa do sistema (iOS/Android)
+        await showNativeNotification(title, body, id ? String(id) : undefined);
+        
+        // Toast como backup
         toast(title, {
-          description: `${profName} • ${d} às ${hour}`,
+          description: body,
         });
       };
 

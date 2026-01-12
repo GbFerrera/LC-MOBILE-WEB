@@ -123,6 +123,15 @@ function LayoutContent({ children }: { children: ReactNode }) {
         process.env.NEXT_PUBLIC_API_URL ||
         "http://localhost:3131";
 
+      // Debug logs para produção
+      console.log('[DEBUG] Environment:', {
+        NODE_ENV: process.env.NODE_ENV,
+        SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
+        API_URL: process.env.NEXT_PUBLIC_API_URL,
+        baseURL,
+        isHTTPS: typeof window !== 'undefined' ? window.location.protocol === 'https:' : false
+      });
+
       const socket = io(baseURL, {
         transports: ["websocket"],
         path: "/socket.io",
@@ -131,6 +140,19 @@ function LayoutContent({ children }: { children: ReactNode }) {
       });
 
       socketRef.current = socket;
+
+      // Debug logs para conexão WebSocket
+      socket.on('connect', () => {
+        console.log('[DEBUG] WebSocket conectado com sucesso');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('[DEBUG] Erro de conexão WebSocket:', error);
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log('[DEBUG] WebSocket desconectado:', reason);
+      });
 
       const showSystemNotification = async (title: string, body: string, tag?: string) => {
         if (typeof window === "undefined") return;
@@ -142,20 +164,29 @@ function LayoutContent({ children }: { children: ReactNode }) {
             const reg = await navigator.serviceWorker.ready;
             await reg.showNotification(title, {
               body,
-              icon: "/icon.png",
-              badge: "/favicon.ico",
+              icon: "/logo.png",
+              badge: "/logo.png",
               tag: tag || "lc-appointment",
-              requireInteraction: true,
+              requireInteraction: false,
+              silent: false,
+              data: {
+                url: '/agenda',
+                appointmentId: tag
+              }
             });
             return;
           }
 
+          // Fallback para notificação direta (caso SW não esteja disponível)
           new Notification(title, {
             body,
-            icon: "/icon.png",
+            icon: "/logo.png",
             tag: tag || "lc-appointment",
+            requireInteraction: false,
+            silent: false
           });
-        } catch {
+        } catch (error) {
+          console.log('[DEBUG] Erro ao mostrar notificação:', error);
         }
       };
 
@@ -228,8 +259,10 @@ function LayoutContent({ children }: { children: ReactNode }) {
         // Reproduzir som da notificação
         playNotificationSound();
 
+        // Mostrar notificação nativa do sistema (iOS/Android)
         showSystemNotification(title, systemBody, appointmentId !== undefined ? String(appointmentId) : undefined);
 
+        // Manter toast apenas como backup/feedback visual adicional
         toast(title, {
           description: systemBody,
         });
@@ -259,10 +292,26 @@ function LayoutContent({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     const initPush = async () => {
-      if (!('serviceWorker' in navigator)) return;
-      if (!('PushManager' in window)) return;
-      if (!('Notification' in window)) return;
-      if (notificationPermission !== 'granted') return;
+      console.log('[DEBUG] Iniciando Push Notification setup...');
+      
+      if (!('serviceWorker' in navigator)) {
+        console.error('[DEBUG] Service Worker não suportado');
+        return;
+      }
+      if (!('PushManager' in window)) {
+        console.error('[DEBUG] PushManager não suportado');
+        return;
+      }
+      if (!('Notification' in window)) {
+        console.error('[DEBUG] Notifications não suportadas');
+        return;
+      }
+      if (notificationPermission !== 'granted') {
+        console.log('[DEBUG] Permissão de notificação não concedida:', notificationPermission);
+        return;
+      }
+
+      console.log('[DEBUG] Todos os pré-requisitos atendidos, continuando...');
 
       const storedUserStr = localStorage.getItem('@linkCallendar:user');
       if (!storedUserStr) return;
@@ -281,33 +330,64 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
       if (!professionalId || !companyId) return;
 
-      const reg = await navigator.serviceWorker.ready;
-
-      const keyResponse = await api.get('/push/vapid-public-key');
-      const publicKey = keyResponse?.data?.publicKey;
-      if (!publicKey) return;
-
-      let subscription = await reg.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
-      }
-
-      await api.post(
-        '/push/subscribe',
-        {
-          professional_id: parseInt(professionalId),
-          subscription,
-          user_agent: navigator.userAgent,
-        },
-        {
-          headers: {
-            company_id: companyId,
-          },
+      try {
+        console.log('[DEBUG] Buscando VAPID public key...');
+        const response = await api.get('/push/vapid-public-key');
+        const publicKey = response.data?.publicKey;
+        
+        if (!publicKey) {
+          console.error('[DEBUG] VAPID public key não encontrada na resposta:', response.data);
+          throw new Error('VAPID public key não encontrada');
         }
-      );
+        
+        console.log('[DEBUG] VAPID public key obtida:', publicKey.substring(0, 20) + '...');
+
+        console.log('[DEBUG] Aguardando service worker...');
+        const reg = await navigator.serviceWorker.ready;
+        console.log('[DEBUG] Service worker pronto:', !!reg);
+
+        console.log('[DEBUG] Verificando subscription existente...');
+        let subscription = await reg.pushManager.getSubscription();
+        
+        if (!subscription) {
+          console.log('[DEBUG] Criando nova subscription...');
+          subscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+          console.log('[DEBUG] Subscription criada com sucesso');
+        } else {
+          console.log('[DEBUG] Subscription existente encontrada');
+        }
+
+        console.log('[DEBUG] Enviando subscription para backend...');
+        await api.post(
+          '/push/subscribe',
+          {
+            professional_id: parseInt(professionalId),
+            subscription,
+            user_agent: navigator.userAgent,
+          },
+          {
+            headers: {
+              company_id: companyId,
+            },
+          }
+        );
+        
+        console.log('[DEBUG] Push notification configurado com sucesso!');
+      } catch (error) {
+        console.error('[DEBUG] Erro ao configurar push notifications:', error);
+        
+        // Log detalhado do erro
+        if (error instanceof Error) {
+          console.error('[DEBUG] Erro detalhado:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
+        }
+      }
     };
 
     initPush().catch(() => {});

@@ -40,13 +40,13 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body,
-    icon: '/icon.png',
-    badge: '/favicon.png',
+    icon: '/logo.png',          // Usar logo do app
+    badge: '/logo.png',         // Badge para iOS
     data: { url, appointmentData },
     tag: data.tag || (data.appointment_id ? `appointment-${data.appointment_id}` : 'lc-notification'),
-    requireInteraction: true,
-    silent: false, // Permitir som da notificação
-    sound: '/notification-sound.mp3', // Som customizado (nem todos os browsers suportam)
+    requireInteraction: false,  // Permite que desapareça automaticamente
+    silent: false,              // Som nativo do sistema
+    timestamp: Date.now(),      // Timestamp para ordenação
   };
 
   // Tentar reproduzir som customizado via service worker

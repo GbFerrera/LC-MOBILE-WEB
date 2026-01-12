@@ -76,7 +76,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
         companyId = user?.company_id ? String(user.company_id) : undefined;
       }
 
-      const baseURL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3131';
+      const baseURL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.linkcallendar.com';
       console.log('[socket] connecting to', baseURL, 'company', companyId);
 
       const socket = io(baseURL, {

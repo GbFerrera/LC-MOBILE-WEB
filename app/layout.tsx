@@ -29,8 +29,8 @@ export const metadata: Metadata = {
     title: "LC Barbeiro",
   },
   icons: {
-    icon: "/favicon.ico",
-    apple: "/icon.png",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
   viewport: {
     width: "device-width",
@@ -53,13 +53,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <meta name="apple-mobile-web-app-title" content="LC Barbeiro" />
-        <link rel="apple-touch-icon" href="/icon.png" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" type="image/png" href="/logo.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} antialiased`}
-        style={{ backgroundColor: '#F1F1E7' }}
+        style={{ backgroundColor: 'var(--app-bg-color, #F1F1E7)' }}
       >
         <ClientLayout>{children}</ClientLayout>
         <div id="toast-root"></div>

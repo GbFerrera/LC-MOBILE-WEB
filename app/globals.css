@@ -223,7 +223,7 @@
   }
   body {
     @apply text-foreground text-[18px] md:text-[19px];
-    background-color: #F1F1E7;
+    background-color: var(--app-bg-color, #F1F1E7);
     font-family: var(--font-outfit), var(--font-geist-sans), system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
   }
 }

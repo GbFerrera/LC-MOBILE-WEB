@@ -108,7 +108,7 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="text-[#3D583F]">Estabelecimentos</SidebarGroupLabel>
+        <SidebarGroupLabel className="text-[#3D583F]">Unidades</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {isLoading ? (

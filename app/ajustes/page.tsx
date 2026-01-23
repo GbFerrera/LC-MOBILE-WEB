@@ -19,6 +19,8 @@ import {
   CalendarDays,
   X,
   Calendar,
+  Bell,
+  BellOff,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
@@ -27,10 +29,12 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { api } from "@/services/api";
 import { toast } from "sonner";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export default function AjustesPage() {
   const { user, updateUser, signOut } = useAuth();
   const router = useRouter();
+  const { permission, isSupported, requestPermission, showNotification } = useNotifications();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isServiceHoursDialogOpen, setIsServiceHoursDialogOpen] = useState(false);
   const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
@@ -276,6 +280,40 @@ export default function AjustesPage() {
     }
   };
 
+  // Função para controlar notificações PWA
+  const handleNotificationToggle = async () => {
+    if (!isSupported) {
+      toast.error("Notificações não são suportadas neste dispositivo");
+      return;
+    }
+
+    if (permission === 'granted') {
+      toast.info("Para desativar notificações, vá nas configurações do seu navegador/celular");
+      return;
+    }
+
+    if (permission === 'denied') {
+      toast.error("Permissão de notificações negada. Ative nas configurações do seu navegador/celular");
+      return;
+    }
+
+    // Solicitar permissão
+    const result = await requestPermission();
+    
+    if (result === 'granted') {
+      toast.success("Notificações ativadas com sucesso!");
+      
+      // Mostrar notificação de teste
+      await showNotification({
+        title: "Notificações Ativadas! 🎉",
+        body: "Você receberá alertas de novos agendamentos",
+        tag: "test-notification"
+      });
+    } else if (result === 'denied') {
+      toast.error("Permissão de notificações negada");
+    }
+  };
+
   // Configurações filtradas
   const settingButtons = [
     {
@@ -300,6 +338,18 @@ export default function AjustesPage() {
       description: "Configure informações do negócio",
       icon: StoreIcon,
       iconColor: "text-emerald-600",
+      bgColor: "bg-white",
+    },
+    {
+      id: "notifications",
+      title: "Notificações",
+      description: permission === 'granted' 
+        ? "Notificações ativadas" 
+        : permission === 'denied'
+          ? "Notificações bloqueadas"
+          : "Receba alertas de novos agendamentos",
+      icon: permission === 'granted' ? Bell : BellOff,
+      iconColor: "text-purple-600",
       bgColor: "bg-white",
     },
   ];
@@ -2216,23 +2266,37 @@ export default function AjustesPage() {
                     <Button
                       size="sm"
                       onClick={
-                        setting.id === 'services'
-                          ? handleServicesClick
-                          : setting.id === 'schedule'
-                            ? handleScheduleClick
-                            : setting.id === 'business'
-                              ? handleCompanyDetailsClick
-                              : undefined
+                        setting.id === 'notifications'
+                          ? handleNotificationToggle
+                          : setting.id === 'services'
+                            ? handleServicesClick
+                            : setting.id === 'schedule'
+                              ? handleScheduleClick
+                              : setting.id === 'business'
+                                ? handleCompanyDetailsClick
+                                : undefined
                       }
-                      className="bg-[#3D583F] hover:bg-[#365137] hover:shadow-lg transition-all duration-300 text-white font-medium px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0"
+                      className={`${
+                        setting.id === 'notifications' && permission === 'granted'
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : setting.id === 'notifications' && permission === 'denied'
+                            ? 'bg-gray-600 hover:bg-gray-700'
+                            : 'bg-[#3D583F] hover:bg-[#365137]'
+                      } hover:shadow-lg transition-all duration-300 text-white font-medium px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0`}
                     >
-                      {setting.id === 'services'
-                        ? 'Ver Serviços'
-                        : setting.id === 'schedule'
-                          ? 'Horários'
-                          : setting.id === 'business'
-                            ? 'Detalhes'
-                            : 'Configurar'
+                      {setting.id === 'notifications'
+                        ? permission === 'granted'
+                          ? 'Ativado'
+                          : permission === 'denied'
+                            ? 'Bloqueado'
+                            : 'Ativar'
+                        : setting.id === 'services'
+                          ? 'Ver Serviços'
+                          : setting.id === 'schedule'
+                            ? 'Horários'
+                            : setting.id === 'business'
+                              ? 'Detalhes'
+                              : 'Configurar'
                       }
                     </Button>
                   </div>

@@ -297,20 +297,30 @@ export default function AjustesPage() {
       return;
     }
 
-    // Solicitar permissão
-    const result = await requestPermission();
-    
-    if (result === 'granted') {
-      toast.success("Notificações ativadas com sucesso!");
+    try {
+      console.log('[Ajustes] Solicitando permissão de notificação...');
       
-      // Mostrar notificação de teste
-      await showNotification({
-        title: "Notificações Ativadas! 🎉",
-        body: "Você receberá alertas de novos agendamentos",
-        tag: "test-notification"
-      });
-    } else if (result === 'denied') {
-      toast.error("Permissão de notificações negada");
+      // Solicitar permissão diretamente (PWA nativo)
+      const result = await Notification.requestPermission();
+      console.log('[Ajustes] Resultado da permissão:', result);
+      
+      if (result === 'granted') {
+        toast.success("Notificações ativadas com sucesso!");
+        
+        // Mostrar notificação de teste
+        await showNotification({
+          title: "Notificações Ativadas! 🎉",
+          body: "Você receberá alertas de novos agendamentos",
+          tag: "test-notification"
+        });
+      } else if (result === 'denied') {
+        toast.error("Permissão de notificações negada");
+      } else {
+        toast.info("Permissão de notificações não concedida");
+      }
+    } catch (error) {
+      console.error('[Ajustes] Erro ao solicitar permissão:', error);
+      toast.error("Erro ao solicitar permissão de notificações");
     }
   };
 

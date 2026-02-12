@@ -37,7 +37,9 @@ import {
   Building,
   Building2,
   ChevronRight,
-  Check
+  Check,
+  CalendarCheck,
+  UserPlus
 } from "lucide-react";
 
 export default function AppSidebar() {
@@ -72,6 +74,13 @@ export default function AppSidebar() {
         { href: "/commissions", label: "Comissões", icon: HandCoinsIcon },
         { href: "/remuneration", label: "Remunerações", icon: HandCoinsIcon },
         { href: "/transactions", label: "Despesas", icon: ActivityIcon },
+      ],
+    },
+    {
+      titulo: "Assinaturas",
+      itens: [
+        { href: "/assinaturas", label: "Assinaturas", icon: CalendarCheck },
+        { href: "/assinaturas/planos", label: "Planos", icon: UserPlus },
       ],
     },
     {

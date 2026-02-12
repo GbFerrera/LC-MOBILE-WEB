@@ -287,20 +287,18 @@ export default function AjustesPage() {
       return;
     }
 
+    // Se já está ativado, informar como desativar
     if (permission === 'granted') {
       toast.info("Para desativar notificações, vá nas configurações do seu navegador/celular");
       return;
     }
 
-    if (permission === 'denied') {
-      toast.error("Permissão de notificações negada. Ative nas configurações do seu navegador/celular");
-      return;
-    }
-
     try {
+      console.log('[Ajustes] Estado atual da permissão:', permission);
       console.log('[Ajustes] Solicitando permissão de notificação...');
       
       // Solicitar permissão diretamente (PWA nativo)
+      // Isso vai abrir o popup nativo do Android/iOS
       const result = await Notification.requestPermission();
       console.log('[Ajustes] Resultado da permissão:', result);
       
@@ -314,13 +312,13 @@ export default function AjustesPage() {
           tag: "test-notification"
         });
       } else if (result === 'denied') {
-        toast.error("Permissão de notificações negada");
+        toast.error("Você negou a permissão. Para ativar, vá em Configurações > Notificações do seu celular");
       } else {
-        toast.info("Permissão de notificações não concedida");
+        toast.info("Permissão não concedida. Tente novamente");
       }
     } catch (error) {
       console.error('[Ajustes] Erro ao solicitar permissão:', error);
-      toast.error("Erro ao solicitar permissão de notificações");
+      toast.error("Erro ao solicitar permissão de notificações. Verifique se o app está instalado como PWA");
     }
   };
 

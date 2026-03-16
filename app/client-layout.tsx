@@ -21,7 +21,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
 
   const socketRef = useRef<Socket | null>(null);
   const handledAppointmentsRef = useRef<Set<number | string>>(new Set());
-  const { permission, isSupported, requestPermission, showNotification } = useNotifications();
+  const { permission, isSupported, requestPermission, showNotification, ensurePushSubscription } = useNotifications();
 
   function HeaderCompanyName() {
     const { currentCompanyName } = useCompanyContext();
@@ -47,6 +47,16 @@ function LayoutContent({ children }: { children: ReactNode }) {
       requestPermission();
     }
   }, [loading, isAuthenticated, isLoginRoute, isSupported, permission, requestPermission]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) return;
+    if (isLoginRoute) return;
+    if (!isSupported) return;
+    if (permission !== 'granted') return;
+
+    ensurePushSubscription({ companyId: user?.company_id, teamId: user?.id }).catch(() => {});
+  }, [loading, isAuthenticated, isLoginRoute, isSupported, permission, user?.company_id, user?.id, ensurePushSubscription]);
 
   // Conectar ao Socket para notificações de novos agendamentos
   useEffect(() => {

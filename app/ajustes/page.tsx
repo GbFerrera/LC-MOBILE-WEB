@@ -34,7 +34,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 export default function AjustesPage() {
   const { user, updateUser, signOut } = useAuth();
   const router = useRouter();
-  const { permission, isSupported, requestPermission, showNotification } = useNotifications();
+  const { permission, isSupported, supportReason, isPushEnabled, requestPermission, showNotification, ensurePushSubscription, disablePushSubscription } = useNotifications();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isServiceHoursDialogOpen, setIsServiceHoursDialogOpen] = useState(false);
   const [isCompanyDetailsDialogOpen, setIsCompanyDetailsDialogOpen] = useState(false);
@@ -283,39 +283,63 @@ export default function AjustesPage() {
   // Função para controlar notificações PWA
   const handleNotificationToggle = async () => {
     if (!isSupported) {
-      toast.error("Notificações não são suportadas neste dispositivo");
+      const message =
+        supportReason === 'ios_requires_install'
+          ? "No iPhone/iPad, instale como PWA (Adicionar à Tela de Início) para receber notificações"
+          : supportReason === 'not_secure_context'
+            ? "Notificações exigem HTTPS (ou localhost)"
+            : supportReason === 'no_service_worker'
+              ? "Este navegador não suporta Service Worker (ou está em modo anônimo)"
+              : supportReason === 'no_push_manager'
+                ? "Este navegador não suporta Push Notifications"
+                : "Notificações não são suportadas neste dispositivo";
+      toast.error(message);
       return;
     }
 
-    // Se já está ativado, informar como desativar
-    if (permission === 'granted') {
-      toast.info("Para desativar notificações, vá nas configurações do seu navegador/celular");
+    if (permission === "denied") {
+      toast.error("Notificações bloqueadas. Ative em Configurações > Notificações do seu celular/navegador");
       return;
     }
 
     try {
-      console.log('[Ajustes] Estado atual da permissão:', permission);
-      console.log('[Ajustes] Solicitando permissão de notificação...');
-      
-      // Solicitar permissão diretamente (PWA nativo)
-      // Isso vai abrir o popup nativo do Android/iOS
-      const result = await Notification.requestPermission();
-      console.log('[Ajustes] Resultado da permissão:', result);
-      
-      if (result === 'granted') {
-        toast.success("Notificações ativadas com sucesso!");
-        
-        // Mostrar notificação de teste
-        await showNotification({
-          title: "Notificações Ativadas! 🎉",
-          body: "Você receberá alertas de novos agendamentos",
-          tag: "test-notification"
-        });
-      } else if (result === 'denied') {
-        toast.error("Você negou a permissão. Para ativar, vá em Configurações > Notificações do seu celular");
-      } else {
-        toast.info("Permissão não concedida. Tente novamente");
+      if (isPushEnabled) {
+        await disablePushSubscription({ companyId: user?.company_id });
+        toast.success("Notificações desativadas com sucesso!");
+        return;
       }
+
+      const perm = await requestPermission();
+      if (perm !== "granted") {
+        toast.info("Permissão não concedida. Tente novamente");
+        return;
+      }
+
+      const result = await ensurePushSubscription({ companyId: user?.company_id, teamId: user?.id });
+      if (result.ok === false) {
+        const msg =
+          result.reason === 'api_error'
+            ? "Não foi possível falar com a API (HTTPS/certificado). Abra também https://192.168.1.7:3444 no navegador e confira o cadeado"
+            : result.reason === 'missing_public_key'
+              ? "A API não retornou a chave pública de push"
+              : result.reason === 'push_subscribe_error'
+                ? "Falha ao registrar no navegador (Push). Isso acontece quando o site não está realmente seguro/trust no dispositivo"
+                : result.reason === 'backend_subscribe_error'
+                  ? `A API recusou salvar a inscrição: ${result.message || 'erro' }`
+                : result.reason === 'permission_denied'
+                  ? "Permissão de notificações negada"
+                  : "Não foi possível ativar as notificações";
+        toast.error(msg);
+        return;
+      }
+
+      toast.success("Notificações ativadas com sucesso!");
+
+      await showNotification({
+        title: "Notificações Ativadas! 🎉",
+        body: "Você receberá alertas de novos agendamentos",
+        tag: "test-notification"
+      });
     } catch (error) {
       console.error('[Ajustes] Erro ao solicitar permissão:', error);
       toast.error("Erro ao solicitar permissão de notificações. Verifique se o app está instalado como PWA");
@@ -351,12 +375,18 @@ export default function AjustesPage() {
     {
       id: "notifications",
       title: "Notificações",
-      description: permission === 'granted' 
-        ? "Notificações ativadas" 
-        : permission === 'denied'
+      description: !isSupported
+        ? supportReason === 'ios_requires_install'
+          ? "Instale como PWA para habilitar"
+          : supportReason === 'not_secure_context'
+            ? "Ative em HTTPS"
+            : "Indisponível neste dispositivo"
+        : permission === "denied"
           ? "Notificações bloqueadas"
-          : "Receba alertas de novos agendamentos",
-      icon: permission === 'granted' ? Bell : BellOff,
+          : isPushEnabled
+            ? "Notificações ativadas"
+            : "Receba alertas de novos agendamentos",
+      icon: isPushEnabled ? Bell : BellOff,
       iconColor: "text-purple-600",
       bgColor: "bg-white",
     },
@@ -2285,7 +2315,7 @@ export default function AjustesPage() {
                                 : undefined
                       }
                       className={`${
-                        setting.id === 'notifications' && permission === 'granted'
+                        setting.id === 'notifications' && isPushEnabled
                           ? 'bg-green-600 hover:bg-green-700'
                           : setting.id === 'notifications' && permission === 'denied'
                             ? 'bg-gray-600 hover:bg-gray-700'
@@ -2293,10 +2323,10 @@ export default function AjustesPage() {
                       } hover:shadow-lg transition-all duration-300 text-white font-medium px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0`}
                     >
                       {setting.id === 'notifications'
-                        ? permission === 'granted'
-                          ? 'Ativado'
-                          : permission === 'denied'
-                            ? 'Bloqueado'
+                        ? permission === 'denied'
+                          ? 'Bloqueado'
+                          : isPushEnabled
+                            ? 'Desativar'
                             : 'Ativar'
                         : setting.id === 'services'
                           ? 'Ver Serviços'

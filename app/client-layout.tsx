@@ -106,6 +106,12 @@ function LayoutContent({ children }: { children: ReactNode }) {
         console.log('[Socket] Novo agendamento recebido:', payload);
 
         const id = payload?.appointment?.id;
+        const professionalId = payload?.appointment?.professional_id;
+        const myId = user?.id ? Number(user.id) : undefined;
+
+        if (myId && professionalId && Number(professionalId) !== myId) {
+          return;
+        }
         
         // Evitar duplicatas
         if (id && handledAppointmentsRef.current.has(id)) {

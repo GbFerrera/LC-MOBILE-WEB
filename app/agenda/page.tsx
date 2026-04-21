@@ -270,16 +270,41 @@ export default function AgendaPage() {
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>(user?.id?.toString() || "");
   const [loadingProfessionals, setLoadingProfessionals] = useState(false);
 
-  // Filtrar clientes com base na busca
-  const filteredClients = clients.filter((client) => {
-    if (!clientSearch.trim()) return false; // Se não houver texto de busca, não mostra nenhum cliente
-    
-    const searchTerm = clientSearch.toLowerCase().trim();
-    const nameMatch = client.name?.toLowerCase().includes(searchTerm);
-    const phoneMatch = client.phone?.includes(searchTerm);
-    
-    return nameMatch || phoneMatch;
-  });
+  // Estado para resultados de busca de clientes
+  const [filteredClients, setFilteredClients] = useState<any[]>([]);
+  const [isSearchingClients, setIsSearchingClients] = useState(false);
+
+  // Buscar clientes no backend com debounce
+  useEffect(() => {
+    if (!clientSearch.trim() || clientSearch.trim().length < 2) {
+      setFilteredClients([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        setIsSearchingClients(true);
+        const response = await api.get("/clients", {
+          headers: {
+            company_id: user?.company_id?.toString() || "0",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          params: { term: clientSearch.trim(), limit: 20 }
+        });
+        let results: any[] = [];
+        if (Array.isArray(response.data)) {
+          results = response.data;
+        } else if (response.data && Array.isArray(response.data.clients)) {
+          results = response.data.clients;
+        }
+        setFilteredClients(results.filter(c => c && c.id));
+      } catch {
+        setFilteredClients([]);
+      } finally {
+        setIsSearchingClients(false);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [clientSearch, user?.company_id]);
 
   // Dados do formulário
   const [formData, setFormData] = useState({
@@ -2273,403 +2298,173 @@ export default function AgendaPage() {
 
       {/* Diálogo de Agendamento */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[440px] max-h-[90vh] overflow-y-auto p-0">
           <form onSubmit={handleSubmitAppointment}>
-            <DialogHeader className="text-center pb-6">
-            
-              
-              {/* Toggle Switch Minimalista */}
-              <div className="flex items-center justify-center mb-4">
-                <div className="flex items-center space-x-3 bg-gray-100 rounded-full p-1">
+            {/* Header compacto */}
+            <div className="px-6 pt-6 pb-4">
+              {/* Toggle Agendamento / Intervalo */}
+              <div className="flex items-center justify-center mb-5">
+                <div className="inline-flex bg-gray-100 rounded-full p-0.5">
                   <button
                     type="button"
                     onClick={() => setIsFreeIntervalMode(false)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                      !isFreeIntervalMode
-                        ? "bg-white text-emerald-700 shadow-sm"
-                        : "text-gray-600 hover:text-gray-800"
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      !isFreeIntervalMode ? "bg-white text-[#3D583F] shadow-sm" : "text-gray-500"
                     }`}
                   >
-                    Novo Agendamento
+                    Agendamento
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsFreeIntervalMode(true)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                      isFreeIntervalMode
-                        ? "bg-white text-emerald-700 shadow-sm"
-                        : "text-gray-600 hover:text-gray-800"
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      isFreeIntervalMode ? "bg-white text-[#3D583F] shadow-sm" : "text-gray-500"
                     }`}
                   >
-                    Intervalo Livre
+                    Intervalo
                   </button>
                 </div>
               </div>
 
-              {/* Switch para Cliente Regular - apenas para agendamento normal */}
-              {!isFreeIntervalMode && (
-                <div className="flex items-center justify-center mb-4">
-                <div className="flex items-center space-x-3 bg-[#3D583F]/10 rounded-lg p-3 border border-[#3D583F]/30">
-                    <input
-                      type="checkbox"
-                      id="regular-client-switch"
-                      checked={isRegularClient}
-                      onChange={(e) => {
-                        setIsRegularClient(e.target.checked);
-                        if (e.target.checked) {
-                          setIsRegularClientDialogOpen(true);
-                        } else {
-                          setRegularClientConfig({
-                            dayOfWeek: "",
-                            time: "",
-                            startDate: "",
-                            endDate: ""
-                          });
-                        }
-                      }}
-                      className="w-4 h-4 text-[#3D583F] bg-gray-100 border-gray-300 rounded focus:ring-[#3D583F]"
-                    />
-                    <label htmlFor="regular-client-switch" className="text-sm font-medium text-[#3D583F]">
-                      Cliente Regular
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Mostrar configuração quando cliente regular ativado e configurado */}
-              {!isFreeIntervalMode && isRegularClient && regularClientConfig.dayOfWeek && regularClientConfig.time && regularClientConfig.startDate && regularClientConfig.endDate && (
-                <div className="mb-4 bg-[#3D583F]/10 p-3 rounded-lg border border-[#3D583F]/30">
-                  <div className="text-sm text-[#3D583F] font-medium mb-1">Configuração:</div>
-                  <div className="text-xs text-[#3D583F] space-y-1">
-                    <div>📅 {
-                      regularClientConfig.dayOfWeek === 'Monday' ? 'Segunda-feira' :
-                      regularClientConfig.dayOfWeek === 'Tuesday' ? 'Terça-feira' :
-                      regularClientConfig.dayOfWeek === 'Wednesday' ? 'Quarta-feira' :
-                      regularClientConfig.dayOfWeek === 'Thursday' ? 'Quinta-feira' :
-                      regularClientConfig.dayOfWeek === 'Friday' ? 'Sexta-feira' :
-                      regularClientConfig.dayOfWeek === 'Saturday' ? 'Sábado' :
-                      regularClientConfig.dayOfWeek === 'Sunday' ? 'Domingo' : ''
-                    } às {regularClientConfig.time}</div>
-                    <div>📆 De {regularClientConfig.startDate ? new Date(regularClientConfig.startDate + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'} até {regularClientConfig.endDate ? new Date(regularClientConfig.endDate + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}</div>
-                    <button 
-                      type="button"
-                      onClick={() => setIsRegularClientDialogOpen(true)}
-                      className="mt-2 px-2 py-1 bg-[#3D583F]/10 hover:bg-[#3D583F]/20 text-[#3D583F] text-xs rounded transition-colors"
-                    >
-                      Alterar Configuração
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <DialogTitle className="text-2xl font-bold text-[#3D583F]">
-                <div className="flex items-center justify-center gap-2">
+              <DialogHeader className="text-center space-y-1 mb-0">
+                <DialogTitle className="text-lg font-semibold text-gray-900">
                   {isFreeIntervalMode ? "Intervalo Livre" : "Novo Agendamento"}
                   {isEncaixe && !isFreeIntervalMode && (
-                    <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded-full">
+                    <span className="ml-2 bg-yellow-100 text-yellow-700 text-[10px] font-semibold px-2 py-0.5 rounded-full align-middle">
                       Encaixe
                     </span>
                   )}
-                </div>
-              </DialogTitle>
-              <DialogDescription className="text-[#3D583F] mt-2">
-                {isFreeIntervalMode 
-                  ? (
-                    <>
-                      Criar um intervalo livre para{" "}
-                      <span className="font-semibold text-[#3D583F]">
-                        {selectedSlot}
-                      </span>
-                    </>
-                  ) : isEncaixe ? (
-                    <>
-                      Encaixar agendamento no horário{" "}
-                      <span className="font-semibold text-yellow-700">
-                        {selectedSlot} até {encaixeEndTime}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      Preencha os dados para criar um novo agendamento para{" "}
-                      <span className="font-semibold text-[#3D583F]">
-                        {selectedSlot}
-                      </span>
-                    </>
-                  )
-                }
-              </DialogDescription>
-            </DialogHeader>
+                </DialogTitle>
+                <DialogDescription className="text-sm text-gray-500">
+                  {date.toLocaleDateString("pt-BR")} &middot; {selectedSlot}
+                  {isEncaixe && encaixeEndTime && ` - ${encaixeEndTime}`}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-            <div className="space-y-6 py-6">
-              {/* Data e Horário - Destacado */}
-              <div className="rounded-xl p-4 border-2 bg-[#3D583F]/5 border-[#3D583F]/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="rounded-lg p-2 bg-[#3D583F]/10">
-                      <svg
-                        className="w-5 h-5 text-[#3D583F]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[#3D583F]">
-                        Data e Horário
-                      </p>
-                      <p className={`${
-                        isFreeIntervalMode ? "text-[#3D583F]" : isEncaixe ? "text-yellow-700" : "text-[#3D583F]"
-                      }`}>
-                        {date.toLocaleDateString("pt-BR")} às {selectedSlot}
-                        {isFreeIntervalMode && selectedEndTime && ` - ${selectedEndTime}`}
-                        {isEncaixe && encaixeEndTime && ` - ${encaixeEndTime}`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
+            <div className="px-6 pb-6 space-y-4">
               {/* Horário Final - Apenas para Intervalo Livre */}
               {isFreeIntervalMode && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-[#3D583F] flex items-center">
-                    <svg
-                      className="w-4 h-4 mr-2 text-[#3D583F]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Horário Final *
-                  </Label>
-                  <Select
-                    value={selectedEndTime}
-                    onValueChange={setSelectedEndTime}
-                  >
-                    <SelectTrigger className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] rounded-lg">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Horário Final</Label>
+                  <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
+                    <SelectTrigger className="h-11 border border-gray-200 rounded-lg">
                       <SelectValue placeholder="Selecione o horário final" />
                     </SelectTrigger>
                     <SelectContent>
                       {getValidEndTimes(selectedSlot).map((time) => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-[#3D583F]">
-                    Horários disponíveis em intervalos de 15 minutos
-                  </p>
                 </div>
               )}
 
-              {/* Cliente - Com busca (apenas para agendamento normal) */}
+              {/* Cliente */}
               {!isFreeIntervalMode && (
-              <div className="space-y-2">
-                <Label
-                  htmlFor="client_id"
-                  className="text-sm font-semibold text-gray-700 flex items-center"
-                >
-                  <svg
-                    className="w-4 h-4 mr-2 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  Cliente *
-                </Label>
-                <div className="relative">
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3D583F]">
-                        <Search size={18} />
-                      </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente</Label>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <Input
                       id="client_search"
                       name="client_id"
-                      placeholder="Buscar cliente por nome ou telefone..."
+                      placeholder="Buscar cliente..."
                       value={clientSearch}
-                      onChange={(e) => {
-                        setClientSearch(e.target.value);
-                        setShowClientDropdown(true);
-                      }}
+                      onChange={(e) => { setClientSearch(e.target.value); setShowClientDropdown(true); }}
                       onFocus={() => {
-                        // Se já tiver um cliente selecionado e o campo estiver preenchido com o nome do cliente,
-                        // limpa o campo para facilitar uma nova busca
-                        if (formData.client_id && clientSearch) {
-                          setClientSearch("");
-                        }
+                        if (formData.client_id && clientSearch) setClientSearch("");
                         setShowClientDropdown(true);
                       }}
-                      onBlur={() => {
-                        // Pequeno delay para permitir que o clique no item da lista seja processado
-                        setTimeout(() => setShowClientDropdown(false), 150);
-                      }}
-                      className="h-12 border-2 border-gray-200 focus:border-emerald-400 rounded-lg pl-10 pr-10"
+                      onBlur={() => setTimeout(() => setShowClientDropdown(false), 150)}
+                      className="h-11 border border-gray-200 rounded-lg pl-9 pr-9"
                       autoComplete="off"
                       required
                     />
-                  </div>
-                  {/* Indicador visual do cliente selecionado */}
-                  {formData.client_id && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
-                      <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
-                        <span className="text-xs font-semibold text-emerald-600">
-                          {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
-                        </span>
+                    {formData.client_id && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <CircleX
+                          className="h-4 w-4 text-gray-400 cursor-pointer hover:text-red-500 transition-colors"
+                          onClick={() => { handleSelectChange("client_id", ""); setClientSearch(""); }}
+                        />
                       </div>
-                      <CircleX
-                        className="h-4 w-4 text-gray-500 cursor-pointer hover:text-red-500"
-                        onClick={() => {
-                          handleSelectChange("client_id", "");
-                          setClientSearch("");
-                        }}
-                      />
-                    </div>
-                  )}
-                  {/* Mostrar resultados da busca abaixo do input */}
-                  {clientSearch.trim() && showClientDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-auto border border-gray-200 animate-in fade-in-50 slide-in-from-top-5 duration-200">
-                      {filteredClients.length > 0 ? (
-                        filteredClients.map((client) => (
-                          <div 
-                            key={client.id} 
-                            className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
-                            onClick={() => {
-                              handleSelectChange("client_id", client.id?.toString() || "");
-                              setClientSearch(client.name);
-                              setShowClientDropdown(false);
-                            }}
-                          >
-                            <div className="font-medium flex items-center">
-                              <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
-                                <span className="text-xs font-semibold text-emerald-600">
-                                  {client.name?.charAt(0)?.toUpperCase() || "C"}
+                    )}
+                    {clientSearch.trim() && showClientDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg max-h-48 overflow-auto border border-gray-100">
+                        {filteredClients.length > 0 ? (
+                          filteredClients.map((client) => (
+                            <div
+                              key={client.id}
+                              className="flex items-center px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => {
+                                handleSelectChange("client_id", client.id?.toString() || "");
+                                setClientSearch(client.name);
+                                setShowClientDropdown(false);
+                                setClients(prev => prev.some(c => c.id === client.id) ? prev : [...prev, client]);
+                              }}
+                            >
+                              <div className="w-7 h-7 rounded-full bg-[#3D583F]/10 flex items-center justify-center mr-2.5 flex-shrink-0">
+                                <span className="text-xs font-semibold text-[#3D583F]">
+                                  {client.name?.charAt(0)?.toUpperCase()}
                                 </span>
                               </div>
-                              {client.name}
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-gray-900 truncate">{client.name}</div>
+                                {client.phone && <div className="text-xs text-gray-400">{client.phone}</div>}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-500 ml-7">{client.phone}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-3 text-gray-500 text-center">
-                          <div className="flex justify-center mb-2">
-                            <Search size={18} className="text-gray-400" />
-                          </div>
-                          Nenhum cliente encontrado
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          ))
+                        ) : (
+                          <div className="py-6 text-center text-sm text-gray-400">Nenhum cliente encontrado</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
               )}
 
-              {/* Serviços - Select com Dropdown Customizado (apenas para agendamento normal) */}
+              {/* Serviços */}
               {!isFreeIntervalMode && (
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-2 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 01-2 2H10a2 2 0 01-2-2V6"
-                    />
-                  </svg>
-                  Serviços *
-                </Label>
-                
-                {/* Select Customizado */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowServiceDropdown(!showServiceDropdown)}
-                    className="w-full h-12 px-3 py-2 text-left bg-white border-2 border-gray-200 rounded-lg hover:border-emerald-400 focus:border-emerald-400 focus:outline-none transition-colors duration-200 flex items-center justify-between"
-                  >
-                    <span className="flex-1 text-gray-900">
-                      {formData.service_ids.length === 0 
-                        ? "Selecione os serviços" 
-                        : formData.service_ids.length === 1
-                        ? `${services.find(s => s.service_id?.toString() === formData.service_ids[0])?.service_name || 'Serviço'}`
-                        : `${formData.service_ids.length} serviços selecionados`
-                      }
-                    </span>
-                    <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-                        showServiceDropdown ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Serviços</Label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                      className="w-full h-11 px-3 text-left bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors flex items-center justify-between"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Dropdown */}
-                  {showServiceDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
-                      {/* Cabeçalho */}
-                      {formData.service_ids.length > 0 && (
-                        <div className="p-3 border-b border-gray-200 bg-gray-50">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-700">Resumo</span>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">
-                                {getTotalDuration()} min
-                              </span>
-                              <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full font-semibold">
-                                R$ {getTotalPrice().toFixed(2)} 
-                              </span>
-                            </div>
+                      <span className={`text-sm ${formData.service_ids.length === 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                        {formData.service_ids.length === 0
+                          ? "Selecione os serviços"
+                          : formData.service_ids.length === 1
+                          ? services.find(s => s.service_id?.toString() === formData.service_ids[0])?.service_name || 'Serviço'
+                          : `${formData.service_ids.length} serviços selecionados`
+                        }
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${showServiceDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showServiceDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg">
+                        {formData.service_ids.length > 0 && (
+                          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">{getTotalDuration()} min</span>
+                            <span className="text-xs font-semibold text-[#3D583F]">R$ {getTotalPrice().toFixed(2)}</span>
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Lista de serviços com scroll */}
-                      <div className="max-h-64 overflow-y-auto">
-                        {services.length > 0 ? (
-                          services.map((service) => {
+                        )}
+                        <div className="max-h-52 overflow-y-auto">
+                          {services.length > 0 ? services.map((service) => {
                             const isSelected = formData.service_ids.includes(service.service_id?.toString() || "");
                             return (
                               <div
                                 key={service.service_id}
-                                className={`flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
-                                  isSelected ? 'bg-emerald-50' : ''
-                                }`}
+                                className={`flex items-center px-3 py-2.5 cursor-pointer transition-colors ${isSelected ? 'bg-[#3D583F]/5' : 'hover:bg-gray-50'}`}
                                 onClick={() => handleServiceToggle(service.service_id?.toString() || "")}
                               >
-                                {/* Checkbox */}
-                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center mr-3 transition-all duration-200 ${
-                                  isSelected 
-                                    ? 'bg-emerald-500 border-emerald-500' 
-                                    : 'border-gray-300'
+                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center mr-3 transition-all flex-shrink-0 ${
+                                  isSelected ? 'bg-[#3D583F] border-[#3D583F]' : 'border-gray-300'
                                 }`}>
                                   {isSelected && (
                                     <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2677,157 +2472,114 @@ export default function AgendaPage() {
                                     </svg>
                                   )}
                                 </div>
-                                
-                                {/* Informações do serviço */}
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className={`text-sm font-medium ${
-                                      isSelected ? 'text-emerald-800' : 'text-gray-800'
-                                    }`}>
-                                      {service.service_name || 'Serviço'}
-                                    </span>
-                                    <div className="flex items-center space-x-2 ml-2">
-                                      <span className="text-xs text-gray-500">
-                                        {service.service_duration}min
-                                      </span>
-                                      <span className="text-xs text-gray-600 font-medium">
-                                        R$ {service.service_price}
-                                      </span>
-                                    </div>
-                                  </div>
+                                <span className="text-sm text-gray-800 flex-1">{service.service_name || 'Serviço'}</span>
+                                <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
+                                  <span>{service.service_duration}min</span>
+                                  <span className="text-gray-600 font-medium">R$ {service.service_price}</span>
                                 </div>
                               </div>
                             );
-                          })
-                        ) : (
-                          <div className="p-4 text-center text-gray-500">
-                            <span className="text-sm">Nenhum serviço disponível</span>
-                          </div>
-                        )}
+                          }) : (
+                            <div className="py-6 text-center text-sm text-gray-400">Nenhum serviço disponível</div>
+                          )}
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {formData.service_ids.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {services
+                        .filter(s => formData.service_ids.includes(s.service_id?.toString() || ""))
+                        .map(s => (
+                          <span key={s.service_id} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#3D583F]/10 text-[#3D583F]">
+                            {s.service_name}
+                          </span>
+                        ))
+                      }
                     </div>
                   )}
                 </div>
-                
-                {/* Resumo dos serviços selecionados (fora do dropdown) */}
-                {formData.service_ids.length > 0 && (
-                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-3 border border-emerald-200 mt-2">
-                    <div className="text-xs text-emerald-700">
-                      <span className="font-medium">Selecionados: </span>
-                      {services
-                        .filter(service => formData.service_ids.includes(service.service_id?.toString() || ""))
-                        .map(service => service.service_name)
-                        .join(", ")}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
+
+              {/* Cliente Regular */}
+              {!isFreeIntervalMode && (
+                <div className="flex items-center justify-between py-2">
+                  <label htmlFor="regular-client-switch" className="text-sm text-gray-600">Cliente Regular</label>
+                  <input
+                    type="checkbox"
+                    id="regular-client-switch"
+                    checked={isRegularClient}
+                    onChange={(e) => {
+                      setIsRegularClient(e.target.checked);
+                      if (e.target.checked) setIsRegularClientDialogOpen(true);
+                      else setRegularClientConfig({ dayOfWeek: "", time: "", startDate: "", endDate: "" });
+                    }}
+                    className="w-4 h-4 text-[#3D583F] rounded border-gray-300 focus:ring-[#3D583F]"
+                  />
+                </div>
+              )}
+
+              {!isFreeIntervalMode && isRegularClient && regularClientConfig.dayOfWeek && regularClientConfig.time && (
+                <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <span>
+                    {regularClientConfig.dayOfWeek === 'Monday' ? 'Seg' : regularClientConfig.dayOfWeek === 'Tuesday' ? 'Ter' :
+                     regularClientConfig.dayOfWeek === 'Wednesday' ? 'Qua' : regularClientConfig.dayOfWeek === 'Thursday' ? 'Qui' :
+                     regularClientConfig.dayOfWeek === 'Friday' ? 'Sex' : regularClientConfig.dayOfWeek === 'Saturday' ? 'Sáb' : 'Dom'}
+                    {' '}&middot; {regularClientConfig.time}
+                    {regularClientConfig.startDate && regularClientConfig.endDate && (
+                      <> &middot; {new Date(regularClientConfig.startDate + 'T00:00:00').toLocaleDateString('pt-BR', {day:'2-digit',month:'short'})} - {new Date(regularClientConfig.endDate + 'T00:00:00').toLocaleDateString('pt-BR', {day:'2-digit',month:'short'})}</>
+                    )}
+                  </span>
+                  <button type="button" onClick={() => setIsRegularClientDialogOpen(true)} className="text-[#3D583F] font-medium hover:underline">Editar</button>
+                </div>
               )}
 
               {/* Observações */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="notes"
-                  className={`text-sm font-semibold flex items-center ${
-                    isFreeIntervalMode ? "text-emerald-700" : "text-gray-700"
-                  }`}
-                >
-                  <svg
-                    className={`w-4 h-4 mr-2 ${
-                      isFreeIntervalMode ? "text-emerald-500" : "text-gray-500"
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 8h10M7 12h4m-7 8l4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z"
-                    />
-                  </svg>
-                  {isFreeIntervalMode ? "Motivo do Intervalo" : "Observações"}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {isFreeIntervalMode ? "Motivo" : "Observações"}
                 </Label>
                 <Textarea
                   id="notes"
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  placeholder={isFreeIntervalMode 
-                    ? "Informe o motivo do intervalo livre (opcional)"
-                    : "Alguma observação importante?"
-                  }
-                  className={`min-h-[80px] border-2 rounded-lg resize-none ${
-                    isFreeIntervalMode 
-                      ? "border-emerald-200 focus:border-emerald-400" 
-                      : "border-gray-200 focus:border-emerald-400"
-                  }`}
+                  placeholder={isFreeIntervalMode ? "Motivo do intervalo (opcional)" : "Observações (opcional)"}
+                  className="min-h-[72px] border border-gray-200 rounded-lg resize-none text-sm"
                 />
               </div>
             </div>
 
-            <DialogFooter className="pt-6 border-t border-gray-100">
+            {/* Footer fixo */}
+            <div className="px-6 pb-6 pt-2 flex gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={closeAppointmentDialog}
                 disabled={isSubmitting}
-                className="px-6 py-2 border-2 border-gray-300 hover:border-gray-400 rounded-lg transition-all duration-200"
+                className="flex-1 h-11 rounded-lg border-gray-200 text-gray-600"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={
-                  isSubmitting || 
-                  (isRegularClient && (!regularClientConfig.dayOfWeek || !regularClientConfig.time || !regularClientConfig.startDate || !regularClientConfig.endDate))
-                }
-                className="px-6 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-[#3D583F] hover:bg-[#365137]"
+                disabled={isSubmitting || (isRegularClient && (!regularClientConfig.dayOfWeek || !regularClientConfig.time || !regularClientConfig.startDate || !regularClientConfig.endDate))}
+                className="flex-1 h-11 rounded-lg bg-[#3D583F] hover:bg-[#2d422f] text-white"
               >
                 {isSubmitting ? (
-                  <span className="flex items-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    {isFreeIntervalMode ? "Criando intervalo..." : "Salvando..."}
+                    {isFreeIntervalMode ? "Criando..." : "Salvando..."}
                   </span>
                 ) : (
-                  <span className="flex items-center">
-                    <svg
-                      className="w-4 h-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    {isFreeIntervalMode ? "Criar Intervalo" : isRegularClient ? "Criar Agendamentos Regulares" : "Agendar"}
-                  </span>
+                  isFreeIntervalMode ? "Criar Intervalo" : isRegularClient ? "Criar Regulares" : "Agendar"
                 )}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

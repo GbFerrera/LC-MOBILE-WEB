@@ -209,15 +209,16 @@ export default function Home() {
     select-none 
     origin-left 
     scale-[2.8]
+    z-0
   "
 />
 
 
 
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
-              <Link href="/ajustes" className="cursor-pointer">
+              <Link href="/ajustes" className="cursor-pointer relative">
                 <Avatar className="h-20 w-20 sm:h-14 sm:w-14 border bg-gray-100 overflow-hidden">
                   <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
                   <AvatarFallback className="bg-[#3D583F] text-white text-sm sm:text-base font-semibold">
@@ -225,7 +226,7 @@ export default function Home() {
                   </AvatarFallback>
                 </Avatar>
               </Link>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 relative">
                 <h1 className="font-semibold text-lg sm:text-xl tracking-wide text-white truncate max-w-[220px]">Olá, {user?.name}!</h1>
                 <p className="text-white/80 text-xs sm:text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}

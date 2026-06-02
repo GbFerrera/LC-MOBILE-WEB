@@ -206,21 +206,31 @@ function AuthProvider({ children }: AuthProviderProps) {
       
       let errorMessage = "Ocorreu um erro ao tentar fazer login. Tente novamente.";
       
-      if (error.response?.status === 401) {
-        errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message.includes("Network Error")) {
-        errorMessage = "Não foi possível conectar ao servidor. Verifique sua conexão.";
-      } else if (error.message.includes("401")) {
-        errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
+      try {
+        if (error.response?.status === 401) {
+          errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.message?.includes("Network Error")) {
+          errorMessage = "Não foi possível conectar ao servidor. Verifique sua conexão.";
+        } else if (error.message?.includes("401")) {
+          errorMessage = "Email ou senha incorretos. Verifique suas credenciais.";
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+      } catch (handlingError) {
+        console.error("Erro ao tratar mensagem de erro:", handlingError);
+        errorMessage = "Ocorreu um erro ao tentar fazer login. Tente novamente.";
       }
       
-      // Exibir toast de erro
-      toast.error(errorMessage);
+      // Exibir toast de erro de forma segura
+      try {
+        toast.error(errorMessage);
+      } catch (toastError) {
+        console.error("Erro ao exibir toast:", toastError);
+      }
       
-      // Re-throw do erro para que o componente possa tratar
-      throw new Error(errorMessage);
+      // Importante: não propagar o erro para evitar recarregamento da página
     } finally {
       setLoading(false);
     }

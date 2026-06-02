@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CircleX, Search, RefreshCw } from "lucide-react";
+import { CircleX, Search, RefreshCw, Utensils } from "lucide-react";
 
 interface Client {
   id: number;
@@ -261,6 +261,10 @@ export default function AgendaPage() {
     endDate: ""
   });
 
+  // Estado para controle de horário de fim personalizado
+  const [enableCustomEndTime, setEnableCustomEndTime] = useState(false);
+
+  
   // Referência para scroll automático e horário atual
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -811,6 +815,9 @@ export default function AgendaPage() {
       setSelectedEndTime(formattedEndTime);
     }
     
+    // Resetar o switch para o estado padrão (desativado)
+    setEnableCustomEndTime(false);
+    
     setIsDialogOpen(true);
   };
 
@@ -902,11 +909,15 @@ export default function AgendaPage() {
       // Calcular duração total de todos os serviços
       const totalDuration = selectedServices.reduce((total, service) => total + (service.service_duration || 0), 0);
 
-      // Calcular end_time baseado na duração total ou usar horário de encaixe
+      // Calcular end_time baseado na duração total, switch personalizado ou usar horário de encaixe
       let formattedEndTime;
       if (isEncaixe && encaixeEndTime) {
         formattedEndTime = encaixeEndTime;
+      } else if (enableCustomEndTime) {
+        // Usar horário personalizado selecionado pelo usuário
+        formattedEndTime = selectedEndTime;
       } else {
+        // Usar cálculo baseado na duração dos serviços
         const endTime = new Date(date);
         endTime.setHours(
           parseInt(hours),
@@ -1486,6 +1497,24 @@ export default function AgendaPage() {
     const startTotalMinutes = startHour * 60 + startMinute;
     const endTimes: string[] = [];
     
+    // Coletar horários já ocupados (exceto o agendamento atual sendo editado)
+    const occupiedTimes = new Set();
+    appointments.forEach(appt => {
+      if (appt.status !== 'canceled' && appt.status !== 'free') {
+        const apptStartMinutes = timeToMinutes(appt.start_time.slice(0, 5));
+        const apptEndMinutes = timeToMinutes(appt.end_time.slice(0, 5));
+        
+        // Adicionar todos os slots de 15 minutos dentro do intervalo ocupado
+        // MAS permitir o horário exato de início de outro agendamento
+        for (let minutes = apptStartMinutes; minutes < apptEndMinutes; minutes += 15) {
+          // Não adicionar o horário de início (permitir terminar quando outro começa)
+          if (minutes !== apptStartMinutes) {
+            occupiedTimes.add(minutes);
+          }
+        }
+      }
+    });
+    
     // Gerar opções de horário final em intervalos de 15 minutos
     // Mínimo: 15 minutos depois do início
     // Máximo: até o final do expediente
@@ -1495,12 +1524,15 @@ export default function AgendaPage() {
     }));
     
     for (let minutes = startTotalMinutes + 15; minutes <= maxEndMinutes; minutes += 15) {
-      const hour = Math.floor(minutes / 60);
-      const minute = minutes % 60;
-      const timeString = `${hour.toString().padStart(2, "0")}:${minute
-        .toString()
-        .padStart(2, "0")}`;
-      endTimes.push(timeString);
+      // Verificar se este horário não está ocupado
+      if (!occupiedTimes.has(minutes)) {
+        const hour = Math.floor(minutes / 60);
+        const minute = minutes % 60;
+        const timeString = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
+        endTimes.push(timeString);
+      }
     }
     
     return endTimes;
@@ -1609,6 +1641,7 @@ export default function AgendaPage() {
     return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
   };
 
+  
   // Função para fazer scroll automático para o horário atual
   const scrollToCurrentTime = useCallback(() => {
     // Só executa se a data atual for hoje
@@ -1799,17 +1832,6 @@ export default function AgendaPage() {
               <p className="text-gray-600 text-sm mt-1">{formattedDate}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/agenda/grade">
-                <Button
-                  variant="outline"
-                  className="h-8 rounded-md border-[#3D583F]/30 bg-white hover:bg-[#3D583F]/5 hover:text-[#3D583F] px-3 text-xs font-medium shadow-sm"
-                >
-                  <svg className="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z" />
-                  </svg>
-                  Grade
-                </Button>
-              </Link>
               <Button
                 variant="outline"
                 size="icon"
@@ -1985,7 +2007,21 @@ export default function AgendaPage() {
               {/* Seleção de Profissional */}
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <div className="flex flex-col space-y-2">
-                  <label className="text-xs font-medium text-gray-700">Profissional</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-gray-700">Profissional</label>
+                    <Link href="/agenda/grade">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-md border-[#3D583F]/30 bg-white hover:bg-[#3D583F]/5 hover:text-[#3D583F] px-2 text-xs font-medium shadow-sm"
+                      >
+                        <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z" />
+                        </svg>
+                        Grade
+                      </Button>
+                    </Link>
+                  </div>
                   <select
                     value={selectedProfessionalId}
                     onChange={(e) => setSelectedProfessionalId(e.target.value)}
@@ -2093,7 +2129,7 @@ export default function AgendaPage() {
                         <div
                           key={slot}
                           id={`slot-${slot.replace(':', '-')}`}
-                          className={`flex items-center justify-between w-full p-3 rounded-lg border transition ${
+                          className={`flex items-center justify-between w-full p-4 rounded-xl border transition ${
                             isLunch
                               ? "bg-amber-50 border-amber-300 text-amber-800"
                             : isBooked && appointment && appointment.status !== 'canceled'
@@ -2147,8 +2183,8 @@ export default function AgendaPage() {
                           }
                         >
                           {/* Lado esquerdo - Horário e ícone */}
-                          <div className="flex items-center space-x-3">
-                            <div className={`p-2 rounded-full ${
+                          <div className="flex items-center space-x-4">
+                            <div className={`p-3 rounded-full ${
                               isLunch
                                 ? "bg-amber-200"
                               : isBooked && appointment && appointment.status !== 'canceled'
@@ -2160,10 +2196,10 @@ export default function AgendaPage() {
                                 : "bg-green-100"
                             }`}>
                               {isLunch ? (
-                                <span className="text-base">🍽️</span>
+                                <Utensils className="w-5 h-5 text-amber-700" />
                               ) : (
                                 <svg
-                                  className={`w-4 h-4 ${
+                                  className={`w-5 h-5 ${
                                     isBooked && appointment && appointment.status !== 'canceled'
                                       ? "text-[#3D583F]"
                                       : isFree
@@ -2186,7 +2222,7 @@ export default function AgendaPage() {
                               )}
                             </div>
                             <div>
-                              <div className={`font-semibold text-base ${
+                              <div className={`font-semibold text-lg ${
                                 isLunch
                                   ? "text-amber-800"
                                   : isBooked && appointment && appointment.status !== 'canceled'
@@ -2208,7 +2244,7 @@ export default function AgendaPage() {
                                   : slot
                                 }
                               </div>
-                              <div className={`text-xs ${
+                              <div className={`text-sm ${
                                 isLunch
                                   ? "text-amber-700"
                                   : isBooked && appointment && appointment.status !== 'canceled'
@@ -2231,7 +2267,7 @@ export default function AgendaPage() {
                                 }
                               </div>
                               {isBooked && appointment && appointment.status !== 'canceled' && appointment.services?.[0] && (
-                                <div className="text-[11px] text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                   {appointment.services.length > 1 
                                     ? `${appointment.services.length} serviços`
                                     : appointment.services[0].service_name || "Serviço"
@@ -2244,11 +2280,11 @@ export default function AgendaPage() {
                           {/* Lado direito - Botão ou informações */}
                           <div className="flex items-center">
                             {isLunch ? (
-                              <div className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-200 text-amber-800 border border-amber-300">
+                              <div className="px-4 py-2 rounded-full text-sm font-semibold bg-amber-200 text-amber-800 border border-amber-300">
                                 Almoço
                               </div>
                             ) : isBooked && appointment && appointment.status !== 'canceled' ? (
-                              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
                                 appointment.status === 'confirmed'
                                   ? "bg-[#3D583F] text-white"
                                   : appointment.status === 'pending'
@@ -2261,16 +2297,16 @@ export default function AgendaPage() {
                               </div>
                             ) : isFree ? (
                               <div className="text-gray-600">
-                                <CircleX size={20} />
+                                <CircleX size={24} />
                               </div>
                             ) : isEncaixe ? (
                               <div className="text-yellow-600">
-                                <span className="text-lg font-bold">+</span>
+                                <span className="text-xl font-bold">+</span>
                               </div>
                             ) : (
                               <div className="text-green-600">
                                 <svg
-                                  className="w-5 h-5"
+                                  className="w-6 h-6"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -2343,23 +2379,7 @@ export default function AgendaPage() {
             </div>
 
             <div className="px-6 pb-6 space-y-4">
-              {/* Horário Final - Apenas para Intervalo Livre */}
-              {isFreeIntervalMode && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Horário Final</Label>
-                  <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
-                    <SelectTrigger className="h-11 border border-gray-200 rounded-lg">
-                      <SelectValue placeholder="Selecione o horário final" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getValidEndTimes(selectedSlot).map((time) => (
-                        <SelectItem key={time} value={time}>{time}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
+              
               {/* Cliente */}
               {!isFreeIntervalMode && (
                 <div className="space-y-1.5">
@@ -2410,7 +2430,7 @@ export default function AgendaPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="text-sm font-medium text-gray-900 truncate">{client.name}</div>
-                                {client.phone && <div className="text-xs text-gray-400">{client.phone}</div>}
+                                {client.phone_number && <div className="text-xs text-gray-400">{client.phone_number}</div>}
                               </div>
                             </div>
                           ))
@@ -2498,6 +2518,51 @@ export default function AgendaPage() {
                         ))
                       }
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Horário Final Personalizado */}
+              {!isFreeIntervalMode && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">Horário Final Personalizado</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEnableCustomEndTime(!enableCustomEndTime);
+                        if (!enableCustomEndTime) {
+                          // Ao ativar, calcular horário base como sugestão
+                          const [hours, minutes] = selectedSlot.split(":").map(Number);
+                          const endTime = new Date();
+                          endTime.setHours(hours, minutes + 30); // 30 minutos como sugestão
+                          const formattedEndTime = endTime.toTimeString().slice(0, 5);
+                          setSelectedEndTime(formattedEndTime);
+                        }
+                      }}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        enableCustomEndTime ? 'bg-[#3D583F]' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          enableCustomEndTime ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  {enableCustomEndTime && (
+                    <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
+                      <SelectTrigger className="h-10 border border-gray-200 rounded-md">
+                        <SelectValue placeholder="Selecione o horário final" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getValidEndTimes(selectedSlot).map((time) => (
+                          <SelectItem key={time} value={time}>{time}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               )}

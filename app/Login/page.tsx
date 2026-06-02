@@ -56,13 +56,15 @@ export default function LoginPage() {
   };
 
   // Função para fazer login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setError("");
 
     if (!validateForm()) {
+      console.log("Validação falhou");
       return;
     }
+
+    console.log("Iniciando login com:", formData.email);
 
     try {
       // Usar o hook de autenticação para fazer login
@@ -72,22 +74,26 @@ export default function LoginPage() {
       });
       // O redirecionamento é feito automaticamente pelo hook de autenticação
     } catch (error: any) {
-      console.error("Erro no login:", error);
+      console.error("Erro no login capturado:", error);
       
       let errorMessage = "Ocorreu um erro ao fazer login. Tente novamente.";
       
-      // Tratar diferentes tipos de erro
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
+      try {
+        // Tratar diferentes tipos de erro de forma segura
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+      } catch (handlingError) {
+        console.error("Erro ao processar mensagem de erro:", handlingError);
+        errorMessage = "Ocorreu um erro ao fazer login. Tente novamente.";
       }
       
-      // Exibir erro tanto no estado local quanto no toast
+      // Exibir erro apenas no estado local (toast já é mostrado pelo hook)
       setError(errorMessage);
-      toast.error("Erro no login", {
-        description: errorMessage,
-      });
     }
   };
 
@@ -117,7 +123,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-lg p-8 border border-[#3D583F]/20">
           <div className="text-center mb-6"></div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <div className="space-y-6">
             {error && (
               <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                 <span className="font-medium">{error}</span>
@@ -176,7 +182,7 @@ export default function LoginPage() {
             </div>
 
             <Button
-              type="submit"
+              onClick={handleLogin}
               className="w-full h-12 text-base font-semibold bg-[#3D583F] hover:bg-[#365137] text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
               disabled={loading}
             >
@@ -211,7 +217,7 @@ export default function LoginPage() {
                 </>
               )}
             </Button>
-          </form>
+          </div>
         </div>
       </div>
     </div>

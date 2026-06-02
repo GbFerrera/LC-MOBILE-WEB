@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   CalendarDays, ChevronLeft, ChevronRight, User, Phone, 
-  CalendarIcon, Clock, RefreshCw, Users, Search, CircleX, Loader2
+  CalendarIcon, Clock, RefreshCw, Users, Search, CircleX, Loader2, Utensils
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,6 +62,12 @@ interface HorarioProfissional {
     is_day_off: boolean;
   }>;
 }
+
+// Função auxiliar para converter tempo em minutos
+const timeToMinutes = (time: string): number => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
 
 // Função para gerar slots de horário de 15 em 15 minutos
 const generateTimeSlots = (startTime: string, endTime: string): string[] => {
@@ -553,21 +559,21 @@ export default function AgendaGradePage() {
     return { top, height };
   };
 
-  // Função para obter cor do agendamento
+  // Função para obter cor do agendamento (mesmas cores da agenda normal)
   const getAppointmentColor = (status: Agendamento['status']) => {
     switch (status) {
       case 'confirmed':
-        return 'bg-green-100 border-green-300 text-green-900';
+        return 'bg-green-200 text-gray-700';
       case 'pending':
-        return 'bg-yellow-100 border-yellow-300 text-yellow-900';
+        return 'bg-orange-200 text-gray-700';
       case 'cancelled':
-        return 'bg-red-100 border-red-300 text-red-900';
+        return 'bg-red-200 text-gray-700';
       case 'completed':
-        return 'bg-blue-100 border-blue-300 text-blue-900';
+        return 'bg-blue-200 text-gray-700';
       case 'free':
-        return 'bg-gray-200 border-gray-400 text-gray-700 border-dashed opacity-80';
+        return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
       default:
-        return 'bg-gray-100 border-gray-300 text-gray-900';
+        return 'bg-gray-200 text-gray-700';
     }
   };
 
@@ -582,15 +588,42 @@ export default function AgendaGradePage() {
     }
     
     const [slotHour, slotMin] = slotTime.split(':').map(Number);
-    const slotTotalMinutes = slotHour * 60 + slotMin;
+    const slotMinutes = slotHour * 60 + slotMin;
     
+    // Verificar se está dentro do horário de trabalho
     const [startHour, startMin] = professionalSchedule.start_time.split(':').map(Number);
     const [endHour, endMin] = professionalSchedule.end_time.split(':').map(Number);
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
     
-    const workStartMinutes = startHour * 60 + startMin;
-    const workEndMinutes = endHour * 60 + endMin;
+    if (slotMinutes < startMinutes || slotMinutes >= endMinutes) {
+      return false;
+    }
     
-    return slotTotalMinutes >= workStartMinutes && slotTotalMinutes < workEndMinutes;
+    // Verificar se está no horário de almoço
+    if (professionalSchedule.lunch_start_time && professionalSchedule.lunch_end_time) {
+      const [lunchStartHour, lunchStartMin] = professionalSchedule.lunch_start_time.split(':').map(Number);
+      const [lunchEndHour, lunchEndMin] = professionalSchedule.lunch_end_time.split(':').map(Number);
+      const lunchStartMinutes = lunchStartHour * 60 + lunchStartMin;
+      const lunchEndMinutes = lunchEndHour * 60 + lunchEndMin;
+      
+      if (slotMinutes >= lunchStartMinutes && slotMinutes < lunchEndMinutes) {
+        return false; // Horário de almoço não está disponível
+      }
+    }
+    
+    // Verificar se o slot não está ocupado por outro agendamento
+    const hasConflict = appointments.some(apt => {
+      if (apt.professional_id !== professionalId || apt.status === 'cancelled') return false;
+      
+      const aptStartMinutes = timeToMinutes(apt.start_time.slice(0, 5));
+      const aptEndMinutes = timeToMinutes(apt.end_time.slice(0, 5));
+      const currentSlotMinutes = slotMinutes;
+      
+      return currentSlotMinutes >= aptStartMinutes && currentSlotMinutes < aptEndMinutes;
+    });
+    
+    return !hasConflict;
   };
 
   // Navegação de data
@@ -789,21 +822,21 @@ export default function AgendaGradePage() {
           {/* Header sticky no topo - rola junto no eixo X */}
           <div className="flex sticky top-0 z-40 bg-white border-b border-gray-200">
             {/* Canto fixo (sticky left + top) */}
-            <div className="h-12 w-16 shrink-0 border-r border-gray-200 sticky left-0 z-50 bg-white" />
+            <div className="h-16 w-16 shrink-0 border-r border-gray-200 sticky left-0 z-50 bg-white" />
             {/* Nomes dos profissionais */}
-            <div className="flex flex-1 items-center h-12">
+            <div className="flex flex-1 items-center h-16">
               {professionals.map((professional) => (
                 <div
                   key={professional.id}
-                  className="min-w-[140px] flex-1 px-2 py-1 border-r last:border-r-0 flex items-center gap-2"
+                  className="min-w-[200px] flex-1 px-3 py-2 border-r last:border-r-0 flex items-center gap-3"
                 >
-                  <Avatar className="h-7 w-7 flex-shrink-0">
+                  <Avatar className="h-12 w-12 flex-shrink-0">
                     <AvatarImage src={professional.url_avatar || professional.photo_url} />
-                    <AvatarFallback className="bg-[#3D583F] text-white text-[10px]">
+                    <AvatarFallback className="bg-[#3D583F] text-white text-base">
                       {professional.name ? professional.name.split(' ').map((n: string) => n[0]).join('') : 'P'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs font-medium text-gray-900 truncate">
+                  <span className="text-base font-medium text-gray-900 truncate">
                     {professional.name || 'Profissional'}
                   </span>
                 </div>
@@ -855,7 +888,7 @@ export default function AgendaGradePage() {
                   return (
                     <div
                       key={professional.id}
-                      className="min-w-[140px] flex-1 border-r last:border-r-0 relative"
+                      className="min-w-[200px] flex-1 border-r last:border-r-0 relative"
                     >
                       {/* Linhas de horário clicáveis */}
                       {allTimeSlots.map((time) => {
@@ -878,6 +911,37 @@ export default function AgendaGradePage() {
                         );
                       })}
 
+                      {/* Cards de almoço */}
+                      {(() => {
+                        const professionalSchedule = schedules.find(s => s.professional_id === professional.id)?.schedules.find(s => s.day_of_week === format(currentDate, 'EEEE'));
+                        
+                        if (professionalSchedule?.lunch_start_time && professionalSchedule.lunch_end_time) {
+                          const { top, height } = getAppointmentPosition(
+                            professionalSchedule.lunch_start_time,
+                            professionalSchedule.lunch_end_time
+                          );
+                          
+                          return (
+                            <div
+                              key={`lunch-${professional.id}`}
+                              className="absolute left-0 right-1 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
+                              style={{ top: `${top}px`, height: `${height}px` }}
+                            >
+                              <div className="flex items-center justify-center h-full">
+                                <div className="text-center">
+                                  <Utensils className="w-6 h-6 text-amber-700 mx-auto mb-1" />
+                                  <div className="font-bold text-amber-800 text-sm">Almoço</div>
+                                  <div className="text-xs text-amber-600">
+                                    {professionalSchedule.lunch_start_time.slice(0, 5)} - {professionalSchedule.lunch_end_time.slice(0, 5)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
                       {/* Agendamentos posicionados absolutamente */}
                       {profAppointments.map((appointment) => {
                         if (appointment.status === 'cancelled') return null;
@@ -890,21 +954,21 @@ export default function AgendaGradePage() {
                         return (
                           <div
                             key={appointment.id}
-                            className={`absolute left-0.5 right-0.5 rounded-md border p-1 text-xs overflow-hidden cursor-pointer transition-all active:scale-[0.98] ${getAppointmentColor(appointment.status)}`}
+                            className={`absolute left-0 right-1 rounded-xl border p-3 overflow-hidden cursor-pointer transition-all active:scale-[0.98] ${getAppointmentColor(appointment.status)}`}
                             style={{ top: `${top}px`, height: `${height}px` }}
                             onClick={() => {
                               setSelectedAppointment(appointment);
                               setIsDrawerOpen(true);
                             }}
                           >
-                            <div className="font-medium truncate text-[11px] leading-tight">
-                              {appointment.client?.name || 'Cliente'}
+                            <div className="font-bold truncate text-base leading-tight">
+                              {appointment.status === 'free' ? 'Intervalo Livre' : (appointment.client?.name || 'Cliente')}
                             </div>
-                            <div className="text-[10px] opacity-75 truncate leading-tight">
+                            <div className="text-sm opacity-75 truncate leading-tight font-semibold">
                               {appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}
                             </div>
                             {height >= 60 && appointment.services && appointment.services.length > 0 && (
-                              <div className="text-[10px] opacity-75 truncate leading-tight">
+                              <div className="text-sm opacity-75 truncate leading-tight">
                                 {appointment.services[0]?.service_name}
                               </div>
                             )}
@@ -1114,16 +1178,16 @@ export default function AgendaGradePage() {
             {selectedAppointment && (
               <>
                 {/* Informações principais */}
-                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div className="bg-gray-50 rounded-xl p-5 space-y-4">
                   {selectedAppointment.status !== "free" && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Telefone</span>
-                      <span className="font-medium text-sm">{selectedAppointment.client?.phone_number || "N/A"}</span>
+                      <span className="text-base text-gray-600">Telefone</span>
+                      <span className="font-semibold text-base">{selectedAppointment.client?.phone_number || "N/A"}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Horário</span>
-                    <span className="font-medium text-sm">
+                    <span className="text-base text-gray-600">Horário</span>
+                    <span className="font-semibold text-base">
                       {selectedAppointment.start_time?.slice(0, 5)} - {selectedAppointment.end_time?.slice(0, 5)}
                     </span>
                   </div>
@@ -1182,14 +1246,14 @@ export default function AgendaGradePage() {
                 {/* Lista de serviços */}
                 {selectedAppointment.status !== "free" && selectedAppointment.services && selectedAppointment.services.length > 0 && (
                   <div>
-                    <span className="text-sm text-gray-600 mb-2 block">
+                    <span className="text-base text-gray-600 mb-3 block font-medium">
                       {selectedAppointment.services.length > 1 ? 'Serviços:' : 'Serviço:'}
                     </span>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {selectedAppointment.services.map((service: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-100">
-                          <span className="text-sm text-gray-800 font-medium">{service.service_name}</span>
-                          <span className="text-sm text-emerald-600 font-semibold">R$ {service.price || service.service_price}</span>
+                        <div key={idx} className="flex items-center justify-between bg-white rounded-xl p-4 border border-gray-100">
+                          <span className="text-base text-gray-800 font-semibold">{service.service_name}</span>
+                          <span className="text-base text-emerald-600 font-semibold">R$ {service.price || service.service_price}</span>
                         </div>
                       ))}
                     </div>
@@ -1199,8 +1263,8 @@ export default function AgendaGradePage() {
                 {/* Observações */}
                 {selectedAppointment.notes && (
                   <div>
-                    <span className="text-sm text-gray-600 mb-1 block">Observações:</span>
-                    <p className="text-sm text-gray-800 bg-white rounded-lg p-3 border border-gray-100">{selectedAppointment.notes}</p>
+                    <span className="text-base text-gray-600 mb-2 block font-medium">Observações:</span>
+                    <p className="text-base text-gray-800 bg-white rounded-xl p-4 border border-gray-100">{selectedAppointment.notes}</p>
                   </div>
                 )}
               </>

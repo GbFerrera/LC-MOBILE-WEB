@@ -861,25 +861,103 @@ export default function AgendaPage() {
           throw new Error("Por favor, selecione o horário final do intervalo");
         }
 
-        const intervalData = {
-          professional_id: selectedProfessionalId || user.id,
-          appointment_date: date.toISOString().split("T")[0],
-          start_time: selectedSlot,
-          end_time: selectedEndTime,
-          notes: formData.notes || "Intervalo livre criado via slot",
-        };
+        const startMinutes = timeToMinutes(selectedSlot);
+        const endMinutes = timeToMinutes(selectedEndTime);
+        if (endMinutes <= startMinutes) {
+          throw new Error("O horário final precisa ser maior que o horário inicial");
+        }
 
-        const response = await api.post(
-          "/schedules/free-interval",
-          intervalData,
-          {
-            headers: {
-              company_id: user?.company_id,
-            },
+        const blockedRanges: Array<{ start: number; end: number }> = [];
+
+        if (lunchSlots.length > 0) {
+          const lunchStart = timeToMinutes(lunchSlots[0]);
+          const lunchEnd = timeToMinutes(lunchSlots[lunchSlots.length - 1]) + 15;
+          blockedRanges.push({ start: lunchStart, end: lunchEnd });
+        }
+
+        appointments.forEach((appt) => {
+          if (!appt.start_time || !appt.end_time) return;
+          if (appt.status === "canceled") return;
+
+          const apptStart = (typeof appt.start_time === "string" && appt.start_time.includes("T"))
+            ? appt.start_time.split("T")[1].slice(0, 5)
+            : appt.start_time.slice(0, 5);
+
+          const apptEnd = (typeof appt.end_time === "string" && appt.end_time.includes("T"))
+            ? appt.end_time.split("T")[1].slice(0, 5)
+            : appt.end_time.slice(0, 5);
+
+          const apptStartMinutes = timeToMinutes(apptStart);
+          const apptEndMinutes = timeToMinutes(apptEnd);
+
+          blockedRanges.push({ start: apptStartMinutes, end: apptEndMinutes });
+        });
+
+        blockedRanges.sort((a, b) => a.start - b.start);
+
+        const segments: Array<{ start: number; end: number }> = [];
+        let cursor = startMinutes;
+
+        for (const block of blockedRanges) {
+          if (block.end <= cursor) continue;
+          if (block.start >= endMinutes) break;
+
+          const segmentEnd = Math.min(block.start, endMinutes);
+          if (segmentEnd - cursor >= 15) {
+            segments.push({ start: cursor, end: segmentEnd });
           }
-        );
 
-        toast.success("Intervalo livre criado com sucesso!");
+          cursor = Math.max(cursor, block.end);
+          if (cursor >= endMinutes) break;
+        }
+
+        if (endMinutes - cursor >= 15) {
+          segments.push({ start: cursor, end: endMinutes });
+        }
+
+        if (segments.length === 0) {
+          throw new Error("Não há horários livres dentro do intervalo selecionado");
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const segment of segments) {
+          try {
+            const intervalData = {
+              professional_id: selectedProfessionalId || user.id,
+              appointment_date: date.toISOString().split("T")[0],
+              start_time: minutesToTime(segment.start),
+              end_time: minutesToTime(segment.end),
+              notes: formData.notes || "Intervalo livre criado via slot",
+            };
+
+            await api.post(
+              "/schedules/free-interval",
+              intervalData,
+              {
+                headers: {
+                  company_id: user?.company_id,
+                },
+              }
+            );
+
+            successCount++;
+          } catch (error) {
+            errorCount++;
+          }
+        }
+
+        if (successCount > 0) {
+          toast.success(
+            errorCount > 0
+              ? `Intervalo criado parcialmente (${successCount} trecho(s)). Alguns horários não puderam ser criados.`
+              : "Intervalo livre criado com sucesso!"
+          );
+        } else {
+          throw new Error("Não foi possível criar o intervalo livre");
+        }
+
         closeAppointmentDialog();
         fetchAppointments(user.id, date);
         return;
@@ -1538,6 +1616,40 @@ export default function AgendaPage() {
     return endTimes;
   };
 
+  const getValidEndTimesForFreeInterval = (startTime: string) => {
+    if (!startTime) return [];
+    if (!availableSlots.length) return [];
+
+    const [startHour, startMinute] = startTime.split(":").map(Number);
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTimes: string[] = [];
+
+    const maxEndMinutes = Math.max(...availableSlots.map((slot) => {
+      const [hour, minute] = slot.split(":").map(Number);
+      return hour * 60 + minute + 15;
+    }));
+
+    for (let minutes = startTotalMinutes + 15; minutes <= maxEndMinutes; minutes += 15) {
+      endTimes.push(minutesToTime(minutes));
+    }
+
+    return endTimes;
+  };
+
+  useEffect(() => {
+    if (!isDialogOpen || !isFreeIntervalMode || !selectedSlot) return;
+
+    const validEndTimes = getValidEndTimesForFreeInterval(selectedSlot);
+    if (validEndTimes.length === 0) {
+      setSelectedEndTime("");
+      return;
+    }
+
+    if (!selectedEndTime || !validEndTimes.includes(selectedEndTime)) {
+      setSelectedEndTime(validEndTimes[0]);
+    }
+  }, [isDialogOpen, isFreeIntervalMode, selectedSlot, selectedEndTime, availableSlots]);
+
   const formattedDate = formatDate(date);
 
   // Função para atualizar status do agendamento
@@ -2129,7 +2241,7 @@ export default function AgendaPage() {
                         <div
                           key={slot}
                           id={`slot-${slot.replace(':', '-')}`}
-                          className={`flex items-center justify-between w-full p-4 rounded-xl border transition ${
+                          className={`flex items-center justify-between ${isEncaixe ? "w-[92%] mx-auto px-3 py-2" : "w-full p-4"} rounded-xl border transition ${
                             isLunch
                               ? "bg-amber-50 border-amber-300 text-amber-800"
                             : isBooked && appointment && appointment.status !== 'canceled'
@@ -2143,7 +2255,7 @@ export default function AgendaPage() {
                             : isFree
                               ? "bg-gray-50 text-gray-700 border-gray-300"
                             : isEncaixe
-                              ? "bg-yellow-50 border-yellow-300 text-gray-700"
+                              ? "bg-orange-50 border-orange-300 text-gray-700"
                               : "bg-white border-gray-200"
                           }`}
                           onClick={
@@ -2184,7 +2296,7 @@ export default function AgendaPage() {
                         >
                           {/* Lado esquerdo - Horário e ícone */}
                           <div className="flex items-center space-x-4">
-                            <div className={`p-3 rounded-full ${
+                            <div className={`${isEncaixe ? "p-2" : "p-3"} rounded-full ${
                               isLunch
                                 ? "bg-amber-200"
                               : isBooked && appointment && appointment.status !== 'canceled'
@@ -2192,20 +2304,20 @@ export default function AgendaPage() {
                               : isFree
                                 ? "bg-gray-200"
                               : isEncaixe
-                                ? "bg-yellow-200"
+                                ? "bg-orange-200"
                                 : "bg-green-100"
                             }`}>
                               {isLunch ? (
                                 <Utensils className="w-5 h-5 text-amber-700" />
                               ) : (
                                 <svg
-                                  className={`w-5 h-5 ${
+                                  className={`${isEncaixe ? "w-4 h-4" : "w-5 h-5"} ${
                                     isBooked && appointment && appointment.status !== 'canceled'
                                       ? "text-[#3D583F]"
                                       : isFree
                                         ? "text-[#3D583F]"
                                       : isEncaixe
-                                      ? "text-yellow-700"
+                                      ? "text-orange-700"
                                       : "text-[#3D583F]"
                                   }`}
                                   fill="none"
@@ -2222,7 +2334,7 @@ export default function AgendaPage() {
                               )}
                             </div>
                             <div>
-                              <div className={`font-semibold text-lg ${
+                              <div className={`font-semibold ${isEncaixe ? "text-base" : "text-lg"} ${
                                 isLunch
                                   ? "text-amber-800"
                                   : isBooked && appointment && appointment.status !== 'canceled'
@@ -2230,21 +2342,21 @@ export default function AgendaPage() {
                                   : isFree
                                   ? "text-[#3D583F]"
                                   : isEncaixe
-                                  ? "text-yellow-800"
+                                  ? "text-orange-800"
                                   : "text-[#3D583F]"
                               }`}>
-                                {isLunch && lunchEndTime 
-                                  ? `${slot} às ${lunchEndTime}` 
-                                  : isFree && freeEndTime
-                                  ? `${slot} às ${freeEndTime}`
-                                  : isEncaixe && fitSlotDetails 
-                                  ? `${slot} às ${fitSlotDetails.endTime}` 
+                                {isEncaixe
+                                  ? "Encaixe"
+                                  : isLunch
+                                  ? slot
+                                  : isFree
+                                  ? slot
                                   : isBooked && appointment && appointment.status !== 'canceled'
-                                  ? `${slot} às ${calculateEndTime(slot, appointment)}`
+                                  ? slot
                                   : slot
                                 }
                               </div>
-                              <div className={`text-sm ${
+                              <div className={`${isEncaixe ? "text-xs" : "text-sm"} ${
                                 isLunch
                                   ? "text-amber-700"
                                   : isBooked && appointment && appointment.status !== 'canceled'
@@ -2252,7 +2364,7 @@ export default function AgendaPage() {
                                   : isFree
                                   ? "text-[#3D583F]"
                                   : isEncaixe
-                                  ? "text-yellow-600"
+                                  ? "text-orange-700"
                                   : "text-[#3D583F]"
                               }`}>
                                 {isLunch
@@ -2300,8 +2412,8 @@ export default function AgendaPage() {
                                 <CircleX size={24} />
                               </div>
                             ) : isEncaixe ? (
-                              <div className="text-yellow-600">
-                                <span className="text-xl font-bold">+</span>
+                              <div className="text-orange-700">
+                                <span className={`${isEncaixe ? "text-lg" : "text-xl"} font-bold`}>+</span>
                               </div>
                             ) : (
                               <div className="text-green-600">
@@ -2597,6 +2709,22 @@ export default function AgendaPage() {
                     )}
                   </span>
                   <button type="button" onClick={() => setIsRegularClientDialogOpen(true)} className="text-[#3D583F] font-medium hover:underline">Editar</button>
+                </div>
+              )}
+
+              {isFreeIntervalMode && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Horário Final</Label>
+                  <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
+                    <SelectTrigger className="h-11 border border-gray-200 rounded-lg">
+                      <SelectValue placeholder="Selecione o horário final" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getValidEndTimesForFreeInterval(selectedSlot).map((time) => (
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

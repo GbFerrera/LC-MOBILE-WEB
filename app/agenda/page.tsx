@@ -35,13 +35,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CircleX, Search, RefreshCw, Utensils } from "lucide-react";
+import { CircleX, Search, RefreshCw } from "lucide-react";
 
 interface Client {
   id: number;
   name: string;
   phone: string;
 }
+
+const normalizeClient = (client: any): Client | null => {
+  if (!client?.id) return null;
+
+  return {
+    id: Number(client.id),
+    name: client.name || "Cliente",
+    phone: client.phone || client.phone_number || "",
+  };
+};
+
+const formatClientPhone = (phone: string) => {
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  }
+
+  if (digits.length === 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  }
+
+  return phone;
+};
 
 interface Service {
   service_id: number;
@@ -247,6 +271,12 @@ export default function AgendaPage() {
   // Estado para busca de clientes
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [isQuickClientFormOpen, setIsQuickClientFormOpen] = useState(false);
+  const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState({
+    name: "",
+    phone_number: "",
+  });
   
   // Estado para dropdown de serviços
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
@@ -438,7 +468,9 @@ export default function AgendaPage() {
           clientsData = [];
         }
         
-        const validClients = clientsData.filter(client => client && client.id);
+        const validClients = clientsData
+          .map((client: any) => normalizeClient(client))
+          .filter((client: Client | null): client is Client => client !== null);
         
         setClients(validClients);
 
@@ -579,6 +611,99 @@ export default function AgendaPage() {
     }));
   };
 
+  const openQuickClientForm = () => {
+    const currentSearch = clientSearch.trim();
+    const searchHasLetters = /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(currentSearch);
+
+    setQuickClientForm({
+      name: searchHasLetters ? currentSearch : "",
+      phone_number: searchHasLetters ? "" : currentSearch,
+    });
+    setIsQuickClientFormOpen(true);
+    setShowClientDropdown(false);
+  };
+
+  const handleQuickClientFormChange = (field: "name" | "phone_number", value: string) => {
+    setQuickClientForm((prev) => ({
+      ...prev,
+      [field]: field === "phone_number" ? value.replace(/[^\d()\-\s+]/g, "") : value,
+    }));
+  };
+
+  const resetQuickClientForm = () => {
+    setIsQuickClientFormOpen(false);
+    setQuickClientForm({
+      name: "",
+      phone_number: "",
+    });
+  };
+
+  const handleQuickCreateClient = async () => {
+    if (!user?.company_id) {
+      toast.error("Não foi possível identificar a empresa");
+      return;
+    }
+
+    const name = quickClientForm.name.trim();
+    const phoneNumber = quickClientForm.phone_number.trim();
+    const phoneDigits = phoneNumber.replace(/\D/g, "");
+
+    if (!name || !phoneNumber) {
+      toast.error("Preencha nome e telefone para criar o cliente");
+      return;
+    }
+
+    if (phoneDigits.length < 10) {
+      toast.error("Informe um telefone válido com DDD");
+      return;
+    }
+
+    try {
+      setIsCreatingQuickClient(true);
+
+      const response = await api.post(
+        "/clients",
+        {
+          name,
+          phone_number: phoneNumber,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user.company_id.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const normalizedClient = normalizeClient(response.data);
+
+      if (!normalizedClient) {
+        throw new Error("Resposta inválida ao criar cliente");
+      }
+
+      setClients((prev) => [
+        normalizedClient,
+        ...prev.filter((client) => client.id !== normalizedClient.id),
+      ]);
+      handleSelectChange("client_id", normalizedClient.id.toString());
+      setClientSearch(normalizedClient.name);
+      setShowClientDropdown(false);
+      resetQuickClientForm();
+      toast.success("Cliente criado com sucesso");
+    } catch (error: any) {
+      console.error("Erro ao criar cliente rapidamente:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Erro ao criar cliente";
+      toast.error(errorMessage);
+    } finally {
+      setIsCreatingQuickClient(false);
+    }
+  };
+
   // Função para gerenciar seleção/deseleção de serviços
   const handleServiceToggle = (serviceId: string) => {
     setFormData((prev) => {
@@ -632,6 +757,14 @@ export default function AgendaPage() {
       time: "",
       startDate: "",
       endDate: ""
+    });
+    setClientSearch("");
+    setShowClientDropdown(false);
+    setIsQuickClientFormOpen(false);
+    setIsCreatingQuickClient(false);
+    setQuickClientForm({
+      name: "",
+      phone_number: "",
     });
   };
 
@@ -1720,6 +1853,17 @@ export default function AgendaPage() {
     }
   };
 
+  const isSubscriptionAppointment = (appointment?: any) => {
+    if (!appointment) return false;
+
+    if (appointment.subscription_id) {
+      return true;
+    }
+
+    const notes = typeof appointment.notes === "string" ? appointment.notes.toLowerCase() : "";
+    return notes.includes("assinatura") || notes.includes("assinaturas");
+  };
+
   // Função para obter as cores do status (baseado nas imagens fornecidas)
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -2396,7 +2540,7 @@ export default function AgendaPage() {
                                 Almoço
                               </div>
                             ) : isBooked && appointment && appointment.status !== 'canceled' ? (
-                              <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                 appointment.status === 'confirmed'
                                   ? "bg-[#3D583F] text-white"
                                   : appointment.status === 'pending'
@@ -2494,10 +2638,31 @@ export default function AgendaPage() {
               
               {/* Cliente */}
               {!isFreeIntervalMode && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente</Label>
-                  <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="space-y-2">
+                <Label
+                  htmlFor="client_id"
+                  className="text-sm font-semibold text-gray-700 flex items-center"
+                >
+                  <svg
+                    className="w-4 h-4 mr-2 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                  Cliente *
+                </Label>
+                <div className="relative">
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3D583F]">
+                        <Search size={18} />
+                      </div>
                     <Input
                       id="client_search"
                       name="client_id"
@@ -2513,46 +2678,61 @@ export default function AgendaPage() {
                       autoComplete="off"
                       required
                     />
-                    {formData.client_id && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                        <CircleX
-                          className="h-4 w-4 text-gray-400 cursor-pointer hover:text-red-500 transition-colors"
-                          onClick={() => { handleSelectChange("client_id", ""); setClientSearch(""); }}
-                        />
+                  </div>
+                  {/* Indicador visual do cliente selecionado */}
+                  {formData.client_id && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                      <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
+                        <span className="text-xs font-semibold text-emerald-600">
+                          {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
+                        </span>
                       </div>
-                    )}
-                    {clientSearch.trim() && showClientDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg max-h-48 overflow-auto border border-gray-100">
-                        {filteredClients.length > 0 ? (
-                          filteredClients.map((client) => (
-                            <div
-                              key={client.id}
-                              className="flex items-center px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                handleSelectChange("client_id", client.id?.toString() || "");
-                                setClientSearch(client.name);
-                                setShowClientDropdown(false);
-                                setClients(prev => prev.some(c => c.id === client.id) ? prev : [...prev, client]);
-                              }}
-                            >
-                              <div className="w-7 h-7 rounded-full bg-[#3D583F]/10 flex items-center justify-center mr-2.5 flex-shrink-0">
-                                <span className="text-xs font-semibold text-[#3D583F]">
-                                  {client.name?.charAt(0)?.toUpperCase()}
+                      <CircleX
+                        className="h-4 w-4 text-gray-500 cursor-pointer hover:text-red-500"
+                        onClick={() => {
+                          handleSelectChange("client_id", "");
+                          setClientSearch("");
+                        }}
+                      />
+                    </div>
+                  )}
+                  {/* Mostrar resultados da busca abaixo do input */}
+                  {clientSearch.trim() && showClientDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-auto border border-gray-200 animate-in fade-in-50 slide-in-from-top-5 duration-200">
+                      {filteredClients.length > 0 ? (
+                        filteredClients.map((client) => (
+                          <div 
+                            key={client.id} 
+                            className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
+                            onClick={() => {
+                              handleSelectChange("client_id", client.id?.toString() || "");
+                              setClientSearch(client.name);
+                              setShowClientDropdown(false);
+                            }}
+                          >
+                            <div className="font-medium flex items-center">
+                              <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  {client.name?.charAt(0)?.toUpperCase() || "C"}
                                 </span>
                               </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-medium text-gray-900 truncate">{client.name}</div>
-                                {client.phone_number && <div className="text-xs text-gray-400">{client.phone_number}</div>}
-                              </div>
+                              {client.name}
                             </div>
-                          ))
-                        ) : (
-                          <div className="py-6 text-center text-sm text-gray-400">Nenhum cliente encontrado</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                            <div className="text-sm text-gray-500 ml-7">{client.phone}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-3 text-gray-500 text-center">
+                          <div className="flex justify-center mb-2">
+                            <Search size={18} className="text-gray-400" />
+                          </div>
+                          Nenhum cliente encontrado
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+              </div>
               )}
 
               {/* Serviços */}

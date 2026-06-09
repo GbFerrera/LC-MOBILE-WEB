@@ -35,13 +35,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CircleX, Search, RefreshCw } from "lucide-react";
+import { CircleX, Search, RefreshCw, Plus, Loader2 } from "lucide-react";
 
 interface Client {
   id: number;
   name: string;
   phone: string;
 }
+
+const normalizeClient = (client: any): Client | null => {
+  if (!client?.id) return null;
+
+  return {
+    id: Number(client.id),
+    name: client.name || "Cliente",
+    phone: client.phone || client.phone_number || "",
+  };
+};
+
+const formatClientPhone = (phone: string) => {
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  }
+
+  if (digits.length === 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  }
+
+  return phone;
+};
 
 interface Service {
   service_id: number;
@@ -247,6 +271,12 @@ export default function AgendaPage() {
   // Estado para busca de clientes
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [isQuickClientFormOpen, setIsQuickClientFormOpen] = useState(false);
+  const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState({
+    name: "",
+    phone_number: "",
+  });
   
   // Estado para dropdown de serviços
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
@@ -409,7 +439,9 @@ export default function AgendaPage() {
           clientsData = [];
         }
         
-        const validClients = clientsData.filter(client => client && client.id);
+        const validClients = clientsData
+          .map((client: any) => normalizeClient(client))
+          .filter((client: Client | null): client is Client => client !== null);
         
         setClients(validClients);
 
@@ -550,6 +582,99 @@ export default function AgendaPage() {
     }));
   };
 
+  const openQuickClientForm = () => {
+    const currentSearch = clientSearch.trim();
+    const searchHasLetters = /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(currentSearch);
+
+    setQuickClientForm({
+      name: searchHasLetters ? currentSearch : "",
+      phone_number: searchHasLetters ? "" : currentSearch,
+    });
+    setIsQuickClientFormOpen(true);
+    setShowClientDropdown(false);
+  };
+
+  const handleQuickClientFormChange = (field: "name" | "phone_number", value: string) => {
+    setQuickClientForm((prev) => ({
+      ...prev,
+      [field]: field === "phone_number" ? value.replace(/[^\d()\-\s+]/g, "") : value,
+    }));
+  };
+
+  const resetQuickClientForm = () => {
+    setIsQuickClientFormOpen(false);
+    setQuickClientForm({
+      name: "",
+      phone_number: "",
+    });
+  };
+
+  const handleQuickCreateClient = async () => {
+    if (!user?.company_id) {
+      toast.error("Não foi possível identificar a empresa");
+      return;
+    }
+
+    const name = quickClientForm.name.trim();
+    const phoneNumber = quickClientForm.phone_number.trim();
+    const phoneDigits = phoneNumber.replace(/\D/g, "");
+
+    if (!name || !phoneNumber) {
+      toast.error("Preencha nome e telefone para criar o cliente");
+      return;
+    }
+
+    if (phoneDigits.length < 10) {
+      toast.error("Informe um telefone válido com DDD");
+      return;
+    }
+
+    try {
+      setIsCreatingQuickClient(true);
+
+      const response = await api.post(
+        "/clients",
+        {
+          name,
+          phone_number: phoneNumber,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            company_id: user.company_id.toString(),
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const normalizedClient = normalizeClient(response.data);
+
+      if (!normalizedClient) {
+        throw new Error("Resposta inválida ao criar cliente");
+      }
+
+      setClients((prev) => [
+        normalizedClient,
+        ...prev.filter((client) => client.id !== normalizedClient.id),
+      ]);
+      handleSelectChange("client_id", normalizedClient.id.toString());
+      setClientSearch(normalizedClient.name);
+      setShowClientDropdown(false);
+      resetQuickClientForm();
+      toast.success("Cliente criado com sucesso");
+    } catch (error: any) {
+      console.error("Erro ao criar cliente rapidamente:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Erro ao criar cliente";
+      toast.error(errorMessage);
+    } finally {
+      setIsCreatingQuickClient(false);
+    }
+  };
+
   // Função para gerenciar seleção/deseleção de serviços
   const handleServiceToggle = (serviceId: string) => {
     setFormData((prev) => {
@@ -603,6 +728,14 @@ export default function AgendaPage() {
       time: "",
       startDate: "",
       endDate: ""
+    });
+    setClientSearch("");
+    setShowClientDropdown(false);
+    setIsQuickClientFormOpen(false);
+    setIsCreatingQuickClient(false);
+    setQuickClientForm({
+      name: "",
+      phone_number: "",
     });
   };
 
@@ -1551,6 +1684,17 @@ export default function AgendaPage() {
     }
   };
 
+  const isSubscriptionAppointment = (appointment?: any) => {
+    if (!appointment) return false;
+
+    if (appointment.subscription_id) {
+      return true;
+    }
+
+    const notes = typeof appointment.notes === "string" ? appointment.notes.toLowerCase() : "";
+    return notes.includes("assinatura") || notes.includes("assinaturas");
+  };
+
   // Função para obter as cores do status (baseado nas imagens fornecidas)
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -2223,16 +2367,23 @@ export default function AgendaPage() {
                                 Almoço
                               </div>
                             ) : isBooked && appointment && appointment.status !== 'canceled' ? (
-                              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                appointment.status === 'confirmed'
-                                  ? "bg-[#3D583F] text-white"
-                                  : appointment.status === 'pending'
-                                  ? "bg-white text-[#3D583F] border border-[#3D583F]/40"
-                                  : appointment.status === 'completed'
-                                  ? "bg-[#3D583F]/15 text-[#3D583F] border border-[#3D583F]/30"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}>
-                                {getStatusText(appointment.status)}
+                              <div className="flex flex-col items-end gap-1">
+                                {isSubscriptionAppointment(appointment) && (
+                                  <div className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#3D583F]/10 text-[#3D583F] border border-[#3D583F]/20 leading-none">
+                                    Assinatura
+                                  </div>
+                                )}
+                                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  appointment.status === 'confirmed'
+                                    ? "bg-[#3D583F] text-white"
+                                    : appointment.status === 'pending'
+                                    ? "bg-white text-[#3D583F] border border-[#3D583F]/40"
+                                    : appointment.status === 'completed'
+                                    ? "bg-[#3D583F]/15 text-[#3D583F] border border-[#3D583F]/30"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}>
+                                  {getStatusText(appointment.status)}
+                                </div>
                               </div>
                             ) : isFree ? (
                               <div className="text-gray-600">
@@ -2499,7 +2650,8 @@ export default function AgendaPage() {
                   Cliente *
                 </Label>
                 <div className="relative">
-                    <div className="relative">
+                    <div className="flex items-stretch gap-2">
+                    <div className="relative flex-1">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3D583F]">
                         <Search size={18} />
                       </div>
@@ -2528,57 +2680,138 @@ export default function AgendaPage() {
                       autoComplete="off"
                       required
                     />
-                  </div>
-                  {/* Indicador visual do cliente selecionado */}
-                  {formData.client_id && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
-                      <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
-                        <span className="text-xs font-semibold text-emerald-600">
-                          {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
-                        </span>
-                      </div>
-                      <CircleX
-                        className="h-4 w-4 text-gray-500 cursor-pointer hover:text-red-500"
-                        onClick={() => {
-                          handleSelectChange("client_id", "");
-                          setClientSearch("");
-                        }}
-                      />
-                    </div>
-                  )}
-                  {/* Mostrar resultados da busca abaixo do input */}
-                  {clientSearch.trim() && showClientDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-auto border border-gray-200 animate-in fade-in-50 slide-in-from-top-5 duration-200">
-                      {filteredClients.length > 0 ? (
-                        filteredClients.map((client) => (
-                          <div 
-                            key={client.id} 
-                            className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
+                      {/* Indicador visual do cliente selecionado */}
+                      {formData.client_id && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                          <div className="bg-emerald-100 rounded-full w-6 h-6 flex items-center justify-center mr-1">
+                            <span className="text-xs font-semibold text-emerald-600">
+                              {clients.find(c => c.id && c.id.toString() === formData.client_id)?.name?.charAt(0)?.toUpperCase() || "C"}
+                            </span>
+                          </div>
+                          <CircleX
+                            className="h-4 w-4 text-gray-500 cursor-pointer hover:text-red-500"
                             onClick={() => {
-                              handleSelectChange("client_id", client.id?.toString() || "");
-                              setClientSearch(client.name);
-                              setShowClientDropdown(false);
+                              handleSelectChange("client_id", "");
+                              setClientSearch("");
                             }}
-                          >
-                            <div className="font-medium flex items-center">
-                              <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
-                                <span className="text-xs font-semibold text-emerald-600">
-                                  {client.name?.charAt(0)?.toUpperCase() || "C"}
-                                </span>
-                              </div>
-                              {client.name}
-                            </div>
-                            <div className="text-sm text-gray-500 ml-7">{client.phone}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-3 text-gray-500 text-center">
-                          <div className="flex justify-center mb-2">
-                            <Search size={18} className="text-gray-400" />
-                          </div>
-                          Nenhum cliente encontrado
+                          />
                         </div>
                       )}
+                      {/* Mostrar resultados da busca abaixo do input */}
+                      {clientSearch.trim() && showClientDropdown && (
+                        <div className="absolute left-0 top-full z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-auto border border-gray-200 animate-in fade-in-50 slide-in-from-top-5 duration-200">
+                          {filteredClients.length > 0 ? (
+                            filteredClients.map((client) => (
+                              <div 
+                                key={client.id} 
+                                className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors duration-150"
+                                onClick={() => {
+                                  handleSelectChange("client_id", client.id?.toString() || "");
+                                  setClientSearch(client.name);
+                                  setShowClientDropdown(false);
+                                }}
+                              >
+                                <div className="font-medium flex items-center">
+                                  <div className="bg-emerald-100 rounded-full w-5 h-5 flex items-center justify-center mr-2">
+                                    <span className="text-xs font-semibold text-emerald-600">
+                                      {client.name?.charAt(0)?.toUpperCase() || "C"}
+                                    </span>
+                                  </div>
+                                  {client.name}
+                                </div>
+                                <div className="text-sm text-gray-500 ml-7">{formatClientPhone(client.phone)}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-3 text-gray-500 text-center">
+                              <div className="flex justify-center mb-2">
+                                <Search size={18} className="text-gray-400" />
+                              </div>
+                              Nenhum cliente encontrado
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 border-2 border-[#3D583F]/20 text-[#3D583F] hover:bg-[#3D583F]/10 hover:text-[#3D583F] rounded-lg"
+                      onClick={openQuickClientForm}
+                      aria-label="Criar cliente rapidamente"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  {isQuickClientFormOpen && (
+                    <div className="mt-3 rounded-xl border border-[#3D583F]/15 bg-[#3D583F]/[0.04] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-[#3D583F]">Novo cliente rapido</p>
+                          <p className="text-xs text-[#3D583F]/80">Cadastre com nome e telefone sem sair do agendamento.</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#3D583F] hover:bg-[#3D583F]/10 hover:text-[#3D583F]"
+                          onClick={resetQuickClientForm}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="quick_client_name" className="text-sm font-medium text-[#3D583F]">
+                            Nome *
+                          </Label>
+                          <Input
+                            id="quick_client_name"
+                            placeholder="Nome do cliente"
+                            value={quickClientForm.name}
+                            onChange={(e) => handleQuickClientFormChange("name", e.target.value)}
+                            className="h-11 border-[#3D583F]/20 focus-visible:ring-[#3D583F]/20"
+                            disabled={isCreatingQuickClient}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="quick_client_phone" className="text-sm font-medium text-[#3D583F]">
+                            Telefone *
+                          </Label>
+                          <Input
+                            id="quick_client_phone"
+                            placeholder="(00) 00000-0000"
+                            value={quickClientForm.phone_number}
+                            onChange={(e) => handleQuickClientFormChange("phone_number", e.target.value)}
+                            className="h-11 border-[#3D583F]/20 focus-visible:ring-[#3D583F]/20"
+                            disabled={isCreatingQuickClient}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          className="h-11 bg-[#3D583F] hover:bg-[#2F4531] text-white"
+                          onClick={handleQuickCreateClient}
+                          disabled={isCreatingQuickClient}
+                        >
+                          {isCreatingQuickClient ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Salvando...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4" />
+                              Criar cliente
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

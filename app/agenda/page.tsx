@@ -50,6 +50,9 @@ interface Service {
   service_description: string;
   service_price: string;
   service_duration: number;
+  base_price?: string | number | null;
+  promotional_price?: string | number | null;
+  promotion_type?: "date" | "weekday" | null;
 }
 
 interface FitSlot {
@@ -538,6 +541,79 @@ export default function AgendaPage() {
     }
   };
 
+  const fetchServicesForContext = async (dateParam?: Date) => {
+    if (!user) return;
+
+    try {
+      const targetDate = dateParam || date;
+      const formattedDate = targetDate.toISOString().split("T")[0];
+      const professionalId = selectedProfessionalId || user.id;
+
+      let servicesResponse;
+      let servicesData: any = [];
+
+      const serviceEndpoints = ["/service"];
+
+      for (const endpoint of serviceEndpoints) {
+        try {
+          servicesResponse = await api.get(endpoint, {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              company_id: user?.company_id?.toString() || "0",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            params: {
+              professional_id: professionalId,
+              date: formattedDate,
+            },
+          });
+
+          servicesData = servicesResponse.data;
+
+          if (servicesData && typeof servicesData === "object" && !Array.isArray(servicesData)) {
+            const possibleKeys = ["services", "data", "items", "results"];
+            for (const key of possibleKeys) {
+              if (servicesData[key] && Array.isArray(servicesData[key])) {
+                servicesData = servicesData[key];
+                break;
+              }
+            }
+          }
+
+          if (Array.isArray(servicesData)) break;
+        } catch (endpointError) {
+          if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
+            throw endpointError;
+          }
+        }
+      }
+
+      const validServices = Array.isArray(servicesData)
+        ? servicesData
+            .filter((service) => service && (service.id || service.service_id))
+            .map((service) => ({
+              service_id: service.service_id || service.id,
+              service_name:
+                service.service_name || service.name || service.title || `Serviço ${service.service_id || service.id}`,
+              service_duration:
+                service.service_duration || service.duration || service.time || service.duration_minutes || 30,
+              service_price: String(service.service_price ?? service.price ?? service.value ?? service.cost ?? "0.00"),
+              service_description: service.service_description || service.description || service.desc || "",
+              base_price: service.base_price ?? null,
+              promotional_price: service.promotional_price ?? null,
+              promotion_type: service.promotion_type ?? null,
+            }))
+        : [];
+
+      setServices(validServices);
+    } catch (error: any) {
+      console.error("Erro ao buscar serviços:", error);
+      toast.error(error.response?.data?.error || "Erro ao carregar serviços");
+      setServices([]);
+    }
+  };
+
   // Carregar clientes, serviços e agendamentos
   useEffect(() => {
     const fetchClientsAndServices = async () => {
@@ -573,91 +649,7 @@ export default function AgendaPage() {
         
         setClients(validClients);
 
-        // Buscar serviços - tentar diferentes endpoints
-        let servicesResponse;
-        let servicesData = [];
-        
-        const serviceEndpoints = ["/service", "/service"];
-        
-        for (const endpoint of serviceEndpoints) {
-          try {
-            console.log(`Tentando buscar serviços no endpoint: ${endpoint}`);
-            servicesResponse = await api.get(endpoint, {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                company_id: user?.company_id?.toString() || "0",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            });
-            
-            console.log(`Resposta do endpoint ${endpoint}:`, servicesResponse);
-            console.log(`Dados do endpoint ${endpoint}:`, servicesResponse.data);
-            
-            // Verificar se a resposta tem a estrutura esperada
-            servicesData = servicesResponse.data;
-            
-            // Se a resposta for um objeto com uma propriedade que contém os serviços
-            if (servicesData && typeof servicesData === 'object' && !Array.isArray(servicesData)) {
-              // Tentar encontrar a propriedade que contém os serviços
-              const possibleKeys = ['services', 'data', 'items', 'results'];
-              for (const key of possibleKeys) {
-                if (servicesData[key] && Array.isArray(servicesData[key])) {
-                  servicesData = servicesData[key];
-                  break;
-                }
-              }
-            }
-            
-            // Se encontrou dados válidos, sair do loop
-            if (Array.isArray(servicesData) && servicesData.length > 0) {
-              console.log(`Serviços encontrados no endpoint ${endpoint}:`, servicesData);
-              break;
-            }
-            
-          } catch (endpointError) {
-            console.error(`Erro no endpoint ${endpoint}:`, endpointError);
-            if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
-              // Se é o último endpoint, propagar o erro
-              throw endpointError;
-            }
-          }
-        }
-        
-        console.log("Dados processados dos serviços:", servicesData);
-        
-        // Normalizar e filtrar serviços válidos
-        const validServices = Array.isArray(servicesData) 
-          ? servicesData
-              .filter(service => {
-                console.log("Verificando serviço:", service);
-                console.log("Tem ID?", !!service?.id);
-                console.log("Tem service_id?", !!service?.service_id);
-                
-                // Verificar se tem id ou service_id
-                return service && (service.id || service.service_id);
-              })
-              .map(service => {
-                // Normalizar a estrutura do serviço
-                const normalizedService = {
-                  service_id: service.service_id || service.id,
-                  service_name: service.service_name || service.service_name || service.title || `Serviço ${service.service_id || service.id}`,
-                  service_duration: service.service_duration || service.duration || service.time || service.duration_minutes || 30,
-                  service_price: service.service_price || service.price || service.value || service.cost || "0.00",
-                  service_description: service.service_description || service.description || service.desc || '',
-                  // Manter dados originais para debug
-                  _original: service
-                };
-                
-                console.log("Serviço normalizado:", normalizedService);
-                return normalizedService;
-              })
-          : [];
-        
-        console.log("Serviços válidos filtrados:", validServices);
-        console.log("Quantidade de serviços:", validServices.length);
-        
-        setServices(validServices);
+        await fetchServicesForContext(date);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
         console.error("Detalhes do erro:", error.response?.data);
@@ -684,6 +676,12 @@ export default function AgendaPage() {
       fetchAppointments(user.id, date);
     }
   }, [date]);
+
+  useEffect(() => {
+    if (user) {
+      fetchServicesForContext(date);
+    }
+  }, [date, selectedProfessionalId]);
 
   // Recalcular encaixes quando slots ou agendamentos mudarem
   useEffect(() => {
@@ -2891,6 +2889,18 @@ export default function AgendaPage() {
                         <div className="max-h-52 overflow-y-auto">
                           {services.length > 0 ? services.map((service) => {
                             const isSelected = formData.service_ids.includes(service.service_id?.toString() || "");
+                            const servicePrice = parseFloat(String(service.service_price || "0"));
+                            const basePrice =
+                              service.base_price === null || service.base_price === undefined
+                                ? null
+                                : parseFloat(String(service.base_price));
+                            const hasPromotion = basePrice !== null && servicePrice !== basePrice;
+                            const promotionLabel =
+                              service.promotion_type === "weekday"
+                                ? "Promo semanal"
+                                : service.promotion_type === "date"
+                                  ? "Promo do dia"
+                                  : null;
                             return (
                               <div
                                 key={service.service_id}
@@ -2907,9 +2917,19 @@ export default function AgendaPage() {
                                   )}
                                 </div>
                                 <span className="text-sm text-gray-800 flex-1">{service.service_name || 'Serviço'}</span>
-                                <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
-                                  <span>{service.service_duration}min</span>
-                                  <span className="text-gray-600 font-medium">R$ {service.service_price}</span>
+                                <div className="flex flex-col items-end gap-0.5 ml-2">
+                                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span>{service.service_duration}min</span>
+                                    <span className="text-gray-600 font-medium">R$ {servicePrice.toFixed(2)}</span>
+                                    {hasPromotion && (
+                                      <span className="text-[11px] text-gray-400 line-through">
+                                        R$ {Number(basePrice).toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {promotionLabel && (
+                                    <span className="text-[11px] text-[#3D583F]">{promotionLabel}</span>
+                                  )}
                                 </div>
                               </div>
                             );

@@ -4,7 +4,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequ
 const api: AxiosInstance = axios.create({
  baseURL: process.env.NEXT_PUBLIC_API_URL 
   ? process.env.NEXT_PUBLIC_API_URL 
-  : "http://api-sandbox.linkcallendar.com",
+  : "https://api.linkcallendar.com",
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

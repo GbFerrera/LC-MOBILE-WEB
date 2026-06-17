@@ -7,6 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChevronLeftIcon,
   ClockIcon,
@@ -21,6 +25,10 @@ import {
   Calendar,
   Bell,
   BellOff,
+  Search,
+  DollarSign,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
@@ -30,6 +38,38 @@ import { useState, useEffect } from "react";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/use-notifications";
+
+interface MobileService {
+  id?: number;
+  service_id?: number;
+  service_name?: string;
+  service_description?: string | null;
+  service_price?: number;
+  base_price?: number | null;
+  promotional_price?: number | null;
+  base_duration?: number;
+  service_duration?: number;
+  promotion_type?: string | null;
+  promotion_weekday?: number | null;
+}
+
+interface ServicePromotion {
+  id: number;
+  service_id: number;
+  date: string;
+  promotional_price: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ServiceWeekdayPromotion {
+  id: number;
+  service_id: number;
+  weekday: number;
+  promotional_price: number;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export default function AjustesPage() {
   const { user, updateUser, signOut } = useAuth();
@@ -41,7 +81,7 @@ export default function AjustesPage() {
   const [isServicesDialogOpen, setIsServicesDialogOpen] = useState(false);
   const [isCreateServiceDialogOpen, setIsCreateServiceDialogOpen] = useState(false);
   const [isEditServiceDialogOpen, setIsEditServiceDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<MobileService | null>(null);
   const [isUpdatingService, setIsUpdatingService] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serviceHoursLoading, setServiceHoursLoading] = useState(false);
@@ -68,7 +108,24 @@ export default function AjustesPage() {
   const [serviceHours, setServiceHours] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<MobileService[]>([]);
+  const [serviceSearchTerm, setServiceSearchTerm] = useState("");
+  const [priceDate, setPriceDate] = useState("");
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false);
+  const [promoService, setPromoService] = useState<MobileService | null>(null);
+  const [promoDate, setPromoDate] = useState("");
+  const [promoDatePrice, setPromoDatePrice] = useState("");
+  const [promoWeekdayPrice, setPromoWeekdayPrice] = useState("");
+  const [isSavingPromo, setIsSavingPromo] = useState(false);
+  const [isRemovingPromo, setIsRemovingPromo] = useState(false);
+  const [promotionHistory, setPromotionHistory] = useState<ServicePromotion[]>([]);
+  const [isLoadingPromotionHistory, setIsLoadingPromotionHistory] = useState(false);
+  const [isRemovingPromotionByDate, setIsRemovingPromotionByDate] = useState<{ [date: string]: boolean }>({});
+  const [weekdayPromotions, setWeekdayPromotions] = useState<ServiceWeekdayPromotion[]>([]);
+  const [isLoadingWeekdayPromotions, setIsLoadingWeekdayPromotions] = useState(false);
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
+  const [isSavingWeekdayPromotions, setIsSavingWeekdayPromotions] = useState(false);
+  const [isRemovingWeekdayPromotion, setIsRemovingWeekdayPromotion] = useState<{ [weekday: number]: boolean }>({});
   const [editForm, setEditForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -213,6 +270,19 @@ export default function AjustesPage() {
       viewDetailsCompany();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (isServicesDialogOpen && user?.id && user?.company_id) {
+      fetchServices();
+    }
+  }, [isServicesDialogOpen, priceDate, user?.id, user?.company_id]);
+
+  useEffect(() => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!promoDialogOpen || !serviceId || !user?.company_id) return;
+    loadPromotionHistory(serviceId);
+    loadWeekdayPromotions(serviceId);
+  }, [promoDialogOpen, promoService?.service_id, promoService?.id, user?.company_id]);
 
   // Atualizar perfil
   const handleUpdateProfile = async () => {
@@ -519,19 +589,42 @@ export default function AjustesPage() {
 
   // Buscar serviços da empresa
   const fetchServices = async () => {
-    if (!user?.company_id) {
+    if (!user?.company_id || !user?.id) {
       toast.error("ID da empresa não identificado");
       return;
     }
 
     setServicesLoading(true);
     try {
-      const response = await api.get(`/team-services/professional/${user.id}`, {
+      const params = new URLSearchParams({
+        professional_id: String(user.id),
+      });
+
+      if (priceDate) {
+        params.set("date", priceDate);
+      }
+
+      const response = await api.get(`/service?${params.toString()}`, {
         headers: {
           company_id: user?.company_id
         }
       });
-      setServices(response.data || []);
+
+      const formattedServices: MobileService[] = (response.data || []).map((service: any) => ({
+        id: Number(service.service_id || service.id || 0),
+        service_id: Number(service.service_id || service.id || 0),
+        service_name: service.service_name || service.name || "",
+        service_description: service.service_description || service.description || null,
+        service_price: Number(service.service_price ?? service.price ?? 0),
+        base_price: service.base_price === null || service.base_price === undefined ? null : Number(service.base_price),
+        promotional_price: service.promotional_price === null || service.promotional_price === undefined ? null : Number(service.promotional_price),
+        base_duration: Number(service.base_duration ?? service.service_duration ?? service.duration ?? 0),
+        service_duration: Number(service.service_duration ?? service.base_duration ?? service.duration ?? 0),
+        promotion_type: service.promotion_type || null,
+        promotion_weekday: service.promotion_weekday === null || service.promotion_weekday === undefined ? null : Number(service.promotion_weekday),
+      }));
+
+      setServices(formattedServices);
     } catch (error: any) {
       console.error('Erro ao buscar serviços:', error);
       toast.error("Erro ao carregar serviços");
@@ -543,7 +636,6 @@ export default function AjustesPage() {
   // Abrir modal de serviços
   const handleServicesClick = () => {
     setIsServicesDialogOpen(true);
-    fetchServices();
   };
 
   // Formatar preço em reais
@@ -563,6 +655,252 @@ export default function AjustesPage() {
       return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
     }
     return `${duration}min`;
+  };
+
+  const openPromotionDialog = (service: MobileService) => {
+    const basePrice = Number(service.base_price ?? service.service_price ?? 0);
+    setPromoService(service);
+    setPromoDate(priceDate || "");
+    setPromoDatePrice(String(basePrice || ""));
+    setPromoWeekdayPrice(String(basePrice || ""));
+    setSelectedWeekdays([]);
+    setPromoDialogOpen(true);
+  };
+
+  const loadPromotionHistory = async (serviceId: number) => {
+    try {
+      setIsLoadingPromotionHistory(true);
+      const response = await api.get(`/service/${serviceId}/promotions`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      const formatted: ServicePromotion[] = (response.data || []).map((promotion: any) => ({
+        id: Number(promotion.id),
+        service_id: Number(promotion.service_id),
+        date: String(promotion.date),
+        promotional_price: Number(promotion.promotional_price),
+        created_at: promotion.created_at ? String(promotion.created_at) : undefined,
+        updated_at: promotion.updated_at ? String(promotion.updated_at) : undefined,
+      }));
+
+      setPromotionHistory(formatted);
+    } catch (error: any) {
+      console.error("Erro ao carregar histórico de promoções:", error);
+      toast.error(error.response?.data?.error || "Erro ao carregar histórico de promoções");
+    } finally {
+      setIsLoadingPromotionHistory(false);
+    }
+  };
+
+  const loadWeekdayPromotions = async (serviceId: number) => {
+    try {
+      setIsLoadingWeekdayPromotions(true);
+      const response = await api.get(`/service/${serviceId}/weekday-promotions`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      const formatted: ServiceWeekdayPromotion[] = (response.data || []).map((promotion: any) => ({
+        id: Number(promotion.id),
+        service_id: Number(promotion.service_id),
+        weekday: Number(promotion.weekday),
+        promotional_price: Number(promotion.promotional_price),
+        created_at: promotion.created_at ? String(promotion.created_at) : undefined,
+        updated_at: promotion.updated_at ? String(promotion.updated_at) : undefined,
+      }));
+
+      setWeekdayPromotions(formatted);
+    } catch (error: any) {
+      console.error("Erro ao carregar promoções semanais:", error);
+      toast.error(error.response?.data?.error || "Erro ao carregar promoções semanais");
+    } finally {
+      setIsLoadingWeekdayPromotions(false);
+    }
+  };
+
+  const savePromotion = async () => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!serviceId) return;
+
+    try {
+      setIsSavingPromo(true);
+
+      if (!promoDate) {
+        toast.error("Informe a data da promoção");
+        return;
+      }
+
+      const numericPrice = Number(promoDatePrice);
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+        toast.error("Informe um preço promocional válido");
+        return;
+      }
+
+      await api.post(`/service/${serviceId}/promotion`, {
+        date: promoDate,
+        promotional_price: numericPrice,
+      }, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      toast.success("Promoção salva com sucesso!");
+      loadPromotionHistory(serviceId);
+      fetchServices();
+    } catch (error: any) {
+      console.error("Erro ao salvar promoção:", error);
+      toast.error(error.response?.data?.error || "Erro ao salvar promoção");
+    } finally {
+      setIsSavingPromo(false);
+    }
+  };
+
+  const removePromotion = async () => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!serviceId) return;
+
+    try {
+      setIsRemovingPromo(true);
+
+      if (!promoDate) {
+        toast.error("Informe a data da promoção para remover");
+        return;
+      }
+
+      await api.delete(`/service/${serviceId}/promotion/${promoDate}`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      toast.success("Promoção removida com sucesso!");
+      setPromoDate("");
+      setPromoDatePrice("");
+      loadPromotionHistory(serviceId);
+      fetchServices();
+    } catch (error: any) {
+      console.error("Erro ao remover promoção:", error);
+      toast.error(error.response?.data?.error || "Erro ao remover promoção");
+    } finally {
+      setIsRemovingPromo(false);
+    }
+  };
+
+  const removePromotionByDate = async (date: string) => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!serviceId) return;
+
+    try {
+      setIsRemovingPromotionByDate((prev) => ({ ...prev, [date]: true }));
+
+      await api.delete(`/service/${serviceId}/promotion/${date}`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      toast.success("Promoção removida com sucesso!");
+
+      if (promoDate === date) {
+        setPromoDate("");
+        setPromoDatePrice("");
+      }
+
+      loadPromotionHistory(serviceId);
+      fetchServices();
+    } catch (error: any) {
+      console.error("Erro ao remover promoção:", error);
+      toast.error(error.response?.data?.error || "Erro ao remover promoção");
+    } finally {
+      setIsRemovingPromotionByDate((prev) => ({ ...prev, [date]: false }));
+    }
+  };
+
+  const toggleWeekday = (weekday: number) => {
+    setSelectedWeekdays((prev) =>
+      prev.includes(weekday) ? prev.filter((item) => item !== weekday) : [...prev, weekday]
+    );
+  };
+
+  const weekdayLabel = (weekday: number) => {
+    const map: { [key: number]: string } = {
+      0: "Dom",
+      1: "Seg",
+      2: "Ter",
+      3: "Qua",
+      4: "Qui",
+      5: "Sex",
+      6: "Sáb",
+    };
+
+    return map[weekday] || String(weekday);
+  };
+
+  const saveWeekdayPromotions = async () => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!serviceId) return;
+
+    try {
+      setIsSavingWeekdayPromotions(true);
+
+      if (selectedWeekdays.length === 0) {
+        toast.error("Selecione ao menos um dia da semana");
+        return;
+      }
+
+      const numericPrice = Number(promoWeekdayPrice);
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+        toast.error("Informe um preço promocional válido");
+        return;
+      }
+
+      await api.post(`/service/${serviceId}/weekday-promotions`, {
+        weekdays: selectedWeekdays,
+        promotional_price: numericPrice,
+      }, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      toast.success("Promoção semanal salva com sucesso!");
+      setSelectedWeekdays([]);
+      loadWeekdayPromotions(serviceId);
+      fetchServices();
+    } catch (error: any) {
+      console.error("Erro ao salvar promoção semanal:", error);
+      toast.error(error.response?.data?.error || "Erro ao salvar promoção semanal");
+    } finally {
+      setIsSavingWeekdayPromotions(false);
+    }
+  };
+
+  const removeWeekdayPromotion = async (weekday: number) => {
+    const serviceId = promoService?.service_id || promoService?.id;
+    if (!serviceId) return;
+
+    try {
+      setIsRemovingWeekdayPromotion((prev) => ({ ...prev, [weekday]: true }));
+
+      await api.delete(`/service/${serviceId}/weekday-promotion/${weekday}`, {
+        headers: {
+          company_id: user?.company_id
+        }
+      });
+
+      toast.success("Promoção semanal removida com sucesso!");
+      loadWeekdayPromotions(serviceId);
+      fetchServices();
+    } catch (error: any) {
+      console.error("Erro ao remover promoção semanal:", error);
+      toast.error(error.response?.data?.error || "Erro ao remover promoção semanal");
+    } finally {
+      setIsRemovingWeekdayPromotion((prev) => ({ ...prev, [weekday]: false }));
+    }
   };
 
   // Buscar dias de folga específicos
@@ -896,13 +1234,13 @@ export default function AjustesPage() {
   };
 
   // Abrir modal de edição de serviço
-  const handleEditServiceClick = (service: any) => {
+  const handleEditServiceClick = (service: MobileService) => {
     setSelectedService(service);
     setEditServiceForm({
-      name: service.service_name,
+      name: service.service_name || "",
       description: service.service_description || "",
-      price: service.base_price.toString(),
-      duration: service.base_duration.toString()
+      price: String(service.base_price ?? service.service_price ?? 0),
+      duration: String(service.base_duration ?? service.service_duration ?? 0)
     });
     setIsEditServiceDialogOpen(true);
   };
@@ -1038,6 +1376,10 @@ export default function AjustesPage() {
     }
   };
 
+  const filteredServices = services.filter((service) =>
+    (service.service_name || "").toLowerCase().includes(serviceSearchTerm.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen">
       <header className="bg-white border-b">
@@ -1155,7 +1497,16 @@ export default function AjustesPage() {
                 </Dialog>
 
                 {/* Services Dialog */}
-                <Dialog open={isServicesDialogOpen} onOpenChange={setIsServicesDialogOpen}>
+                <Dialog
+                  open={isServicesDialogOpen}
+                  onOpenChange={(open) => {
+                    setIsServicesDialogOpen(open);
+                    if (!open) {
+                      setServiceSearchTerm("");
+                      setPriceDate("");
+                    }
+                  }}
+                >
                   <DialogContent className="z-[1000] w-[95vw] sm:w-[90vw] max-w-3xl border border-gray-200 shadow-xl bg-white rounded-2xl sm:rounded-3xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-4 sm:pb-6 border-b border-gray-100">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
@@ -1184,22 +1535,57 @@ export default function AjustesPage() {
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto py-4 sm:py-6">
+                      <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Input
+                            placeholder="Buscar serviço..."
+                            value={serviceSearchTerm}
+                            onChange={(e) => setServiceSearchTerm(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                          <Input
+                            type="date"
+                            value={priceDate}
+                            onChange={(e) => setPriceDate(e.target.value)}
+                            className="sm:max-w-[180px]"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setPriceDate("")}
+                            disabled={!priceDate}
+                            className="w-full sm:w-auto"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Limpar
+                          </Button>
+                        </div>
+                      </div>
+
                       {servicesLoading ? (
                         <div className="flex flex-col items-center justify-center py-12 sm:py-16">
                           <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin mb-4"></div>
                           <p className="text-gray-600 text-sm sm:text-base">Carregando serviços...</p>
                         </div>
-                      ) : services.length > 0 ? (
+                      ) : filteredServices.length > 0 ? (
                         <div className="space-y-3 sm:space-y-4">
-                          {services.map((service, index) => (
-                            <div key={service.id || index} className="group">
+                          {filteredServices.map((service, index) => (
+                            <div key={service.service_id || service.id || index} className="group">
                               <div className="bg-white border border-[#3D583F]/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:shadow-md transition-all duration-300 hover:border-[#3D583F]/30">
                                 <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-                          <div className="w-3 h-3 bg-[#3D583F] rounded-full mt-1 sm:mt-2 flex-shrink-0"></div>
+                                  <div className="w-3 h-3 bg-[#3D583F] rounded-full mt-1 sm:mt-2 flex-shrink-0"></div>
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
-                                      {service.service_name}
-                                    </h3>
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                      <h3 className="font-semibold text-base sm:text-lg text-gray-900">
+                                        {service.service_name}
+                                      </h3>
+                                      <Badge variant="secondary" className="shrink-0">
+                                        Serviço
+                                      </Badge>
+                                    </div>
                                     {service.service_description && (
                                       <p className="text-gray-600 mb-3 sm:mb-4 text-xs sm:text-sm leading-relaxed">
                                         {service.service_description}
@@ -1207,30 +1593,72 @@ export default function AjustesPage() {
                                     )}
                                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                                       <div className="flex items-center gap-2 bg-[#3D583F]/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
-                                        <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
-                                          {formatPrice(service.base_price)}
-                                        </span>
+                                        <DollarSign className="h-4 w-4 text-[#3D583F]" />
+                                        {priceDate && service.promotional_price !== null && service.promotional_price !== undefined ? (
+                                          <div className="flex items-baseline gap-2">
+                                            <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
+                                              {formatPrice(service.service_price || 0)}
+                                            </span>
+                                            <span className="text-[11px] sm:text-xs text-gray-500 line-through">
+                                              {formatPrice(service.base_price || 0)}
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
+                                            {formatPrice(service.service_price || service.base_price || 0)}
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-2 bg-[#3D583F]/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
+                                        <ClockIcon className="h-4 w-4 text-[#3D583F]" />
                                         <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
-                                          {formatDuration(service.base_duration)}
+                                          {formatDuration(service.service_duration || service.base_duration || 0)}
                                         </span>
                                       </div>
                                     </div>
                                   </div>
-                                  <Button
-                                    onClick={() => handleEditServiceClick(service)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 w-full sm:w-auto mt-2 sm:mt-0 text-xs sm:text-sm"
-                                  >
-                                    <PencilIcon className="h-4 w-4 mr-1" />
-                                    Editar
-                                  </Button>
+                                  <div className="flex w-full sm:w-auto flex-col gap-2 mt-2 sm:mt-0">
+                                    <Button
+                                      onClick={() => openPromotionDialog(service)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 w-full sm:w-auto text-xs sm:text-sm"
+                                    >
+                                      <Sparkles className="h-4 w-4 mr-1" />
+                                      Promoção
+                                    </Button>
+                                    <Button
+                                      onClick={() => handleEditServiceClick(service)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 w-full sm:w-auto text-xs sm:text-sm"
+                                    >
+                                      <PencilIcon className="h-4 w-4 mr-1" />
+                                      Editar
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           ))}
+                        </div>
+                      ) : services.length > 0 ? (
+                        <div className="text-center py-16">
+                          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <Search className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum serviço encontrado</h3>
+                          <p className="text-gray-600 mb-6 max-w-sm mx-auto">Tente ajustar a busca ou limpar o filtro de data</p>
+                          <Button
+                            onClick={() => {
+                              setServiceSearchTerm("");
+                              setPriceDate("");
+                            }}
+                            variant="outline"
+                            className="rounded-md"
+                          >
+                            Limpar filtros
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-center py-16">
@@ -1259,6 +1687,261 @@ export default function AjustesPage() {
                         Fechar
                       </Button>
                     </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog
+                  open={promoDialogOpen}
+                  onOpenChange={(open) => {
+                    setPromoDialogOpen(open);
+                    if (!open) {
+                      setPromoService(null);
+                      setPromoDate("");
+                      setPromoDatePrice("");
+                      setPromoWeekdayPrice("");
+                      setPromotionHistory([]);
+                      setIsRemovingPromotionByDate({});
+                      setWeekdayPromotions([]);
+                      setSelectedWeekdays([]);
+                      setIsRemovingWeekdayPromotion({});
+                    }
+                  }}
+                >
+                  <DialogContent className="z-[1100] w-[95vw] sm:max-w-md border border-gray-200 shadow-xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Promoções</DialogTitle>
+                      <DialogDescription>
+                        {promoService?.service_name
+                          ? `Gerencie promoções para ${promoService.service_name}`
+                          : "Gerencie promoções do serviço"}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <Tabs defaultValue="date" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="date">Por data</TabsTrigger>
+                        <TabsTrigger value="weekday">Semanal</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="date" className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Data</div>
+                          <Input
+                            type="date"
+                            value={promoDate}
+                            onChange={(e) => setPromoDate(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Preço</div>
+                          <Input
+                            inputMode="decimal"
+                            value={promoDatePrice}
+                            onChange={(e) => setPromoDatePrice(e.target.value)}
+                            placeholder="Ex: 30"
+                          />
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-2 pt-1">
+                          <Button
+                            variant="outline"
+                            onClick={() => setPromoDialogOpen(false)}
+                            disabled={isRemovingPromo || isSavingPromo}
+                          >
+                            Fechar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={removePromotion}
+                            disabled={isRemovingPromo || isSavingPromo}
+                            className="hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                          >
+                            {isRemovingPromo ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remover data"}
+                          </Button>
+                          <Button
+                            onClick={savePromotion}
+                            disabled={isSavingPromo || isRemovingPromo}
+                            className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                          >
+                            {isSavingPromo ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar data"}
+                          </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Histórico</div>
+                          <div className="rounded-md border">
+                            <ScrollArea className="h-[220px]">
+                              {isLoadingPromotionHistory ? (
+                                <div className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Carregando promoções...
+                                </div>
+                              ) : promotionHistory.length === 0 ? (
+                                <div className="p-4 text-sm text-muted-foreground">
+                                  Nenhuma promoção por data cadastrada.
+                                </div>
+                              ) : (
+                                <div className="p-2 space-y-2">
+                                  {promotionHistory.map((promotion) => (
+                                    <div
+                                      key={`${promotion.service_id}-${promotion.date}`}
+                                      className="flex items-center justify-between gap-2 rounded-md border bg-background p-2"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-medium">{promotion.date}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {formatPrice(promotion.promotional_price)}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => {
+                                            setPromoDate(promotion.date);
+                                            setPromoDatePrice(String(Number(promotion.promotional_price || 0)));
+                                          }}
+                                        >
+                                          Editar
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          className="h-8 px-2 text-xs hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                                          disabled={!!isRemovingPromotionByDate[promotion.date]}
+                                          onClick={() => removePromotionByDate(promotion.date)}
+                                        >
+                                          {isRemovingPromotionByDate[promotion.date] ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            "Cancelar"
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </ScrollArea>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="weekday" className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Dias da semana</div>
+                          <div className="rounded-md border p-3">
+                            <div className="flex flex-wrap gap-3">
+                              {[1, 2, 3, 4, 5, 6, 0].map((weekday) => (
+                                <label key={weekday} className="flex items-center gap-2 text-sm">
+                                  <Checkbox
+                                    checked={selectedWeekdays.includes(weekday)}
+                                    onCheckedChange={() => toggleWeekday(weekday)}
+                                  />
+                                  {weekdayLabel(weekday)}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Preço</div>
+                          <Input
+                            inputMode="decimal"
+                            value={promoWeekdayPrice}
+                            onChange={(e) => setPromoWeekdayPrice(e.target.value)}
+                            placeholder="Ex: 30"
+                          />
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-2 pt-1">
+                          <Button
+                            variant="outline"
+                            onClick={() => setPromoDialogOpen(false)}
+                            disabled={isSavingWeekdayPromotions || isSavingPromo || isRemovingPromo}
+                          >
+                            Fechar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setSelectedWeekdays([])}
+                            disabled={selectedWeekdays.length === 0}
+                          >
+                            Limpar seleção
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={saveWeekdayPromotions}
+                            disabled={isSavingWeekdayPromotions || isSavingPromo || isRemovingPromo}
+                          >
+                            {isSavingWeekdayPromotions ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Salvar semanal"
+                            )}
+                          </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Regras cadastradas</div>
+                          <div className="rounded-md border">
+                            <ScrollArea className="h-[260px]">
+                              {isLoadingWeekdayPromotions ? (
+                                <div className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Carregando promoções semanais...
+                                </div>
+                              ) : weekdayPromotions.length === 0 ? (
+                                <div className="p-4 text-sm text-muted-foreground">
+                                  Nenhuma promoção semanal cadastrada.
+                                </div>
+                              ) : (
+                                <div className="p-2 space-y-2">
+                                  {weekdayPromotions.map((promotion) => (
+                                    <div
+                                      key={`${promotion.service_id}-${promotion.weekday}`}
+                                      className="flex items-center justify-between gap-2 rounded-md border bg-background p-2"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-medium">{weekdayLabel(promotion.weekday)}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {formatPrice(promotion.promotional_price)}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => {
+                                            setPromoWeekdayPrice(String(Number(promotion.promotional_price || 0)));
+                                            setSelectedWeekdays([promotion.weekday]);
+                                          }}
+                                        >
+                                          Editar
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          className="h-8 px-2 text-xs hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                                          disabled={!!isRemovingWeekdayPromotion[promotion.weekday]}
+                                          onClick={() => removeWeekdayPromotion(promotion.weekday)}
+                                        >
+                                          {isRemovingWeekdayPromotion[promotion.weekday] ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            "Cancelar"
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </ScrollArea>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </DialogContent>
                 </Dialog>
 

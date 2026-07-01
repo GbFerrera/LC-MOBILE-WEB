@@ -12,6 +12,7 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { useCompanyContext } from "@/contexts/CompanyContext";
 import { io, Socket } from "socket.io-client";
 import { useNotifications } from "@/hooks/use-notifications";
+import AccessGuard from "@/components/AccessGuard";
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -179,26 +180,28 @@ function LayoutContent({ children }: { children: ReactNode }) {
   }
 
   return (
-    <CompanyProvider>
-      <SidebarProvider defaultOpen>
-        <div className="flex min-h-screen w-full">
-          <Sidebar variant="inset">
-            <AppSidebar />
-          </Sidebar>
-          <SidebarInset>
-            <div className="sticky top-0 z-10 border-b text-white" style={{ backgroundColor: "#3D583F" }}>
-              <div className="flex items-center gap-2 px-3 py-2">
-                <div className="text-white">
-                  <SidebarTrigger />
+    <AccessGuard companyId={user?.company_id}>
+      <CompanyProvider>
+        <SidebarProvider defaultOpen>
+          <div className="flex min-h-screen w-full">
+            <Sidebar variant="inset">
+              <AppSidebar />
+            </Sidebar>
+            <SidebarInset>
+              <div className="sticky top-0 z-10 border-b text-white" style={{ backgroundColor: "#3D583F" }}>
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <div className="text-white">
+                    <SidebarTrigger />
+                  </div>
+                  <HeaderCompanyName />
                 </div>
-                <HeaderCompanyName />
               </div>
-            </div>
-            <div className="">{children}</div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
-    </CompanyProvider>
+              <div className="">{children}</div>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </CompanyProvider>
+    </AccessGuard>
   );
 }
 

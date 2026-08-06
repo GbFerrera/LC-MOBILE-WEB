@@ -1,223 +1,193 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ScissorsIcon,
-  LogInIcon,
-  Eye,
-  EyeOff,
-  Mail,
-  Lock,
-  Sparkles,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/auth";
-import { toast } from "sonner";
-import Image from "next/image";
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
-  const { signIn, loading, user } = useAuth();
-  const router = useRouter();
+  const [errors, setErrors] = useState({ email: "", password: "" });
+  const { signIn, signInLoading } = useAuth();
 
-  // Função para atualizar os dados do formulário
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  // Função para validar o formulário
   const validateForm = () => {
-    if (!formData.email || !formData.password) {
-      setError("Preencha todos os campos");
-      return false;
+    const newErrors = { email: "", password: "" };
+    let isValid = true;
+
+    if (!email) {
+      newErrors.email = "O email é obrigatório";
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = "Por favor, insira um email válido";
+      isValid = false;
     }
 
-    if (formData.password.length < 4) {
-      setError("A senha deve ter pelo menos 4 caracteres");
-      return false;
+    if (!password) {
+      newErrors.password = "A senha é obrigatória";
+      isValid = false;
+    } else if (password.length < 4) {
+      newErrors.password = "A senha deve ter pelo menos 4 caracteres";
+      isValid = false;
     }
 
-    return true;
+    setErrors(newErrors);
+    return isValid;
   };
 
-  // Função para fazer login
-  const handleLogin = async () => {
-    setError("");
-
-    if (!validateForm()) {
-      console.log("Validação falhou");
-      return;
-    }
-
-    console.log("Iniciando login com:", formData.email);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
     try {
-      // Usar o hook de autenticação para fazer login
-      await signIn({
-        email: formData.email,
-        password: formData.password,
-      });
-      // O redirecionamento é feito automaticamente pelo hook de autenticação
-    } catch (error: any) {
-      console.error("Erro no login capturado:", error);
-      
-      let errorMessage = "Ocorreu um erro ao fazer login. Tente novamente.";
-      
-      try {
-        // Tratar diferentes tipos de erro de forma segura
-        if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message;
-        } else if (error?.message) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        }
-      } catch (handlingError) {
-        console.error("Erro ao processar mensagem de erro:", handlingError);
-        errorMessage = "Ocorreu um erro ao fazer login. Tente novamente.";
-      }
-      
-      // Exibir erro apenas no estado local (toast já é mostrado pelo hook)
-      setError(errorMessage);
+      await signIn({ email, password });
+    } catch {
+      // Toast de erro já é exibido pelo AuthProvider
     }
   };
 
-  useEffect(() => {
-    if(user) {
-      router.push("/")
-    }
-  }, [])
-
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4" style={{ backgroundColor: "#3D583F" }}>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <Image src="/favicon.png" alt="" width={160} height={160} className="absolute top-6 left-8 opacity-20 rotate-12" aria-hidden />
-        <Image src="/favicon.png" alt="" width={96} height={96} className="absolute top-14 right-16 opacity-15 -rotate-6" aria-hidden />
-        <Image src="/favicon.png" alt="" width={200} height={200} className="absolute bottom-16 right-10 opacity-25 rotate-3" aria-hidden />
-        <Image src="/favicon.png" alt="" width={120} height={120} className="absolute bottom-8 left-1/4 opacity-20 -rotate-3" aria-hidden />
-        <Image src="/favicon.png" alt="" width={80} height={80} className="absolute top-1/2 left-10 -translate-y-1/2 opacity-10 rotate-6" aria-hidden />
-        <Image src="/favicon.png" alt="" width={140} height={140} className="absolute top-24 right-1/4 opacity-20 rotate-12" aria-hidden />
-        <Image src="/favicon.png" alt="" width={64} height={64} className="absolute bottom-6 right-1/3 opacity-15 -rotate-12" aria-hidden />
-      </div>
-      <div className="w-full max-w-md -mt-1 sm:-mt-2 md:-mt-12">
-        <div className="flex items-center justify-center mb-6">
-          <Image src="/favicon.png" alt="Link Callendar" width={120} height={120} className="rounded-lg" />
-          <h1 className="text-3xl font-bold text-white">Link Callendar</h1>
+    <div className="relative flex min-h-dvh flex-col bg-white">
+      {/* Pontilhado decorativo — só no header */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-5 top-8 z-30 h-20 w-20 opacity-20"
+        style={{
+          backgroundImage: "radial-gradient(#9ca3af 1.5px, transparent 1.5px)",
+          backgroundSize: "9px 9px",
+        }}
+      />
+
+      {/* Header com foto + curva */}
+      <div className="relative min-h-[300px] h-[44vh] max-h-[360px] shrink-0 overflow-hidden border-0 sm:min-h-[280px] sm:h-[42vh] sm:max-h-[380px]">
+        <img
+          src="/image-login.png"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/35 to-black/55" />
+
+        <div className="relative z-30 max-w-[90%] px-8 pb-14 pt-[max(2.75rem,env(safe-area-inset-top))] text-left sm:max-w-none sm:pb-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/50">
+            Plataforma Link Callendar
+          </p>
+          <h1 className="mt-3 text-[1.75rem] font-bold leading-tight tracking-tight text-white sm:text-[2rem] md:text-[2.15rem]">
+            Bem-vindo <br />
+            de volta
+          </h1>
+          <p className="mt-2.5 max-w-[280px] text-sm leading-relaxed text-white/75 sm:text-[15px]">
+            Organize horários, clientes e equipe com praticidade — tudo pensado para o seu dia a dia.
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-[#3D583F]/20">
-          <div className="text-center mb-6"></div>
+        {/* Curva branca sobre a foto */}
+        <svg
+          className="pointer-events-none absolute bottom-12 left-0 z-20 block h-12 w-full leading-[0] sm:bottom-14"
+          viewBox="0 0 400 56"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <path
+            d="M0,56 L0,50 Q200,64 400,10 L400,56 Z"
+            fill="#ffffff"
+          />
+        </svg>
+      </div>
 
-          <div className="space-y-6">
-            {error && (
-              <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                <span className="font-medium">{error}</span>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="email"
-                className="text-sm font-semibold text-[#3D583F] flex items-center gap-2"
-              >
-                <Mail className="h-4 w-4" /> Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                className="h-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] focus:ring-[#3D583F] rounded-lg"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="password"
-                className="text-sm font-semibold text-[#3D583F] flex items-center gap-2"
-              >
-                <Lock className="h-4 w-4" /> Senha
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                  className="h-12 pr-12 border-2 border-[#3D583F]/30 focus:border-[#3D583F] focus:ring-[#3D583F] rounded-lg"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#3D583F]"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleLogin}
-              className="w-full h-12 text-base font-semibold bg-[#3D583F] hover:bg-[#365137] text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
+      {/* Corpo branco */}
+      <div className="relative z-10 -mt-[calc(3rem+2px)] shrink-0 border-0 bg-white sm:-mt-[calc(3.5rem+2px)]">
+        <div className="flex w-full flex-col px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8 sm:pt-10">
+          <form onSubmit={handleSubmit} className="w-full space-y-4">
+            <div className="space-y-1.5">
+              <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-[#f8f9f8] transition-colors focus-within:border-[#3D583F]/35 focus-within:bg-white">
+                <div className="border-b border-gray-200/80 px-4 py-3.5">
+                  <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-xs font-medium text-gray-500"
                   >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Entrando no sistema...
-                </>
-              ) : (
-                <>
-                  <LogInIcon className="mr-2 h-5 w-5" />
-                  Entrar no Sistema
-                </>
+                    Email
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-[18px] w-[18px] shrink-0 text-gray-400" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="seu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-auto min-h-0 flex-1 border-0 bg-transparent p-0 text-base font-medium text-gray-900 shadow-none placeholder:font-normal placeholder:text-gray-400 focus-visible:ring-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="px-4 py-3.5">
+                  <label
+                    htmlFor="password"
+                    className="mb-1.5 block text-xs font-medium text-gray-500"
+                  >
+                    Senha
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <Lock className="h-[18px] w-[18px] shrink-0 text-gray-400" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-auto min-h-0 flex-1 border-0 bg-transparent p-0 pr-2 text-base font-medium text-gray-900 shadow-none placeholder:font-normal placeholder:text-gray-400 focus-visible:ring-0"
+                    />
+                    <button
+                      type="button"
+                      className="shrink-0 text-gray-400 transition-colors hover:text-gray-600"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-[18px] w-[18px]" />
+                      ) : (
+                        <Eye className="h-[18px] w-[18px]" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {(errors.email || errors.password) && (
+                <div className="space-y-1 px-1">
+                  {errors.email && (
+                    <p className="text-xs text-red-500">{errors.email}</p>
+                  )}
+                  {errors.password && (
+                    <p className="text-xs text-red-500">{errors.password}</p>
+                  )}
+                </div>
               )}
-            </Button>
-          </div>
+            </div>
+
+            <p className="pt-1 text-center text-sm text-gray-400">
+              Esqueceu a senha?
+            </p>
+
+            <button
+              type="submit"
+              disabled={signInLoading}
+              className="flex h-[3.25rem] w-full items-center justify-center rounded-full bg-gradient-to-r from-[#4a6b4c] via-[#3D583F] to-[#2f4631] text-base font-semibold text-white shadow-none transition-opacity active:opacity-90 disabled:opacity-60"
+            >
+              {signInLoading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+
+          <p className="pt-10 text-center text-sm text-gray-400">
+            Desenvolvido por{" "}
+            <span className="font-semibold text-[#3D583F]">Link System</span>
+          </p>
         </div>
       </div>
     </div>

@@ -58,10 +58,24 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} antialiased`}
-        style={{ backgroundColor: 'var(--app-bg-color, #F1F1E7)' }}
+        className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} antialiased min-h-dvh`}
       >
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0"
+          style={{ backgroundColor: "var(--app-bg-color, #F1F1E7)" }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-10 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: "var(--app-bg-image, none)",
+            opacity: "var(--app-bg-image-opacity, 0)",
+          }}
+        />
+        <div className="relative z-20 min-h-dvh">
         <ClientLayout>{children}</ClientLayout>
+        </div>
         <div id="toast-root"></div>
       </body>
     </html>

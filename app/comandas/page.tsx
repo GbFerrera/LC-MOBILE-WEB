@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -38,6 +38,13 @@ import {
   FilterIcon,
   SearchIcon,
   CalendarIcon,
+  PercentIcon,
+  Banknote,
+  QrCode,
+  ChevronRight,
+  Phone,
+  Mail,
+  User,
   XIcon as X
 } from "lucide-react";
 
@@ -95,11 +102,15 @@ interface CartItem {
 interface CommandItem {
   id: number;
   name: string;
-  price: string;
+  price: string | number;
   quantity: number;
   item_type: string;
   professional_id?: string;
   professional_name?: string;
+  original_price?: number;
+  discount_type?: "none" | "percentage" | "fixed";
+  discount_value?: number;
+  final_price?: number;
 }
 
 interface PaymentMethod {
@@ -130,11 +141,63 @@ interface CommandDetails {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Dinheiro', icon: '💵' },
-  { value: 'credit', label: 'Cartão de Crédito', icon: '💳' },
-  { value: 'debit', label: 'Cartão de Débito', icon: '💳' },
-  { value: 'pix', label: 'PIX', icon: '⚡' },
-];
+  { value: 'cash', label: 'Dinheiro' },
+  { value: 'credit', label: 'Cartão de Crédito' },
+  { value: 'debit', label: 'Cartão de Débito' },
+  { value: 'pix', label: 'PIX' },
+] as const;
+
+function normalizeClientsResponse(data: unknown): any[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    if (Array.isArray(record.clients)) return record.clients;
+    if (Array.isArray(record.data)) return record.data;
+  }
+  return [];
+}
+
+function formatClientRecord(client: any): Client {
+  return {
+    id: String(client.id),
+    name: client.name || "",
+    email: client.email || "",
+    phone_number: client.phone_number || "",
+    document: client.document || "",
+  };
+}
+
+function matchesClientFilter(client: Client, filter: string): boolean {
+  const normalized = filter.trim().toLowerCase();
+  if (!normalized) return true;
+
+  const name = (client.name || "").toLowerCase();
+  const email = (client.email || "").toLowerCase();
+  const phone = (client.phone_number || "").replace(/\D/g, "");
+  const document = (client.document || "").replace(/\D/g, "");
+  const filterDigits = normalized.replace(/\D/g, "");
+
+  return (
+    name.includes(normalized) ||
+    email.includes(normalized) ||
+    (filterDigits.length > 0 && phone.includes(filterDigits)) ||
+    (filterDigits.length > 0 && document.includes(filterDigits))
+  );
+}
+
+function getPaymentMethodIcon(method: string, className = "h-4 w-4") {
+  switch (method) {
+    case "cash":
+      return <Banknote className={className} />;
+    case "credit":
+    case "debit":
+      return <CreditCardIcon className={className} />;
+    case "pix":
+      return <QrCode className={className} />;
+    default:
+      return <CreditCardIcon className={className} />;
+  }
+}
 
 export default function CommandsPage() {
   const { user } = useAuth();
@@ -175,6 +238,8 @@ export default function CommandsPage() {
   }[]>([]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [selectedPaymentType, setSelectedPaymentType] = useState<'cash' | 'credit' | 'debit' | 'pix'>('cash');
+  const [commandItems, setCommandItems] = useState<CommandItem[]>([]);
+  const [discountDrafts, setDiscountDrafts] = useState<Record<number, string>>({});
 
   // Estados para controle
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -198,6 +263,7 @@ export default function CommandsPage() {
   const [professionalFilter, setProfessionalFilter] = useState<string>('');
   const [serviceFilter, setServiceFilter] = useState<string>('');
   const [productFilter, setProductFilter] = useState<string>('');
+  const [loadingClients, setLoadingClients] = useState(false);
 
   useEffect(() => {
     if (user?.company_id) {
@@ -279,32 +345,42 @@ export default function CommandsPage() {
     }
   };
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async (searchTerm = "") => {
     if (!user?.company_id) return;
     try {
+      setLoadingClients(true);
+      const params: Record<string, string | number> = {
+        limit: 500,
+        offset: 0,
+      };
+
+      const trimmedSearch = searchTerm.trim();
+      if (trimmedSearch) {
+        params.term = trimmedSearch;
+      }
+
       const response = await api.get('/clients', {
         headers: {
           company_id: user.company_id.toString(),
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        params,
       });
-      const formattedClients = (response.data || []).map((client: any) => ({
-        id: client.id.toString(),
-        name: client.name,
-        email: client.email,
-        phone_number: client.phone_number,
-        document: client.document
-      }));
-      setClients(formattedClients);
+
+      const clientsData = normalizeClientsResponse(response.data);
+      setClients(clientsData.map(formatClientRecord));
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
+      setClients([]);
       toast({
         title: "Erro",
         description: "Não foi possível carregar os clientes",
         variant: "destructive",
       });
+    } finally {
+      setLoadingClients(false);
     }
-  };
+  }, [user?.company_id]);
 
   const fetchServices = async () => {
     if (!user?.company_id) return;
@@ -393,6 +469,13 @@ export default function CommandsPage() {
     }).format(value);
   };
 
+  const getClientInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  };
+
   // Funções para formatação de input monetário
   const formatCurrencyInput = (value: string, maxValue?: number, onMaxReached?: (reached: boolean) => void) => {
     // Remove tudo exceto números
@@ -448,16 +531,151 @@ export default function CommandsPage() {
     return paymentMethod?.label || method;
   };
 
+  const calculateDiscountedPrice = (
+    originalPrice: number,
+    discountType: string,
+    discountValue: number,
+  ): number => {
+    if (discountType === "percentage") {
+      return originalPrice * (1 - discountValue / 100);
+    }
+    if (discountType === "fixed") {
+      return Math.max(0, originalPrice - discountValue);
+    }
+    return originalPrice;
+  };
+
+  const validateDiscount = (
+    discountType: string,
+    discountValue: number,
+    originalPrice: number,
+  ): string | null => {
+    if (discountType === "percentage") {
+      if (discountValue < 0 || discountValue > 100) {
+        return "Desconto percentual deve estar entre 0% e 100%";
+      }
+    } else if (discountType === "fixed") {
+      if (discountValue < 0) {
+        return "Valor do desconto não pode ser negativo";
+      }
+      if (discountValue > originalPrice) {
+        return "Desconto não pode ser maior que o preço original";
+      }
+    }
+    return null;
+  };
+
+  const formatDiscountInfo = (
+    discountType: string,
+    discountValue: number,
+    originalPrice: number,
+  ): string => {
+    if (discountType === "percentage") {
+      return `- ${Number(discountValue)}% de desconto`;
+    }
+    if (discountType === "fixed") {
+      return `- R$ ${Number(discountValue).toFixed(2)} de desconto`;
+    }
+    return "Sem desconto";
+  };
+
+  const calculateCommandTotal = () => {
+    return commandItems.reduce((total, item) => {
+      const unitPrice = Number(item.final_price ?? item.price) || 0;
+      const quantity = Number(item.quantity) || 1;
+      return total + unitPrice * quantity;
+    }, 0);
+  };
+
+  const getRemainingPaymentAmount = () => {
+    const paid = selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0);
+    return Math.max(0, calculateCommandTotal() - paid);
+  };
+
+  const applyDiscountToCommandItem = (
+    index: number,
+    discountType: "none" | "percentage" | "fixed",
+    discountValue: number,
+  ) => {
+    const newItems = [...commandItems];
+    const item = { ...newItems[index] };
+    const originalPrice = Number(item.original_price ?? item.price) || 0;
+
+    const validationError = validateDiscount(discountType, discountValue, originalPrice);
+    if (validationError) {
+      toast({
+        title: "Erro no desconto",
+        description: validationError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    item.discount_type = discountType;
+    item.discount_value = discountValue;
+    item.final_price = calculateDiscountedPrice(originalPrice, discountType, discountValue);
+    newItems[index] = item;
+    setCommandItems(newItems);
+
+    toast({
+      title: "Desconto aplicado",
+      description: formatDiscountInfo(discountType, discountValue, originalPrice),
+    });
+  };
+
+  const removeDiscountFromCommandItem = (index: number) => {
+    const newItems = [...commandItems];
+    const item = { ...newItems[index] };
+    const originalPrice = Number(item.original_price ?? item.price) || 0;
+
+    item.discount_type = "none";
+    item.discount_value = 0;
+    item.final_price = originalPrice;
+    newItems[index] = item;
+    setCommandItems(newItems);
+    setDiscountDrafts((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+
+    toast({
+      title: "Desconto removido",
+      description: "O desconto foi removido do item.",
+    });
+  };
+
   // Funções do carrinho
-  const getItemQuantity = (itemId: string) => {
+  const getItemQuantity = (itemId: string, type?: 'service' | 'product') => {
+    const cartItem = cartItems.find(
+      (item) => item.id === itemId && (!type || item.type === type),
+    );
+    if (cartItem) return cartItem.quantity;
     return itemQuantities[itemId] || 1;
   };
 
-  const updateItemQuantity = (itemId: string, quantity: number) => {
-    setItemQuantities(prev => ({
+  const updateItemQuantity = (
+    itemId: string,
+    quantity: number,
+    type: 'service' | 'product',
+  ) => {
+    if (quantity <= 0) {
+      removeFromCart(itemId, type);
+      return;
+    }
+
+    setItemQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(1, quantity)
+      [itemId]: quantity,
     }));
+
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId && item.type === type
+          ? { ...item, quantity, total: item.price * quantity }
+          : item,
+      ),
+    );
   };
 
   const addToCart = (item: Service | Product, type: 'service' | 'product') => {
@@ -465,7 +683,7 @@ export default function CommandsPage() {
     const itemName = type === 'service' ? (item as Service).service_name || (item as Service).name || '' : item.name || '';
     const itemPrice = type === 'service' ? (item as Service).service_price || (item as Service).price || 0 : item.price || 0;
     
-    const quantity = getItemQuantity(itemId);
+    const quantity = getItemQuantity(itemId, type);
     const cartItem: CartItem = {
       id: itemId,
       name: itemName,
@@ -496,12 +714,32 @@ export default function CommandsPage() {
   };
 
   const removeFromCart = (itemId: string, type: 'service' | 'product') => {
-    setCartItems(prev => prev.filter(item => !(item.id === itemId && item.type === type)));
+    setCartItems((prev) => prev.filter((item) => !(item.id === itemId && item.type === type)));
+    setItemQuantities((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
   };
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => total + item.total, 0);
   };
+
+  useEffect(() => {
+    if (!createCommandModalOpen) return;
+
+    const timer = window.setTimeout(() => {
+      fetchClients(clientFilter);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [clientFilter, createCommandModalOpen, fetchClients]);
+
+  const filteredClients = useMemo(
+    () => clients.filter((client) => matchesClientFilter(client, clientFilter)),
+    [clients, clientFilter],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -522,6 +760,39 @@ export default function CommandsPage() {
     fetchServices();
     fetchProducts();
     fetchProfessionals();
+  };
+
+  const createCommandSteps = ['responsible', 'items', 'cart'] as const;
+  const createCommandStepLabels: Record<(typeof createCommandSteps)[number], string> = {
+    responsible: 'Cliente e profissional',
+    items: 'Adicionar itens',
+    cart: 'Revisar carrinho',
+  };
+  const createCommandStepIndex = createCommandSteps.indexOf(currentTab);
+  const isFirstCreateStep = currentTab === 'responsible';
+  const isLastCreateStep = currentTab === 'cart';
+
+  const goToNextCreateStep = () => {
+    if (currentTab === 'responsible') {
+      if (!selectedClient || !selectedProfessional) {
+        toast({
+          title: "Dados obrigatórios",
+          description: "Selecione um cliente e um profissional antes de continuar.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setCurrentTab('items');
+      return;
+    }
+    if (currentTab === 'items') {
+      setCurrentTab('cart');
+    }
+  };
+
+  const goToPreviousCreateStep = () => {
+    if (currentTab === 'items') setCurrentTab('responsible');
+    else if (currentTab === 'cart') setCurrentTab('items');
   };
 
   const openAddItemModal = (commandId: string) => {
@@ -548,6 +819,19 @@ export default function CommandsPage() {
     setPaymentAmount('');
     setSelectedPaymentType('cash');
     setMaxValueReached(false);
+    setDiscountDrafts({});
+
+    const itemsWithDiscount = (command.items || []).map((item) => ({
+      ...item,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1,
+      original_price: Number(item.original_price ?? item.price) || 0,
+      discount_type: (item.discount_type || "none") as "none" | "percentage" | "fixed",
+      discount_value: Number(item.discount_value) || 0,
+      final_price: Number(item.final_price ?? item.price) || 0,
+    }));
+
+    setCommandItems(itemsWithDiscount);
     setPaymentModalOpen(true);
   };
 
@@ -648,15 +932,50 @@ export default function CommandsPage() {
   const processPayment = async () => {
     if (!selectedCommand || selectedPaymentMethods.length === 0) return;
 
+    const finalTotal = calculateCommandTotal();
+    const remaining = getRemainingPaymentAmount();
+
+    if (remaining > 0.01) {
+      toast({
+        title: "Erro",
+        description: `Ainda falta pagar ${formatCurrency(remaining)}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessingPayment(true);
     try {
+      const itemsWithDiscounts = commandItems.filter(
+        (item) => item.discount_type !== "none" && (item.discount_value || 0) > 0,
+      );
+
+      if (itemsWithDiscounts.length > 0) {
+        await api.patch(
+          `/commands/${selectedCommand.id}/items/discounts`,
+          {
+            items: itemsWithDiscounts.map((item) => ({
+              id: item.id,
+              discount_type: item.discount_type,
+              discount_value: item.discount_value,
+            })),
+          },
+          {
+            headers: {
+              company_id: user.company_id.toString(),
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
+      }
+
       const totalPaymentAmount = selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0);
-      
-      const response = await api.post('/payments', {
+
+      await api.post('/payments', {
         company_id: user.company_id,
         client_id: selectedCommand.client_id,
         command_id: selectedCommand.id,
-        total_amount: totalPaymentAmount,
+        total_amount: finalTotal || totalPaymentAmount,
         status: 'paid',
         paid_at: new Date().toISOString(),
         payment_methods: selectedPaymentMethods.map(pm => ({
@@ -675,14 +994,14 @@ export default function CommandsPage() {
         description: "Pagamento processado com sucesso",
       });
 
-      // Reset payment form
       setSelectedPaymentMethods([]);
       setPaymentAmount('');
       setSelectedPaymentType('cash');
+      setCommandItems([]);
+      setDiscountDrafts({});
       setPaymentModalOpen(false);
       setSelectedCommand(null);
-      
-      // Refresh commands
+
       await fetchCommands();
     } catch (error: any) {
       console.error('Erro ao processar pagamento:', error);
@@ -1250,8 +1569,9 @@ export default function CommandsPage() {
                               )}
                             </span>
                             {item.professional_id && (
-                              <div className="text-xs text-emerald-600 font-medium mt-1">
-                                👤 {item.professional_name || 'Profissional não encontrado'}
+                              <div className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600">
+                                <User className="h-3 w-3" />
+                                {item.professional_name || 'Profissional não encontrado'}
                               </div>
                             )}
                           </div>
@@ -1339,7 +1659,7 @@ export default function CommandsPage() {
         {/* Botão flutuante para criar comanda */}
         <Button
           onClick={openCreateCommandModal}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 hover:scale-110 transition-all duration-200"
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-[#3D583F] shadow-2xl transition-all duration-200 hover:scale-110 hover:bg-[#365137]"
           size="icon"
         >
           <PlusIcon className="h-6 w-6" />
@@ -1348,611 +1668,536 @@ export default function CommandsPage() {
 
       {/* Modal para criar comanda */}
       <Dialog open={createCommandModalOpen} onOpenChange={setCreateCommandModalOpen}>
-        <DialogContent className="w-[95vw] max-w-5xl max-h-[95vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sm:p-6 -m-4 sm:-m-6 mb-4 sm:mb-6 rounded-t-lg">
-            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
-              <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
+        <DialogContent className="flex h-[95dvh] max-h-[95dvh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 rounded-t-lg bg-[#3D583F] p-4 text-white sm:p-6">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:gap-3 sm:text-xl">
+              <div className="rounded-full bg-white/20 p-1.5 sm:p-2">
                 <PlusIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="font-bold truncate">Nova Comanda</h2>
-                <p className="text-emerald-100 text-xs sm:text-sm font-normal mt-1">Configure cliente, responsável e itens</p>
+                <h2 className="truncate font-bold">Nova Comanda</h2>
+                <p className="mt-1 text-xs font-normal text-white/80 sm:text-sm">
+                  {createCommandStepLabels[currentTab]} · Etapa {createCommandStepIndex + 1} de {createCommandSteps.length}
+                </p>
               </div>
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs 
-            value={currentTab} 
-            onValueChange={(value: any) => {
-              // Só permite ir para "items" ou "cart" se cliente e profissional estiverem selecionados
-              if ((value === "items" || value === "cart") && (!selectedClient || !selectedProfessional)) {
-                toast({
-                  title: "Dados obrigatórios",
-                  description: "Selecione um cliente e um profissional antes de adicionar itens.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setCurrentTab(value);
-            }}
-          >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="responsible" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-                <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Responsável</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="items" 
-                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 ${
-                  !selectedClient || !selectedProfessional 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
-                }`}
-                disabled={!selectedClient || !selectedProfessional}
-              >
-                <ShoppingCartIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Itens</span>
-                {(!selectedClient || !selectedProfessional) && (
-                  <span className="ml-1 text-xs">🔒</span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="cart" 
-                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 ${
-                  !selectedClient || !selectedProfessional 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
-                }`}
-                disabled={!selectedClient || !selectedProfessional}
-              >
-                <CheckIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Carrinho ({cartItems.length})</span>
-                <span className="xs:hidden">🛒 {cartItems.length}</span>
-                {(!selectedClient || !selectedProfessional) && (
-                  <span className="ml-1 text-xs">🔒</span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="responsible" className="space-y-4 sm:space-y-6">
-              {/* Header da seção */}
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-emerald-600 text-white rounded-full flex-shrink-0">
-                    <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-emerald-800 text-base sm:text-lg truncate">Selecionar Cliente e Profissional</h3>
-                    <p className="text-emerald-600 text-xs sm:text-sm">Escolha o cliente e o profissional responsável</p>
-                  </div>
-                </div>
-                
-                {/* Select de Profissional Responsável */}
-                <div className="mb-4">
-                  <Label className="text-sm font-medium text-emerald-700 mb-2 block">
-                    Profissional Responsável *
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {currentTab === 'responsible' && (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
+                <div className="border-b border-[#3D583F]/10 px-4 py-4 sm:px-5">
+                  <Label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Profissional responsável
                   </Label>
                   <Select value={selectedProfessional || undefined} onValueChange={setSelectedProfessional}>
-                    <SelectTrigger className="border-emerald-300 focus:border-emerald-500 w-full">
-                      <SelectValue placeholder="Selecione o profissional responsável" />
+                    <SelectTrigger className="h-11 w-full border-[#3D583F]/15 bg-gray-50/80 focus:border-[#3D583F]">
+                      <SelectValue placeholder="Selecione o profissional" />
                     </SelectTrigger>
                     <SelectContent>
                       {professionals.map((professional) => (
                         <SelectItem key={professional.id} value={professional.id}>
-                          <span className="font-medium">{professional.name}</span>
+                          {professional.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
-                {/* Filtro de Cliente */}
-                <div className="relative">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 h-4 w-4" />
-                  <Input
-                    placeholder="Buscar cliente por nome ou telefone..."
-                    value={clientFilter}
-                    onChange={(e) => setClientFilter(e.target.value)}
-                    className="pl-10 border-emerald-300 focus:border-emerald-500 bg-white/70"
-                  />
-                </div>
-              </div>
-              
-              {/* Aviso sobre campos obrigatórios */}
-              {(!selectedClient || !selectedProfessional) && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-amber-100 p-1 rounded-md">
-                      <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-amber-700">
-                      <strong>Atenção:</strong> Selecione um cliente e um profissional para prosseguir.
-                    </p>
+
+                <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                  <div className="relative">
+                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      placeholder="Buscar cliente por nome ou telefone..."
+                      value={clientFilter}
+                      onChange={(e) => setClientFilter(e.target.value)}
+                      className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
+                    />
                   </div>
                 </div>
-              )}
-              
-              {/* Lista de Clientes com Cores */}
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {clients
-                  .filter(client => 
-                    clientFilter === '' || 
-                    client.name.toLowerCase().includes(clientFilter.toLowerCase()) ||
-                    client.phone_number.includes(clientFilter)
-                  )
-                  .map((client, index) => {
-                    const colors = [
-                      'from-green-50 to-emerald-50 border-green-200',
-                      'from-teal-50 to-cyan-50 border-teal-200',
-                      'from-blue-50 to-indigo-50 border-blue-200'
-                    ];
-                    const colorClass = colors[index % colors.length];
-                    
-                    return (
-                      <div
-                        key={client.id}
-                        className={`p-3 sm:p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md bg-gradient-to-r ${
-                          selectedClient === client.id
-                            ? 'border-emerald-500 bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg'
-                            : `${colorClass} hover:shadow-md`
-                        }`}
-                        onClick={() => setSelectedClient(client.id)}
-                      >
-                        <div className="flex items-center justify-between min-w-0">
-                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                            <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${
-                              selectedClient === client.id 
-                                ? 'bg-emerald-600 text-white' 
-                                : 'bg-white/70 text-gray-600'
-                            }`}>
-                              <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+
+                {loadingClients ? (
+                  <div className="flex flex-col items-center py-14 text-gray-500">
+                    <RefreshCwIcon className="mb-2 h-7 w-7 animate-spin text-[#3D583F]/40" />
+                    <p className="text-sm">Buscando clientes...</p>
+                  </div>
+                ) : filteredClients.length > 0 ? (
+                  <ul className="divide-y divide-[#3D583F]/8">
+                    {filteredClients.map((client) => {
+                      const isSelected = selectedClient === client.id;
+                      return (
+                        <li key={client.id}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedClient(client.id)}
+                            className={cn(
+                              "flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors sm:gap-4 sm:px-5 sm:py-4",
+                              isSelected ? "bg-[#3D583F]/8" : "hover:bg-gray-50",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                                isSelected
+                                  ? "bg-[#3D583F] text-white"
+                                  : "bg-[#3D583F]/10 text-[#3D583F]",
+                              )}
+                            >
+                              {getClientInitials(client.name)}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-gray-900 text-sm sm:text-base truncate">{client.name}</div>
-                              <div className="text-xs sm:text-sm text-gray-600 flex items-center gap-1">
-                                <span>📞</span>
-                                <span className="truncate">{client.phone_number}</span>
+                              <p className="truncate font-medium text-gray-900">{client.name}</p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                                {client.phone_number && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Phone className="h-3 w-3 shrink-0" />
+                                    {client.phone_number}
+                                  </span>
+                                )}
+                                {client.email && (
+                                  <span className="inline-flex min-w-0 items-center gap-1">
+                                    <Mail className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{client.email}</span>
+                                  </span>
+                                )}
                               </div>
-                              {client.email && (
-                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                  <span>✉️</span>
-                                  <span className="truncate">{client.email}</span>
-                                </div>
-                              )}
                             </div>
-                          </div>
-                          {selectedClient === client.id && (
-                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                              <Badge className="bg-emerald-600 text-white text-xs">
-                                <CheckIcon className="h-3 w-3 mr-1" />
-                                <span className="hidden sm:inline">Selecionado</span>
-                                <span className="sm:hidden">✓</span>
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                
-                {clients.filter(client => 
-                  clientFilter === '' || 
-                  client.name.toLowerCase().includes(clientFilter.toLowerCase()) ||
-                  client.phone_number.includes(clientFilter)
-                ).length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
+                            {isSelected && (
+                              <CheckIcon className="h-5 w-5 shrink-0 text-[#3D583F]" />
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="flex flex-col items-center py-14 text-center text-gray-500">
                     {clientFilter ? (
                       <>
-                        <SearchIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p>Nenhum cliente encontrado</p>
+                        <SearchIcon className="mb-2 h-8 w-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-600">Nenhum cliente encontrado</p>
                       </>
                     ) : (
                       <>
-                        <UsersIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p>Carregando clientes...</p>
+                        <UsersIcon className="mb-2 h-8 w-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-600">Nenhum cliente cadastrado</p>
                       </>
                     )}
                   </div>
                 )}
               </div>
-            </TabsContent>
 
-            <TabsContent value="items" className="space-y-6">
-              <Tabs value={itemTab} onValueChange={(value: any) => setItemTab(value)}>
-                <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-emerald-100 to-teal-100 p-1">
-                  <TabsTrigger value="service" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                    <div className="flex items-center gap-2">
-                      <ClockIcon className="h-4 w-4" />
-                      Serviços
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger value="product" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCartIcon className="h-4 w-4" />
-                      Produtos
-                    </div>
-                  </TabsTrigger>
-                </TabsList>
+              {(!selectedClient || !selectedProfessional) && (
+                <p className="mt-3 text-center text-xs text-gray-500">
+                  Selecione o profissional e o cliente para continuar
+                </p>
+              )}
+            </div>
+            )}
 
-                <TabsContent value="service" className="space-y-4">
-                  {/* Filtro de Serviços */}
-                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2 bg-emerald-600 text-white rounded-full">
-                        <ClockIcon className="h-4 w-4" />
-                      </div>
-                      <h3 className="font-semibold text-emerald-800">Serviços Disponíveis</h3>
-                    </div>
+            {currentTab === 'items' && (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              <div className="mb-4 flex rounded-xl border border-[#3D583F]/12 bg-[#3D583F]/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => setItemTab('service')}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
+                    itemTab === 'service'
+                      ? "bg-white text-[#3D583F] shadow-sm"
+                      : "text-gray-600 hover:text-[#3D583F]",
+                  )}
+                >
+                  <ClockIcon className="h-4 w-4" />
+                  Serviços
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemTab('product')}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
+                    itemTab === 'product'
+                      ? "bg-white text-[#3D583F] shadow-sm"
+                      : "text-gray-600 hover:text-[#3D583F]",
+                  )}
+                >
+                  <ShoppingCartIcon className="h-4 w-4" />
+                  Produtos
+                </button>
+              </div>
+
+              {itemTab === 'service' && (
+                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
+                  <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
                     <div className="relative">
-                      <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 h-4 w-4" />
+                      <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <Input
-                        placeholder="Buscar serviços por nome..."
+                        placeholder="Buscar serviços..."
                         value={serviceFilter}
                         onChange={(e) => setServiceFilter(e.target.value)}
-                        className="pl-10 border-emerald-300 focus:border-emerald-500 bg-white/70"
+                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
                       />
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                    {services
-                      .filter(service => 
-                        serviceFilter === '' || 
-                        (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase())
-                      )
-                      .map((service) => {
-                        const serviceId = service.service_id || service.id || '';
-                        const serviceName = service.service_name || service.name || '';
-                        const servicePrice = service.service_price || service.price || 0;
-                        const quantity = getItemQuantity(serviceId);
-                        const isInCart = cartItems.some(item => item.id === serviceId && item.type === 'service');
-                        
-                        return (
-                          <Card key={serviceId} className={`p-5 border-2 transition-all duration-300 hover:shadow-lg ${
-                            isInCart ? 'border-[#3D583F] bg-[#3D583F]/10 shadow-md' : 'border-[#3D583F]/30 hover:border-[#3D583F]/50'
-                          }`}>
-                            <div className="space-y-4">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className={`p-1.5 rounded-full ${
-                                      isInCart ? 'bg-[#3D583F] text-white' : 'bg-[#3D583F]/10 text-[#3D583F]'
-                                    }`}>
-                                      <ClockIcon className="h-3 w-3" />
-                                    </div>
-                                    <h4 className="font-semibold text-gray-900 text-sm">{serviceName}</h4>
-                                  </div>
-                                  <p className="text-xl font-bold text-[#3D583F] mb-2">
-                                    {formatCurrency(servicePrice)}
+
+                  {services.filter((service) =>
+                    serviceFilter === '' ||
+                    (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase()),
+                  ).length === 0 ? (
+                    <div className="flex flex-col items-center py-14 text-center text-gray-500">
+                      <ClockIcon className="mb-2 h-8 w-8 text-gray-300" />
+                      <p className="text-sm font-medium text-gray-600">
+                        {serviceFilter ? 'Nenhum serviço encontrado' : 'Nenhum serviço disponível'}
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-[#3D583F]/8">
+                      {services
+                        .filter((service) =>
+                          serviceFilter === '' ||
+                          (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase()),
+                        )
+                        .map((service) => {
+                          const serviceId = service.service_id || service.id || '';
+                          const serviceName = service.service_name || service.name || '';
+                          const servicePrice = service.service_price || service.price || 0;
+                          const quantity = getItemQuantity(serviceId, 'service');
+                          const isInCart = cartItems.some((item) => item.id === serviceId && item.type === 'service');
+
+                          return (
+                            <li key={serviceId} className={cn("px-4 py-3.5 sm:px-5 sm:py-4", isInCart && "bg-[#3D583F]/[0.03]")}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-gray-900">{serviceName}</p>
+                                  <p className="mt-0.5 text-xs text-gray-500">
+                                    {service.service_duration ? `${service.service_duration} min` : 'Serviço'}
+                                    {service.service_description && ` · ${service.service_description}`}
                                   </p>
-                                  {service.service_description && (
-                                    <p className="text-xs text-gray-500 leading-tight">
-                                      {service.service_description}
-                                    </p>
-                                  )}
-                                  {service.service_duration && (
-                                    <p className="text-xs text-[#3D583F] mt-1">
-                                      Duração: {service.service_duration} min
-                                    </p>
-                                  )}
                                 </div>
-                                {isInCart && (
-                                  <div className="p-1 bg-[#3D583F] text-white rounded-full">
-                                    <CheckIcon className="h-3 w-3" />
-                                  </div>
-                                )}
+                                <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                                  {formatCurrency(servicePrice)}
+                                </p>
                               </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 bg-[#3D583F]/10 rounded-full px-3 py-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-[#3D583F] hover:bg-[#3D583F]/20"
-                                    onClick={() => updateItemQuantity(serviceId, quantity - 1)}
+                              <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="flex items-center rounded-lg border border-[#3D583F]/15">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItemQuantity(serviceId, quantity - 1, 'service')}
+                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    aria-label="Diminuir quantidade"
                                   >
-                                    <MinusCircleIcon className="h-3 w-3" />
-                                  </Button>
-                                  <span className="font-bold text-[#3D583F] w-6 text-center text-sm">
+                                    <MinusCircleIcon className="h-4 w-4" />
+                                  </button>
+                                  <span className="w-8 text-center text-sm font-medium tabular-nums text-gray-700">
                                     {quantity}
                                   </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-[#3D583F] hover:bg-[#3D583F]/20"
-                                    onClick={() => updateItemQuantity(serviceId, quantity + 1)}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isInCart) {
+                                        updateItemQuantity(serviceId, quantity + 1, 'service');
+                                      } else {
+                                        setItemQuantities((prev) => ({ ...prev, [serviceId]: quantity + 1 }));
+                                      }
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    aria-label="Aumentar quantidade"
                                   >
-                                    <PlusCircleIcon className="h-3 w-3" />
-                                  </Button>
+                                    <PlusCircleIcon className="h-4 w-4" />
+                                  </button>
                                 </div>
                                 <Button
                                   size="sm"
-                                  onClick={() => addToCart(service, 'service')}
-                                  className={`transition-all ${
-                                    isInCart 
-                                      ? 'bg-[#365137] hover:bg-[#2f472f] text-white' 
-                                      : 'bg-[#3D583F] hover:bg-[#365137] text-white'
-                                  }`}
+                                  variant={isInCart ? "outline" : "default"}
+                                  onClick={() =>
+                                    isInCart
+                                      ? removeFromCart(serviceId, 'service')
+                                      : addToCart(service, 'service')
+                                  }
+                                  className={cn(
+                                    "h-8 shrink-0",
+                                    isInCart
+                                      ? "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                      : "bg-[#3D583F] text-white hover:bg-[#365137]",
+                                  )}
                                 >
                                   {isInCart ? (
                                     <>
-                                      <CheckIcon className="h-3 w-3 mr-1" />
-                                      Atualizar
+                                      <TrashIcon className="mr-1.5 h-3.5 w-3.5" />
+                                      Remover
                                     </>
                                   ) : (
                                     <>
-                                      <PlusIcon className="h-3 w-3 mr-1" />
+                                      <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
                                       Adicionar
                                     </>
                                   )}
                                 </Button>
                               </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                  {services.filter(service => 
-                    serviceFilter === '' || 
-                    (service.service_name || service.name || '').toLowerCase().includes(serviceFilter.toLowerCase())
-                  ).length === 0 && serviceFilter && (
-                    <div className="text-center py-12 text-gray-500">
-                      <ClockIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                      <p>Nenhum serviço encontrado</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="product" className="space-y-4">
-                  {/* Filtro de Produtos */}
-                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2 bg-teal-600 text-white rounded-full">
-                        <ShoppingCartIcon className="h-4 w-4" />
-                      </div>
-                      <h3 className="font-semibold text-teal-800">Produtos Disponíveis</h3>
-                    </div>
-                    <div className="relative">
-                      <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-teal-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar produtos por nome..."
-                        value={productFilter}
-                        onChange={(e) => setProductFilter(e.target.value)}
-                        className="pl-10 border-teal-300 focus:border-teal-500 bg-white/70"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                    {products
-                      .filter(product => 
-                        productFilter === '' || 
-                        product.name.toLowerCase().includes(productFilter.toLowerCase())
-                      )
-                      .map((product) => {
-                        const quantity = getItemQuantity(product.id);
-                        const isInCart = cartItems.some(item => item.id === product.id && item.type === 'product');
-                        
-                        return (
-                          <Card key={product.id} className={`p-5 border-2 transition-all duration-300 hover:shadow-lg ${
-                            isInCart ? 'border-teal-500 bg-teal-50 shadow-md' : 'border-teal-200 hover:border-teal-400'
-                          }`}>
-                            <div className="space-y-4">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className={`p-1.5 rounded-full ${
-                                      isInCart ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-600'
-                                    }`}>
-                                      <ShoppingCartIcon className="h-3 w-3" />
-                                    </div>
-                                    <h4 className="font-semibold text-gray-900 text-sm">{product.name}</h4>
-                                  </div>
-                                  <p className="text-xl font-bold text-teal-600 mb-2">
-                                    {formatCurrency(product.price)}
-                                  </p>
-                                  {product.description && (
-                                    <p className="text-xs text-gray-500 leading-tight">
-                                      {product.description}
-                                    </p>
-                                  )}
-                                  {product.stock !== undefined && (
-                                    <p className="text-xs text-teal-600 mt-1">
-                                      Estoque: {product.stock}
-                                    </p>
-                                  )}
-                                </div>
-                                {isInCart && (
-                                  <div className="p-1 bg-teal-600 text-white rounded-full">
-                                    <CheckIcon className="h-3 w-3" />
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 bg-teal-100 rounded-full px-3 py-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-teal-600 hover:bg-teal-200"
-                                    onClick={() => updateItemQuantity(product.id, quantity - 1)}
-                                  >
-                                    <MinusCircleIcon className="h-3 w-3" />
-                                  </Button>
-                                  <span className="font-bold text-teal-700 w-6 text-center text-sm">
-                                    {quantity}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-teal-600 hover:bg-teal-200"
-                                    onClick={() => updateItemQuantity(product.id, quantity + 1)}
-                                    disabled={product.stock !== undefined && quantity >= product.stock}
-                                  >
-                                    <PlusCircleIcon className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => addToCart(product, 'product')}
-                                  className={`transition-all ${
-                                    isInCart 
-                                      ? 'bg-teal-700 hover:bg-teal-800 text-white' 
-                                      : 'bg-teal-600 hover:bg-teal-700 text-white'
-                                  }`}
-                                  disabled={product.stock !== undefined && product.stock === 0}
-                                >
-                                  {isInCart ? (
-                                    <>
-                                      <CheckIcon className="h-3 w-3 mr-1" />
-                                      Atualizar
-                                    </>
-                                  ) : (
-                                    <>
-                                      <PlusIcon className="h-3 w-3 mr-1" />
-                                      Adicionar
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                  {products.filter(product => 
-                    productFilter === '' || 
-                    product.name.toLowerCase().includes(productFilter.toLowerCase())
-                  ).length === 0 && productFilter && (
-                    <div className="text-center py-12 text-gray-500">
-                      <ShoppingCartIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                      <p>Nenhum produto encontrado</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            <TabsContent value="cart" className="space-y-6">
-              {/* Header do carrinho */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-600 text-white rounded-full">
-                    <ShoppingCartIcon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-green-800 text-lg">Resumo do Pedido</h3>
-                    <p className="text-green-600 text-sm">
-                      {cartItems.length} {cartItems.length === 1 ? 'item adicionado' : 'itens adicionados'}
-                    </p>
-                  </div>
-                  {cartItems.length > 0 && (
-                    <div className="ml-auto">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setCartItems([])}
-                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                      >
-                        <TrashIcon className="h-4 w-4 mr-1" />
-                        Limpar tudo
-                      </Button>
-                    </div>
+                            </li>
+                          );
+                        })}
+                    </ul>
                   )}
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-4">
-                {cartItems.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <div className="bg-gray-100 rounded-full p-6 w-24 h-24 mx-auto mb-4">
-                      <ShoppingCartIcon className="h-12 w-12 text-gray-400" />
+              {itemTab === 'product' && (
+                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
+                  <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                    <div className="relative">
+                      <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        placeholder="Buscar produtos..."
+                        value={productFilter}
+                        onChange={(e) => setProductFilter(e.target.value)}
+                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
+                      />
                     </div>
-                    <h3 className="font-medium text-lg mb-2">Carrinho vazio</h3>
-                    <p className="text-sm">Adicione serviços ou produtos na aba anterior</p>
                   </div>
-                ) : (
-                  <>
+
+                  {products.filter((product) =>
+                    productFilter === '' ||
+                    product.name.toLowerCase().includes(productFilter.toLowerCase()),
+                  ).length === 0 ? (
+                    <div className="flex flex-col items-center py-14 text-center text-gray-500">
+                      <ShoppingCartIcon className="mb-2 h-8 w-8 text-gray-300" />
+                      <p className="text-sm font-medium text-gray-600">
+                        {productFilter ? 'Nenhum produto encontrado' : 'Nenhum produto disponível'}
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-[#3D583F]/8">
+                      {products
+                        .filter((product) =>
+                          productFilter === '' ||
+                          product.name.toLowerCase().includes(productFilter.toLowerCase()),
+                        )
+                        .map((product) => {
+                          const quantity = getItemQuantity(product.id, 'product');
+                          const isInCart = cartItems.some((item) => item.id === product.id && item.type === 'product');
+                          const outOfStock = product.stock !== undefined && product.stock === 0;
+
+                          return (
+                            <li
+                              key={product.id}
+                              className={cn(
+                                "px-4 py-3.5 sm:px-5 sm:py-4",
+                                isInCart && "bg-[#3D583F]/[0.03]",
+                                outOfStock && "opacity-60",
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-gray-900">{product.name}</p>
+                                  <p className="mt-0.5 text-xs text-gray-500">
+                                    Produto
+                                    {product.stock !== undefined && ` · Estoque: ${product.stock}`}
+                                    {product.description && ` · ${product.description}`}
+                                  </p>
+                                </div>
+                                <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                                  {formatCurrency(product.price)}
+                                </p>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="flex items-center rounded-lg border border-[#3D583F]/15">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItemQuantity(product.id, quantity - 1, 'product')}
+                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    aria-label="Diminuir quantidade"
+                                  >
+                                    <MinusCircleIcon className="h-4 w-4" />
+                                  </button>
+                                  <span className="w-8 text-center text-sm font-medium tabular-nums text-gray-700">
+                                    {quantity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isInCart) {
+                                        updateItemQuantity(product.id, quantity + 1, 'product');
+                                      } else {
+                                        setItemQuantities((prev) => ({ ...prev, [product.id]: quantity + 1 }));
+                                      }
+                                    }}
+                                    disabled={product.stock !== undefined && quantity >= product.stock}
+                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10 disabled:opacity-40"
+                                    aria-label="Aumentar quantidade"
+                                  >
+                                    <PlusCircleIcon className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant={isInCart ? "outline" : "default"}
+                                  onClick={() =>
+                                    isInCart
+                                      ? removeFromCart(product.id, 'product')
+                                      : addToCart(product, 'product')
+                                  }
+                                  disabled={outOfStock}
+                                  className={cn(
+                                    "h-8 shrink-0",
+                                    isInCart
+                                      ? "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                      : "bg-[#3D583F] text-white hover:bg-[#365137]",
+                                  )}
+                                >
+                                  {isInCart ? (
+                                    <>
+                                      <TrashIcon className="mr-1.5 h-3.5 w-3.5" />
+                                      Remover
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
+                                      Adicionar
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {cartItems.length > 0 && (
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-[#3D583F]/12 bg-[#3D583F]/5 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm text-[#3D583F]">
+                    <ShoppingCartIcon className="h-4 w-4" />
+                    <span className="font-medium">
+                      {cartItems.length} {cartItems.length === 1 ? 'item no carrinho' : 'itens no carrinho'}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums text-[#3D583F]">
+                    {formatCurrency(getCartTotal())}
+                  </span>
+                </div>
+              )}
+            </div>
+            )}
+
+            {currentTab === 'cart' && (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              {cartItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <ShoppingCartIcon className="mb-3 h-10 w-10 text-[#3D583F]/25" />
+                  <p className="font-medium text-gray-700">Carrinho vazio</p>
+                  <p className="mt-1 text-sm text-gray-500">Volte e adicione serviços ou produtos</p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                    <p className="text-sm font-medium text-gray-700">
+                      {cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCartItems([])}
+                      className="text-xs font-medium text-red-500 transition-colors hover:text-red-600"
+                    >
+                      Limpar tudo
+                    </button>
+                  </div>
+
+                  <ul className="divide-y divide-[#3D583F]/8">
                     {cartItems.map((item) => (
-                      <Card key={`${item.id}-${item.type}`} className="p-5 border-2 border-green-200 bg-gradient-to-r from-white to-green-50">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-full ${
-                            item.type === 'service' ? 'bg-emerald-100 text-emerald-600' : 'bg-teal-100 text-teal-600'
-                          }`}>
-                            {item.type === 'service' ? (
-                              <ClockIcon className="h-4 w-4" />
-                            ) : (
-                              <ShoppingCartIcon className="h-4 w-4" />
-                            )}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-gray-900">{item.name}</h4>
-                              <Badge variant="outline" className={`text-xs ${
-                                item.type === 'service' ? 'border-emerald-300 text-emerald-600' : 'border-teal-300 text-teal-600'
-                              }`}>
-                                {item.type === 'service' ? 'Serviço' : 'Produto'}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                              <span>Qtd: {item.quantity}</span>
-                              <span>×</span>
-                              <span className="font-medium text-green-600">{formatCurrency(item.price)}</span>
-                              <span>=</span>
-                              <span className="font-bold text-green-700">{formatCurrency(item.total)}</span>
-                            </div>
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeFromCart(item.id, item.type)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
+                      <li
+                        key={`${item.id}-${item.type}`}
+                        className="flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4"
+                      >
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3D583F]/8 text-[#3D583F]">
+                          {item.type === 'service' ? (
+                            <ClockIcon className="h-4 w-4" />
+                          ) : (
+                            <ShoppingCartIcon className="h-4 w-4" />
+                          )}
                         </div>
-                      </Card>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="truncate font-medium text-gray-900">{item.name}</p>
+                            <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                              {formatCurrency(item.total)}
+                            </p>
+                          </div>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {item.type === 'service' ? 'Serviço' : 'Produto'}
+                            {' · '}
+                            {item.quantity}× {formatCurrency(item.price)}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.id, item.type)}
+                          className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                          aria-label={`Remover ${item.name}`}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </li>
                     ))}
+                  </ul>
 
-                    {/* Card do total */}
-                    <Card className="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-none shadow-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-emerald-100 text-sm mb-1">Total da Comanda</p>
-                          <span className="text-3xl font-bold">
-                            {formatCurrency(getCartTotal())}
-                          </span>
-                        </div>
-                        <div className="p-3 bg-white/20 rounded-full">
-                          <CheckIcon className="h-8 w-8" />
-                        </div>
-                      </div>
-                    </Card>
-                  </>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+                  <div className="flex items-center justify-between border-t border-[#3D583F]/10 bg-[#3D583F]/[0.04] px-4 py-4 sm:px-5">
+                    <span className="text-sm font-medium text-gray-600">Total da comanda</span>
+                    <span className="text-2xl font-bold tabular-nums tracking-tight text-[#3D583F]">
+                      {formatCurrency(getCartTotal())}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            )}
+          </div>
 
-          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between pt-4 sm:pt-6 border-t">
-            <Button 
-              variant="outline" 
-              onClick={() => setCreateCommandModalOpen(false)}
-              className="w-full sm:w-auto"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={createCommand}
-              disabled={!selectedClient || !selectedProfessional || cartItems.length === 0 || isCreatingCommand}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 w-full sm:w-auto"
-            >
-              {isCreatingCommand ? 'Criando...' : 'Criar Comanda'}
-            </Button>
+          <div className="flex shrink-0 flex-col gap-3 border-t border-[#3D583F]/10 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button 
+                variant="outline" 
+                onClick={() => setCreateCommandModalOpen(false)}
+                className="w-full border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              {!isFirstCreateStep && (
+                <Button
+                  variant="outline"
+                  onClick={goToPreviousCreateStep}
+                  className="w-full border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 sm:w-auto"
+                >
+                  <ArrowLeftIcon className="mr-2 h-4 w-4" />
+                  Voltar
+                </Button>
+              )}
+            </div>
+            {!isLastCreateStep ? (
+              <Button
+                onClick={goToNextCreateStep}
+                disabled={isFirstCreateStep && (!selectedClient || !selectedProfessional)}
+                className="w-full bg-[#3D583F] text-white hover:bg-[#365137] sm:w-auto"
+              >
+                {currentTab === 'items' && cartItems.length > 0
+                  ? `Ver carrinho (${cartItems.length})`
+                  : 'Próxima etapa'}
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={createCommand}
+                disabled={!selectedClient || !selectedProfessional || cartItems.length === 0 || isCreatingCommand}
+                className="w-full bg-[#3D583F] text-white hover:bg-[#365137] sm:w-auto"
+              >
+                {isCreatingCommand ? 'Criando...' : 'Criar Comanda'}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1961,7 +2206,7 @@ export default function CommandsPage() {
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-[#3D583F]">
               <CreditCardIcon className="h-5 w-5" />
               Fechar Comanda #{selectedCommand?.id}
             </DialogTitle>
@@ -1969,21 +2214,190 @@ export default function CommandsPage() {
 
           {selectedCommand && (
             <div className="space-y-6">
+              {/* Itens com desconto */}
+              <div className="space-y-3 rounded-xl border border-[#3D583F]/20 p-4">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-[#3D583F]">
+                  <ShoppingCartIcon className="h-4 w-4" />
+                  Itens da Comanda
+                </h3>
+
+                <div className="max-h-56 space-y-3 overflow-y-auto">
+                  {commandItems.map((item, index) => {
+                    const originalPrice = Number(item.original_price ?? item.price) || 0;
+                    const unitPrice = Number(item.final_price ?? item.price) || 0;
+                    const hasDiscount =
+                      item.discount_type !== "none" && (item.discount_value || 0) > 0;
+
+                    return (
+                      <div
+                        key={`${item.id}-${index}`}
+                        className="rounded-lg border border-[#3D583F]/15 bg-[#3D583F]/5 p-3"
+                      >
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-[#3D583F]">
+                              {item.name}
+                            </p>
+                            <p className="mt-1 text-xs text-[#3D583F]/70">
+                              Qtd: {item.quantity} · Unitário: {formatCurrency(originalPrice)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {hasDiscount && (
+                              <>
+                                <p className="text-xs text-gray-400 line-through">
+                                  {formatCurrency(originalPrice * Number(item.quantity))}
+                                </p>
+                                <p className="text-xs font-medium text-[#3D583F]">
+                                  {formatDiscountInfo(
+                                    item.discount_type || "none",
+                                    item.discount_value || 0,
+                                    originalPrice,
+                                  )}
+                                </p>
+                              </>
+                            )}
+                            <p className="text-sm font-bold text-[#3D583F]">
+                              {formatCurrency(unitPrice * Number(item.quantity))}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-md border border-[#3D583F]/15 bg-white p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="flex items-center gap-1 text-xs font-medium text-[#3D583F]">
+                              <PercentIcon className="h-3 w-3" />
+                              Aplicar desconto
+                            </span>
+                            {hasDiscount && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-red-500 hover:text-red-700"
+                                onClick={() => removeDiscountFromCommandItem(index)}
+                              >
+                                Remover
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <select
+                              className="rounded-md border border-[#3D583F]/20 bg-white px-2 py-2 text-xs text-[#3D583F]"
+                              value={item.discount_type || "none"}
+                              onChange={(e) => {
+                                const value = e.target.value as "none" | "percentage" | "fixed";
+                                if (value === "none") {
+                                  removeDiscountFromCommandItem(index);
+                                  return;
+                                }
+                                const newItems = [...commandItems];
+                                newItems[index] = {
+                                  ...newItems[index],
+                                  discount_type: value,
+                                  discount_value: 0,
+                                  final_price: originalPrice,
+                                };
+                                setCommandItems(newItems);
+                              }}
+                            >
+                              <option value="none">Sem desconto</option>
+                              <option value="percentage">% Percentual</option>
+                              <option value="fixed">R$ Valor fixo</option>
+                            </select>
+
+                            {item.discount_type !== "none" && (
+                              <>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={
+                                    item.discount_type === "percentage"
+                                      ? "100"
+                                      : originalPrice.toString()
+                                  }
+                                  step={item.discount_type === "percentage" ? "1" : "0.01"}
+                                  placeholder={
+                                    item.discount_type === "percentage" ? "0" : "0,00"
+                                  }
+                                  value={discountDrafts[index] ?? ""}
+                                  onChange={(e) =>
+                                    setDiscountDrafts((prev) => ({
+                                      ...prev,
+                                      [index]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-9 text-xs"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-9 bg-[#3D583F] text-white hover:bg-[#365137]"
+                                  onClick={() => {
+                                    const value = parseFloat(discountDrafts[index] || "0");
+                                    if (!Number.isNaN(value) && value > 0) {
+                                      applyDiscountToCommandItem(
+                                        index,
+                                        item.discount_type || "none",
+                                        value,
+                                      );
+                                    }
+                                  }}
+                                >
+                                  Aplicar
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Resumo da Comanda */}
-              <Card className="p-4 bg-emerald-50 border-emerald-200">
+              <Card className="border-[#3D583F]/20 bg-[#3D583F]/10 p-4">
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-emerald-800">Resumo da Comanda</h3>
-                  <p className="text-emerald-700">{selectedCommand.client_name}</p>
+                  <h3 className="font-semibold text-[#3D583F]">Resumo da Comanda</h3>
+                  <p className="text-[#3D583F]/80">{selectedCommand.client_name}</p>
+                  {(() => {
+                    const originalTotal = commandItems.reduce((sum, item) => {
+                      return (
+                        sum +
+                        Number(item.original_price ?? item.price) * Number(item.quantity)
+                      );
+                    }, 0);
+                    const finalTotal = calculateCommandTotal();
+                    const totalDiscount = originalTotal - finalTotal;
+                    const hasDiscounts = totalDiscount > 0.009;
+
+                    return (
+                      <>
+                        {hasDiscounts && (
+                          <div className="flex justify-between text-sm text-[#3D583F]/70">
+                            <span>Subtotal:</span>
+                            <span>{formatCurrency(originalTotal)}</span>
+                          </div>
+                        )}
+                        {hasDiscounts && (
+                          <div className="flex justify-between text-sm text-[#3D583F]">
+                            <span>Desconto:</span>
+                            <span>- {formatCurrency(totalDiscount)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#3D583F]">Total:</span>
+                          <span className="text-2xl font-bold text-[#3D583F]">
+                            {formatCurrency(finalTotal)}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="flex justify-between items-center">
-                    <span className="text-emerald-700">Total:</span>
-                    <span className="text-2xl font-bold text-emerald-800">
-                      {formatCurrency(selectedCommand.total)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-emerald-700">Restante:</span>
-                    <span className="font-semibold text-emerald-800">
-                      {formatCurrency(selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0))}
+                    <span className="text-[#3D583F]">Restante:</span>
+                    <span className="font-semibold text-[#3D583F]">
+                      {formatCurrency(getRemainingPaymentAmount())}
                     </span>
                   </div>
                 </div>
@@ -1991,31 +2405,36 @@ export default function CommandsPage() {
 
               {/* Adicionar Pagamento */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Adicionar Pagamento</Label>
-                
-                {/* Seletor de método de pagamento */}
+                <Label className="text-base font-semibold text-[#3D583F]">
+                  Adicionar Pagamento
+                </Label>
+
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map((method) => (
                     <Button
                       key={method.value}
                       variant={selectedPaymentType === method.value ? "default" : "outline"}
                       className={`flex items-center justify-center gap-2 ${
-                        selectedPaymentType === method.value 
-                          ? 'bg-emerald-600 hover:bg-emerald-700' 
-                          : 'hover:bg-emerald-50'
+                        selectedPaymentType === method.value
+                          ? "bg-[#3D583F] text-white hover:bg-[#365137]"
+                          : "border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
                       }`}
                       onClick={() => setSelectedPaymentType(method.value as any)}
                     >
-                      <span>{method.icon}</span>
+                      {getPaymentMethodIcon(
+                        method.value,
+                        selectedPaymentType === method.value
+                          ? "h-4 w-4 text-white"
+                          : "h-4 w-4 text-[#3D583F]",
+                      )}
                       <span className="text-sm">{method.label}</span>
                     </Button>
                   ))}
                 </div>
 
-                {/* Campo de valor */}
                 <div className="space-y-2">
-                  <Label htmlFor="paymentAmount">
-                    Valor (Máx: {formatCurrency(selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0))})
+                  <Label htmlFor="paymentAmount" className="text-[#3D583F]">
+                    Valor (Máx: {formatCurrency(getRemainingPaymentAmount())})
                   </Label>
                   <Input
                     id="paymentAmount"
@@ -2023,14 +2442,18 @@ export default function CommandsPage() {
                     placeholder="0,00"
                     value={paymentAmount}
                     onChange={(e) => {
-                      const remainingValue = selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0);
-                      const formatted = formatCurrencyInput(e.target.value, remainingValue, setMaxValueReached);
+                      const remainingValue = getRemainingPaymentAmount();
+                      const formatted = formatCurrencyInput(
+                        e.target.value,
+                        remainingValue,
+                        setMaxValueReached,
+                      );
                       setPaymentAmount(formatted);
                     }}
-                    className={`text-lg ${maxValueReached ? 'border-orange-400 bg-orange-50' : ''}`}
+                    className={`text-lg ${maxValueReached ? "border-orange-400 bg-orange-50" : "border-[#3D583F]/20"}`}
                   />
                   {maxValueReached && (
-                    <p className="text-sm text-orange-600 flex items-center gap-1">
+                    <p className="flex items-center gap-1 text-sm text-orange-600">
                       <XIcon className="h-4 w-4" />
                       Valor limitado ao máximo disponível da comanda
                     </p>
@@ -2039,10 +2462,10 @@ export default function CommandsPage() {
 
                 <Button
                   onClick={addPaymentMethod}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-[#3D583F] text-white hover:bg-[#365137]"
                   disabled={!paymentAmount || parseCurrencyInput(paymentAmount) <= 0}
                 >
-                  <PlusIcon className="w-4 h-4 mr-2" />
+                  <PlusIcon className="mr-2 h-4 w-4" />
                   Adicionar Método
                 </Button>
               </div>
@@ -2050,26 +2473,28 @@ export default function CommandsPage() {
               {/* Métodos Selecionados */}
               {selectedPaymentMethods.length > 0 && (
                 <div className="space-y-4">
-                  <Label className="text-base font-semibold">Métodos Selecionados</Label>
+                  <Label className="text-base font-semibold text-[#3D583F]">
+                    Métodos Selecionados
+                  </Label>
                   <div className="space-y-2">
                     {selectedPaymentMethods.map((method, index) => (
-                      <Card key={index} className="p-3">
-                        <div className="flex justify-between items-center">
+                      <Card key={index} className="border-[#3D583F]/15 p-3">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span>
-                              {PAYMENT_METHODS.find(pm => pm.value === method.method)?.icon}
+                            {getPaymentMethodIcon(method.method, "h-4 w-4 text-[#3D583F]")}
+                            <span className="text-[#3D583F]">
+                              {getPaymentMethodLabel(method.method)}
                             </span>
-                            <span>{getPaymentMethodLabel(method.method)}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold">
+                            <span className="font-semibold text-[#3D583F]">
                               {formatCurrency(method.amount)}
                             </span>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => removePaymentMethod(index)}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-800"
                             >
                               <TrashIcon className="h-4 w-4" />
                             </Button>
@@ -2081,23 +2506,24 @@ export default function CommandsPage() {
                 </div>
               )}
 
-              <div className="flex justify-between pt-6 border-t">
-                <Button 
-                  variant="outline" 
+              <div className="flex justify-between border-t pt-6">
+                <Button
+                  variant="outline"
                   onClick={() => setPaymentModalOpen(false)}
+                  className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={processPayment}
                   disabled={
-                    selectedCommand.total - selectedPaymentMethods.reduce((sum, pm) => sum + pm.amount, 0) > 0.01 ||
+                    getRemainingPaymentAmount() > 0.01 ||
                     selectedPaymentMethods.length === 0 ||
                     isProcessingPayment
                   }
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  className="bg-[#3D583F] text-white hover:bg-[#365137]"
                 >
-                  {isProcessingPayment ? 'Processando...' : 'Finalizar Pagamento'}
+                  {isProcessingPayment ? "Processando..." : "Finalizar Pagamento"}
                 </Button>
               </div>
             </div>
@@ -2397,8 +2823,9 @@ export default function CommandsPage() {
                           }`}>
                             {serviceName}
                             {isSuccess && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full animate-bounce">
-                                ✓ Adicionado!
+                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 animate-bounce">
+                                <CheckIcon className="h-3 w-3" />
+                                Adicionado!
                               </span>
                             )}
                           </h3>
@@ -2502,8 +2929,9 @@ export default function CommandsPage() {
                           }`}>
                             {product.name}
                             {isSuccess && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full animate-bounce">
-                                ✓ Adicionado!
+                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 animate-bounce">
+                                <CheckIcon className="h-3 w-3" />
+                                Adicionado!
                               </span>
                             )}
                           </h3>

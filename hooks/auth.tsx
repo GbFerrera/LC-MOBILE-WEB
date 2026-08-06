@@ -1,11 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { api, setupAPIInterceptors } from "../services/api";
+import { api, setupAPIInterceptors, resetAPIInterceptors } from "../services/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner"
 import { jwtDecode } from "jwt-decode";
 import { AxiosError, AxiosResponse } from "axios";
+import { clearAppSession, persistAuthSession } from "@/lib/session-storage";
 
 interface User {
   id: string;
@@ -24,6 +25,7 @@ interface AuthContextData {
   updateCompanyId: (companyId: number) => void;
   isAuthenticated: boolean;
   loading: boolean;
+  signInLoading: boolean;
 }
 
 interface SignInCredentials {
@@ -43,6 +45,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     token: null,
   });
   const [loading, setLoading] = useState(true);
+  const [signInLoading, setSignInLoading] = useState(false);
   const router = useRouter();
 
   // Carrega os dados do usuário ao iniciar o app
@@ -99,7 +102,9 @@ function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async ({ email, password }: SignInCredentials): Promise<void> => {
     try {
-      setLoading(true);
+      setSignInLoading(true);
+      clearAppSession();
+      resetAPIInterceptors();
       
       // Verifica se são as credenciais de teste
       if (email === 'admin@barbearialink.com' && password === '123456') {
@@ -115,8 +120,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         
         // Salva os dados no localStorage (apenas no cliente)
         if (typeof window !== 'undefined') {
-          localStorage.setItem("@linkCallendar:user", JSON.stringify(mockUser));
-          localStorage.setItem("@linkCallendar:token", mockToken);
+          persistAuthSession(mockToken, mockUser);
         }
         
         // Configura o interceptor com o company_id
@@ -184,8 +188,7 @@ function AuthProvider({ children }: AuthProviderProps) {
 
       // Salva os dados no localStorage (apenas no cliente)
       if (typeof window !== 'undefined') {
-        localStorage.setItem("@linkCallendar:user", JSON.stringify(user));
-        localStorage.setItem("@linkCallendar:token", token);
+        persistAuthSession(token, user);
       }
       
       // Configura o interceptor com o company_id
@@ -232,7 +235,7 @@ function AuthProvider({ children }: AuthProviderProps) {
       
       // Importante: não propagar o erro para evitar recarregamento da página
     } finally {
-      setLoading(false);
+      setSignInLoading(false);
     }
   };
 
@@ -267,14 +270,10 @@ function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signOut = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem("@linkCallendar:token");
-      localStorage.removeItem("@linkCallendar:user");
-      localStorage.removeItem("@linkCallendar:navigation_context");
-      localStorage.removeItem("@linkCallendar:navigation_data");
-    }
+    clearAppSession();
+    resetAPIInterceptors();
     setData({ user: null, token: null });
-    // Removido o redirecionamento automático para a página de Login
+    router.push("/Login");
   };
 
   // Verifica se o token está expirado a cada minuto
@@ -297,9 +296,13 @@ function AuthProvider({ children }: AuthProviderProps) {
     const interceptor = api.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Verificar se o erro é de autenticação (401)
-        if (error.response && error.response.status === 401) {
-          signOut();
+        if (error.response?.status === 401) {
+          const requestUrl = error.config?.url || "";
+          const isLoginRequest = requestUrl.includes("/sessions");
+
+          if (!isLoginRequest) {
+            signOut();
+          }
         }
         return Promise.reject(error);
       }
@@ -321,7 +324,8 @@ function AuthProvider({ children }: AuthProviderProps) {
     updateCompanyId,
     user: data.user,
     isAuthenticated: !!data.user,
-    loading
+    loading,
+    signInLoading,
   };
 
   return (

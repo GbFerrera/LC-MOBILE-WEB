@@ -11,17 +11,25 @@ const api: AxiosInstance = axios.create({
   },
 });
 
+let requestInterceptorId: number | null = null;
+
+const resetAPIInterceptors = (): void => {
+  if (requestInterceptorId !== null) {
+    api.interceptors.request.eject(requestInterceptorId);
+    requestInterceptorId = null;
+  }
+};
+
 // Adicionar company_id aos headers de todas as requisições
-const setupAPIInterceptors = (companyId: number): number => {
-  return api.interceptors.request.use(
+const setupAPIInterceptors = (companyId: number): void => {
+  resetAPIInterceptors();
+
+  requestInterceptorId = api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      // Adicionar company_id ao header se existir
       if (companyId) {
-        // Garantindo que os headers existam
         if (!config.headers) {
           config.headers = new AxiosHeaders();
         }
-        // Adicionando o company_id ao header
         config.headers.set('company_id', String(companyId));
       }
       return config;
@@ -32,4 +40,4 @@ const setupAPIInterceptors = (companyId: number): number => {
   );
 };
 
-export { api, setupAPIInterceptors };
+export { api, setupAPIInterceptors, resetAPIInterceptors };

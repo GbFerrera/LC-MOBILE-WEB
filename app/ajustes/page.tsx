@@ -30,6 +30,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/use-notifications";
+import { AppearanceSettingsSection } from "@/components/appearance-settings-section";
 
 export default function AjustesPage() {
   const { user, updateUser, signOut } = useAuth();
@@ -394,7 +395,6 @@ export default function AjustesPage() {
 
   const handleLogout = () => {
     signOut();
-    router.push("/Login");
   };
 
   // Buscar horários de funcionamento do usuário
@@ -2281,6 +2281,7 @@ export default function AjustesPage() {
 
           {/* Settings Buttons - Vertical Stack */}
           <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-lg mx-auto mt-6 px-3 sm:px-4 pb-24">
+          <AppearanceSettingsSection />
           {settingButtons.map((setting, index) => (
             <Card
               key={setting.id}

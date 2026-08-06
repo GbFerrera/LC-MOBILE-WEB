@@ -88,10 +88,44 @@ export const clearNavigationData = (): void => {
   localStorage.removeItem(NAVIGATION_CONTEXT_KEY);
 };
 
-export const initializeNavigation = (apiData: CompanyData[]): void => {
+export const initializeNavigation = (apiData: CompanyData[], preferredCompanyId?: number): void => {
   saveNavigationData(apiData);
+
   const current = getNavigationContext();
-  if (!current && apiData.length > 0) {
+  if (current && !preferredCompanyId) {
+    return;
+  }
+
+  if (preferredCompanyId) {
+    const mainCompany = apiData.find((company) => company.id === preferredCompanyId);
+    if (mainCompany) {
+      setNavigationContext({
+        currentCompanyId: mainCompany.id,
+        currentCompanyName: mainCompany.name,
+        currentCompanyType: mainCompany.company_type,
+        parentCompanyId: mainCompany.parent_company_id,
+        availableCompanies: apiData,
+      });
+      return;
+    }
+
+    for (const company of apiData) {
+      const branch = (company.branches || []).find((item) => item.id === preferredCompanyId);
+      if (branch) {
+        setNavigationContext({
+          currentCompanyId: branch.id,
+          currentCompanyName: branch.name,
+          currentCompanyType: "branch",
+          parentCompanyId: company.id,
+          parentCompanyName: company.name,
+          availableCompanies: apiData,
+        });
+        return;
+      }
+    }
+  }
+
+  if (apiData.length > 0) {
     const first = apiData[0];
     setNavigationContext({
       currentCompanyId: first.id,

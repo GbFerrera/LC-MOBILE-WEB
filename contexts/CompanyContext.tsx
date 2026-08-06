@@ -11,7 +11,8 @@ import {
   getAvailableCompanies,
   getCompanyBranches,
   initializeNavigation,
-  navigateToCompany
+  navigateToCompany,
+  clearNavigationData,
 } from '@/lib/navigation-storage';
 import { useAuth } from '@/hooks/auth';
 
@@ -35,7 +36,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [availableCompanies, setAvailableCompanies] = useState<CompanyData[]>([]);
   const [availableBranches, setAvailableBranches] = useState<BranchData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { updateCompanyId } = useAuth();
+  const { updateCompanyId, user } = useAuth();
 
   const updateContext = async () => {
     try {
@@ -43,8 +44,14 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       if (companies.length === 0) {
         const response = await api.get('/companies');
         const data: CompanyData[] = response.data || [];
-        initializeNavigation(data);
+        initializeNavigation(data, user?.company_id);
         companies = getAvailableCompanies();
+      } else {
+        const ctx = getNavigationContext();
+        if (user?.company_id && ctx?.currentCompanyId !== user.company_id) {
+          clearNavigationData();
+          initializeNavigation(companies, user.company_id);
+        }
       }
       const ctx = getNavigationContext();
       let branches: BranchData[] = [];
@@ -62,8 +69,12 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     updateContext();
     const handler = () => updateContext();
     window.addEventListener('navigationContextChanged', handler);
-    return () => window.removeEventListener('navigationContextChanged', handler);
-  }, []);
+    window.addEventListener('appSessionCleared', handler);
+    return () => {
+      window.removeEventListener('navigationContextChanged', handler);
+      window.removeEventListener('appSessionCleared', handler);
+    };
+  }, [user?.company_id]);
 
   const switchToCompany = async (companyId: number) => {
     setIsLoading(true);

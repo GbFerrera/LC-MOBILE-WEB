@@ -35,7 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CircleX, Search, RefreshCw, Utensils } from "lucide-react";
+import type { Subscription } from "@/api/subscriptions";
+import { CircleX, Search, RefreshCw, Utensils, Plus, Loader2 } from "lucide-react";
 
 interface Client {
   id: number;
@@ -49,6 +50,9 @@ interface Service {
   service_description: string;
   service_price: string;
   service_duration: number;
+  base_price?: string | number | null;
+  promotional_price?: string | number | null;
+  promotion_type?: "date" | "weekday" | null;
 }
 
 interface FitSlot {
@@ -200,6 +204,46 @@ function generateTimeSlots(
   return { availableSlots, lunchSlots, scheduleData: schedule };
 }
 
+const hasSubscriptionNotes = (notes?: string) =>
+  typeof notes === "string" && notes.toLowerCase().includes("assinatura");
+
+const formatDisplayDate = (value?: string) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("pt-BR");
+};
+
+const getSubscriptionStatusLabel = (status?: string) => {
+  switch (status) {
+    case "active":
+      return "Ativa";
+    case "inactive":
+      return "Inativa";
+    case "canceled":
+      return "Cancelada";
+    case "pending":
+      return "Pendente";
+    default:
+      return "Sem status";
+  }
+};
+
+const getSubscriptionStatusClasses = (status?: string) => {
+  switch (status) {
+    case "active":
+      return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "inactive":
+      return "bg-gray-100 text-gray-700 border-gray-200";
+    case "canceled":
+      return "bg-red-100 text-red-700 border-red-200";
+    case "pending":
+      return "bg-amber-100 text-amber-700 border-amber-200";
+    default:
+      return "bg-gray-100 text-gray-700 border-gray-200";
+  }
+};
+
 export default function AgendaPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -277,6 +321,14 @@ export default function AgendaPage() {
   // Estado para resultados de busca de clientes
   const [filteredClients, setFilteredClients] = useState<any[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
+  const [isQuickClientFormOpen, setIsQuickClientFormOpen] = useState(false);
+  const [isCreatingQuickClient, setIsCreatingQuickClient] = useState(false);
+  const [quickClientData, setQuickClientData] = useState({
+    name: "",
+    phone_number: "",
+  });
+  const [subscriptionCard, setSubscriptionCard] = useState<Subscription | null>(null);
+  const [isLoadingSubscriptionCard, setIsLoadingSubscriptionCard] = useState(false);
 
   // Buscar clientes no backend com debounce
   useEffect(() => {
@@ -309,6 +361,88 @@ export default function AgendaPage() {
     }, 300);
     return () => clearTimeout(timeout);
   }, [clientSearch, user?.company_id]);
+
+  useEffect(() => {
+    const shouldLoadSubscription =
+      isDrawerOpen &&
+      selectedAppointment &&
+      selectedAppointment.status !== "free" &&
+      hasSubscriptionNotes(selectedAppointment.notes);
+
+    if (!shouldLoadSubscription) {
+      setSubscriptionCard(null);
+      setIsLoadingSubscriptionCard(false);
+      return;
+    }
+
+    const clientId = selectedAppointment?.client?.id || selectedAppointment?.client_id;
+    const subscriptionId = selectedAppointment?.subscription_id;
+
+    if (!clientId || !user?.company_id) {
+      setSubscriptionCard(null);
+      return;
+    }
+
+    let ignore = false;
+
+    const fetchSubscriptionCard = async () => {
+      try {
+        setIsLoadingSubscriptionCard(true);
+
+        let subscription: Subscription | null = null;
+
+        if (subscriptionId) {
+          const response = await api.get(`/subscriptions/${subscriptionId}`, {
+            headers: {
+              company_id: user.company_id?.toString() || "0",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          subscription = response.data;
+        } else {
+          const response = await api.get(`/subscriptions/client/${clientId}`, {
+            headers: {
+              company_id: user.company_id?.toString() || "0",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+
+          const subscriptions = Array.isArray(response.data?.subscriptions)
+            ? response.data.subscriptions
+            : [];
+
+          subscription =
+            subscriptions.find((item: Subscription) => item.status === "active") ||
+            subscriptions.find((item: Subscription) => item.status === "pending") ||
+            subscriptions[0] ||
+            null;
+        }
+
+        if (!ignore) {
+          setSubscriptionCard(subscription);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar card de assinatura:", error);
+        if (!ignore) {
+          setSubscriptionCard(null);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoadingSubscriptionCard(false);
+        }
+      }
+    };
+
+    fetchSubscriptionCard();
+
+    return () => {
+      ignore = true;
+    };
+  }, [
+    isDrawerOpen,
+    selectedAppointment,
+    user?.company_id,
+  ]);
 
   // Dados do formulário
   const [formData, setFormData] = useState({
@@ -407,6 +541,79 @@ export default function AgendaPage() {
     }
   };
 
+  const fetchServicesForContext = async (dateParam?: Date) => {
+    if (!user) return;
+
+    try {
+      const targetDate = dateParam || date;
+      const formattedDate = targetDate.toISOString().split("T")[0];
+      const professionalId = selectedProfessionalId || user.id;
+
+      let servicesResponse;
+      let servicesData: any = [];
+
+      const serviceEndpoints = ["/service"];
+
+      for (const endpoint of serviceEndpoints) {
+        try {
+          servicesResponse = await api.get(endpoint, {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              company_id: user?.company_id?.toString() || "0",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            params: {
+              professional_id: professionalId,
+              date: formattedDate,
+            },
+          });
+
+          servicesData = servicesResponse.data;
+
+          if (servicesData && typeof servicesData === "object" && !Array.isArray(servicesData)) {
+            const possibleKeys = ["services", "data", "items", "results"];
+            for (const key of possibleKeys) {
+              if (servicesData[key] && Array.isArray(servicesData[key])) {
+                servicesData = servicesData[key];
+                break;
+              }
+            }
+          }
+
+          if (Array.isArray(servicesData)) break;
+        } catch (endpointError) {
+          if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
+            throw endpointError;
+          }
+        }
+      }
+
+      const validServices = Array.isArray(servicesData)
+        ? servicesData
+            .filter((service) => service && (service.id || service.service_id))
+            .map((service) => ({
+              service_id: service.service_id || service.id,
+              service_name:
+                service.service_name || service.name || service.title || `Serviço ${service.service_id || service.id}`,
+              service_duration:
+                service.service_duration || service.duration || service.time || service.duration_minutes || 30,
+              service_price: String(service.service_price ?? service.price ?? service.value ?? service.cost ?? "0.00"),
+              service_description: service.service_description || service.description || service.desc || "",
+              base_price: service.base_price ?? null,
+              promotional_price: service.promotional_price ?? null,
+              promotion_type: service.promotion_type ?? null,
+            }))
+        : [];
+
+      setServices(validServices);
+    } catch (error: any) {
+      console.error("Erro ao buscar serviços:", error);
+      toast.error(error.response?.data?.error || "Erro ao carregar serviços");
+      setServices([]);
+    }
+  };
+
   // Carregar clientes, serviços e agendamentos
   useEffect(() => {
     const fetchClientsAndServices = async () => {
@@ -442,91 +649,7 @@ export default function AgendaPage() {
         
         setClients(validClients);
 
-        // Buscar serviços - tentar diferentes endpoints
-        let servicesResponse;
-        let servicesData = [];
-        
-        const serviceEndpoints = ["/service", "/service"];
-        
-        for (const endpoint of serviceEndpoints) {
-          try {
-            console.log(`Tentando buscar serviços no endpoint: ${endpoint}`);
-            servicesResponse = await api.get(endpoint, {
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                company_id: user?.company_id?.toString() || "0",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            });
-            
-            console.log(`Resposta do endpoint ${endpoint}:`, servicesResponse);
-            console.log(`Dados do endpoint ${endpoint}:`, servicesResponse.data);
-            
-            // Verificar se a resposta tem a estrutura esperada
-            servicesData = servicesResponse.data;
-            
-            // Se a resposta for um objeto com uma propriedade que contém os serviços
-            if (servicesData && typeof servicesData === 'object' && !Array.isArray(servicesData)) {
-              // Tentar encontrar a propriedade que contém os serviços
-              const possibleKeys = ['services', 'data', 'items', 'results'];
-              for (const key of possibleKeys) {
-                if (servicesData[key] && Array.isArray(servicesData[key])) {
-                  servicesData = servicesData[key];
-                  break;
-                }
-              }
-            }
-            
-            // Se encontrou dados válidos, sair do loop
-            if (Array.isArray(servicesData) && servicesData.length > 0) {
-              console.log(`Serviços encontrados no endpoint ${endpoint}:`, servicesData);
-              break;
-            }
-            
-          } catch (endpointError) {
-            console.error(`Erro no endpoint ${endpoint}:`, endpointError);
-            if (endpoint === serviceEndpoints[serviceEndpoints.length - 1]) {
-              // Se é o último endpoint, propagar o erro
-              throw endpointError;
-            }
-          }
-        }
-        
-        console.log("Dados processados dos serviços:", servicesData);
-        
-        // Normalizar e filtrar serviços válidos
-        const validServices = Array.isArray(servicesData) 
-          ? servicesData
-              .filter(service => {
-                console.log("Verificando serviço:", service);
-                console.log("Tem ID?", !!service?.id);
-                console.log("Tem service_id?", !!service?.service_id);
-                
-                // Verificar se tem id ou service_id
-                return service && (service.id || service.service_id);
-              })
-              .map(service => {
-                // Normalizar a estrutura do serviço
-                const normalizedService = {
-                  service_id: service.service_id || service.id,
-                  service_name: service.service_name || service.service_name || service.title || `Serviço ${service.service_id || service.id}`,
-                  service_duration: service.service_duration || service.duration || service.time || service.duration_minutes || 30,
-                  service_price: service.service_price || service.price || service.value || service.cost || "0.00",
-                  service_description: service.service_description || service.description || service.desc || '',
-                  // Manter dados originais para debug
-                  _original: service
-                };
-                
-                console.log("Serviço normalizado:", normalizedService);
-                return normalizedService;
-              })
-          : [];
-        
-        console.log("Serviços válidos filtrados:", validServices);
-        console.log("Quantidade de serviços:", validServices.length);
-        
-        setServices(validServices);
+        await fetchServicesForContext(date);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
         console.error("Detalhes do erro:", error.response?.data);
@@ -554,6 +677,12 @@ export default function AgendaPage() {
     }
   }, [date]);
 
+  useEffect(() => {
+    if (user) {
+      fetchServicesForContext(date);
+    }
+  }, [date, selectedProfessionalId]);
+
   // Recalcular encaixes quando slots ou agendamentos mudarem
   useEffect(() => {
     if (availableSlots.length > 0) {
@@ -577,6 +706,95 @@ export default function AgendaPage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleQuickClientInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = e.target;
+    setQuickClientData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleToggleQuickClientForm = () => {
+    const trimmedSearch = clientSearch.trim();
+    const digitsOnly = trimmedSearch.replace(/\D/g, "");
+
+    setShowClientDropdown(false);
+    setIsQuickClientFormOpen((prev) => {
+      const nextOpen = !prev;
+
+      if (nextOpen) {
+        setQuickClientData((current) => ({
+          name: current.name || (digitsOnly.length >= 8 ? "" : trimmedSearch),
+          phone_number:
+            current.phone_number || (digitsOnly.length >= 8 ? trimmedSearch : ""),
+        }));
+      }
+
+      return nextOpen;
+    });
+  };
+
+  const handleCreateQuickClient = async () => {
+    if (!user?.company_id) {
+      toast.error("Empresa não identificada para criar o cliente");
+      return;
+    }
+
+    const payload = {
+      name: quickClientData.name.trim(),
+      phone_number: quickClientData.phone_number.trim(),
+    };
+
+    if (!payload.name || !payload.phone_number) {
+      toast.error("Preencha nome e telefone do cliente");
+      return;
+    }
+
+    try {
+      setIsCreatingQuickClient(true);
+
+      const response = await api.post("/clients", payload, {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          company_id: user.company_id?.toString() || "0",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      const createdClient = {
+        ...response.data,
+        phone_number: response.data?.phone_number || payload.phone_number,
+      };
+
+      setClients((prev) =>
+        prev.some((client) => client.id === createdClient.id)
+          ? prev
+          : [createdClient, ...prev]
+      );
+      setFilteredClients((prev) =>
+        prev.some((client) => client.id === createdClient.id)
+          ? prev
+          : [createdClient, ...prev]
+      );
+      handleSelectChange("client_id", createdClient.id?.toString() || "");
+      setClientSearch(createdClient.name || payload.name);
+      setQuickClientData({ name: "", phone_number: "" });
+      setIsQuickClientFormOpen(false);
+      toast.success("Cliente criado e selecionado com sucesso!");
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        "Erro ao criar cliente";
+      toast.error(message);
+    } finally {
+      setIsCreatingQuickClient(false);
+    }
   };
 
   // Função para gerenciar seleção/deseleção de serviços
@@ -632,6 +850,14 @@ export default function AgendaPage() {
       time: "",
       startDate: "",
       endDate: ""
+    });
+    setClientSearch("");
+    setFilteredClients([]);
+    setShowClientDropdown(false);
+    setIsQuickClientFormOpen(false);
+    setQuickClientData({
+      name: "",
+      phone_number: "",
     });
   };
 
@@ -2390,7 +2616,12 @@ export default function AgendaPage() {
                           </div>
 
                           {/* Lado direito - Botão ou informações */}
-                          <div className="flex items-center">
+                          <div className="flex flex-col items-end justify-center gap-2">
+                            {isBooked && appointment && appointment.status !== 'canceled' && hasSubscriptionNotes(appointment.notes) && (
+                              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
+                                Assinatura
+                              </div>
+                            )}
                             {isLunch ? (
                               <div className="px-4 py-2 rounded-full text-sm font-semibold bg-amber-200 text-amber-800 border border-amber-300">
                                 Almoço
@@ -2509,19 +2740,28 @@ export default function AgendaPage() {
                         setShowClientDropdown(true);
                       }}
                       onBlur={() => setTimeout(() => setShowClientDropdown(false), 150)}
-                      className="h-11 border border-gray-200 rounded-lg pl-9 pr-9"
+                      className="h-11 border border-gray-200 rounded-lg pl-9 pr-20"
                       autoComplete="off"
                       required
                     />
                     {formData.client_id && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <div className="absolute right-11 top-1/2 -translate-y-1/2">
                         <CircleX
                           className="h-4 w-4 text-gray-400 cursor-pointer hover:text-red-500 transition-colors"
                           onClick={() => { handleSelectChange("client_id", ""); setClientSearch(""); }}
                         />
                       </div>
                     )}
-                    {clientSearch.trim() && showClientDropdown && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleToggleQuickClientForm}
+                      className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-gray-200 text-gray-500 transition-colors hover:border-[#3D583F]/30 hover:bg-[#3D583F]/5 hover:text-[#3D583F]"
+                      aria-label="Criar cliente"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                    {clientSearch.trim() && showClientDropdown && !isQuickClientFormOpen && (
                       <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg max-h-48 overflow-auto border border-gray-100">
                         {filteredClients.length > 0 ? (
                           filteredClients.map((client) => (
@@ -2532,6 +2772,7 @@ export default function AgendaPage() {
                                 handleSelectChange("client_id", client.id?.toString() || "");
                                 setClientSearch(client.name);
                                 setShowClientDropdown(false);
+                                setIsQuickClientFormOpen(false);
                                 setClients(prev => prev.some(c => c.id === client.id) ? prev : [...prev, client]);
                               }}
                             >
@@ -2552,6 +2793,65 @@ export default function AgendaPage() {
                       </div>
                     )}
                   </div>
+                  {isQuickClientFormOpen && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="quick_client_name" className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                          Nome
+                        </Label>
+                        <Input
+                          id="quick_client_name"
+                          name="name"
+                          placeholder="Nome do cliente"
+                          value={quickClientData.name}
+                          onChange={handleQuickClientInputChange}
+                          className="h-10 bg-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="quick_client_phone" className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                          Telefone
+                        </Label>
+                        <Input
+                          id="quick_client_phone"
+                          name="phone_number"
+                          placeholder="(11) 99999-9999"
+                          value={quickClientData.phone_number}
+                          onChange={handleQuickClientInputChange}
+                          className="h-10 bg-white"
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9"
+                          onClick={() => {
+                            setIsQuickClientFormOpen(false);
+                            setQuickClientData({ name: "", phone_number: "" });
+                          }}
+                          disabled={isCreatingQuickClient}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          className="h-9 bg-[#3D583F] hover:bg-[#365137] text-white"
+                          onClick={handleCreateQuickClient}
+                          disabled={isCreatingQuickClient}
+                        >
+                          {isCreatingQuickClient ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Criando...
+                            </>
+                          ) : (
+                            "Criar cliente"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2589,6 +2889,18 @@ export default function AgendaPage() {
                         <div className="max-h-52 overflow-y-auto">
                           {services.length > 0 ? services.map((service) => {
                             const isSelected = formData.service_ids.includes(service.service_id?.toString() || "");
+                            const servicePrice = parseFloat(String(service.service_price || "0"));
+                            const basePrice =
+                              service.base_price === null || service.base_price === undefined
+                                ? null
+                                : parseFloat(String(service.base_price));
+                            const hasPromotion = basePrice !== null && servicePrice !== basePrice;
+                            const promotionLabel =
+                              service.promotion_type === "weekday"
+                                ? "Promo semanal"
+                                : service.promotion_type === "date"
+                                  ? "Promo do dia"
+                                  : null;
                             return (
                               <div
                                 key={service.service_id}
@@ -2605,9 +2917,19 @@ export default function AgendaPage() {
                                   )}
                                 </div>
                                 <span className="text-sm text-gray-800 flex-1">{service.service_name || 'Serviço'}</span>
-                                <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
-                                  <span>{service.service_duration}min</span>
-                                  <span className="text-gray-600 font-medium">R$ {service.service_price}</span>
+                                <div className="flex flex-col items-end gap-0.5 ml-2">
+                                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span>{service.service_duration}min</span>
+                                    <span className="text-gray-600 font-medium">R$ {servicePrice.toFixed(2)}</span>
+                                    {hasPromotion && (
+                                      <span className="text-[11px] text-gray-400 line-through">
+                                        R$ {Number(basePrice).toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {promotionLabel && (
+                                    <span className="text-[11px] text-[#3D583F]">{promotionLabel}</span>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -3206,6 +3528,102 @@ export default function AgendaPage() {
                       <p className="text-gray-800 mt-1">
                         {selectedAppointment.notes}
                       </p>
+                    </div>
+                  )}
+                  {selectedAppointment.status !== "free" && hasSubscriptionNotes(selectedAppointment.notes) && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                              Assinaturas
+                            </span>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {isLoadingSubscriptionCard
+                                ? "Carregando assinatura..."
+                                : subscriptionCard?.plan?.name || "Assinatura vinculada"}
+                            </p>
+                          </div>
+                          {!isLoadingSubscriptionCard && subscriptionCard?.status && (
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getSubscriptionStatusClasses(subscriptionCard.status)}`}
+                            >
+                              {getSubscriptionStatusLabel(subscriptionCard.status)}
+                            </span>
+                          )}
+                        </div>
+
+                        {isLoadingSubscriptionCard ? (
+                          <div className="mt-3 flex items-center gap-2 text-sm text-violet-700">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Buscando dados da assinatura...
+                          </div>
+                        ) : subscriptionCard ? (
+                          <div className="mt-3 space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div className="rounded-lg bg-white/80 p-2">
+                                <span className="block text-[11px] uppercase tracking-wide text-gray-500">
+                                  Pagamento
+                                </span>
+                                <span className="font-medium text-gray-900">
+                                  {subscriptionCard.payment_status ? "Pago" : "Pendente"}
+                                </span>
+                              </div>
+                              <div className="rounded-lg bg-white/80 p-2">
+                                <span className="block text-[11px] uppercase tracking-wide text-gray-500">
+                                  Sessoes
+                                </span>
+                                <span className="font-medium text-gray-900">
+                                  {subscriptionCard.remaining_sessions ?? "-"}
+                                </span>
+                              </div>
+                              <div className="rounded-lg bg-white/80 p-2">
+                                <span className="block text-[11px] uppercase tracking-wide text-gray-500">
+                                  Inicio
+                                </span>
+                                <span className="font-medium text-gray-900">
+                                  {formatDisplayDate(subscriptionCard.start_date)}
+                                </span>
+                              </div>
+                              <div className="rounded-lg bg-white/80 p-2">
+                                <span className="block text-[11px] uppercase tracking-wide text-gray-500">
+                                  Prox. cobranca
+                                </span>
+                                <span className="font-medium text-gray-900">
+                                  {formatDisplayDate(subscriptionCard.next_billing_date)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {subscriptionCard.plan?.services && subscriptionCard.plan.services.length > 0 && (
+                              <div>
+                                <span className="block text-[11px] uppercase tracking-wide text-gray-500">
+                                  Servicos do plano
+                                </span>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {subscriptionCard.plan.services.slice(0, 3).map((service) => (
+                                    <span
+                                      key={service.id}
+                                      className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs text-violet-700"
+                                    >
+                                      {service.name}
+                                    </span>
+                                  ))}
+                                  {subscriptionCard.plan.services.length > 3 && (
+                                    <span className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs text-violet-700">
+                                      +{subscriptionCard.plan.services.length - 3} servicos
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-gray-600">
+                            Nao encontrei uma assinatura vinculada para este agendamento.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

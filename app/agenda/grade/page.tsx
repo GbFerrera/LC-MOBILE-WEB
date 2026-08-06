@@ -164,8 +164,13 @@ export default function AgendaGradePage() {
   const fetchServices = useCallback(async () => {
     if (!user?.company_id) return;
     try {
+      const formattedDate = format(currentDate, "yyyy-MM-dd");
       const response = await api.get("/service", {
-        headers: { company_id: user.company_id.toString(), Authorization: `Bearer ${localStorage.getItem("token")}` }
+        headers: { company_id: user.company_id.toString(), Authorization: `Bearer ${localStorage.getItem("token")}` },
+        params: {
+          professional_id: selectedProfessionalId || user.id,
+          date: formattedDate,
+        }
       });
       let data = response.data;
       if (data && !Array.isArray(data)) {
@@ -175,12 +180,15 @@ export default function AgendaGradePage() {
       }
       setServices(Array.isArray(data) ? data.filter(s => s?.service_id || s?.id).map(s => ({
         service_id: s.service_id || s.id,
-        service_name: s.service_name || s.title || `Serviço ${s.service_id || s.id}`,
+        service_name: s.service_name || s.name || s.title || `Serviço ${s.service_id || s.id}`,
         service_duration: s.service_duration || s.duration || 30,
         service_price: s.service_price || s.price || "0.00",
+        base_price: s.base_price ?? null,
+        promotional_price: s.promotional_price ?? null,
+        promotion_type: s.promotion_type ?? null,
       })) : []);
     } catch { setServices([]); }
-  }, [user?.company_id]);
+  }, [user?.company_id, user?.id, currentDate, selectedProfessionalId]);
 
   const openSlotDialog = (slot: string, professionalId: string) => {
     setSelectedSlot(slot);
@@ -1085,6 +1093,18 @@ export default function AgendaGradePage() {
                     <div className="max-h-52 overflow-y-auto">
                       {services.length > 0 ? services.map((service) => {
                         const isSelected = formData.service_ids.includes(service.service_id?.toString() || "");
+                        const servicePrice = parseFloat(String(service.service_price || "0"));
+                        const basePrice =
+                          service.base_price === null || service.base_price === undefined
+                            ? null
+                            : parseFloat(String(service.base_price));
+                        const hasPromotion = basePrice !== null && servicePrice !== basePrice;
+                        const promotionLabel =
+                          service.promotion_type === "weekday"
+                            ? "Promo semanal"
+                            : service.promotion_type === "date"
+                              ? "Promo do dia"
+                              : null;
                         return (
                           <div
                             key={service.service_id}
@@ -1099,9 +1119,19 @@ export default function AgendaGradePage() {
                               )}
                             </div>
                             <span className="text-sm text-gray-800 flex-1">{service.service_name}</span>
-                            <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
-                              <span>{service.service_duration}min</span>
-                              <span className="text-gray-600 font-medium">R$ {service.service_price}</span>
+                            <div className="flex flex-col items-end gap-0.5 ml-2">
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span>{service.service_duration}min</span>
+                                <span className="text-gray-600 font-medium">R$ {servicePrice.toFixed(2)}</span>
+                                {hasPromotion && (
+                                  <span className="text-[11px] text-gray-400 line-through">
+                                    R$ {Number(basePrice).toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              {promotionLabel && (
+                                <span className="text-[11px] text-[#3D583F]">{promotionLabel}</span>
+                              )}
                             </div>
                           </div>
                         );

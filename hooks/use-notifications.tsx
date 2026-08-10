@@ -232,7 +232,12 @@ export function useNotifications() {
       const { data } = await api.get('/web-push/public-key', { headers });
       publicKey = data?.publicKey as string | undefined;
     } catch (e: any) {
-      return { ok: false, reason: 'api_error', message: e?.message };
+      const status = e?.response?.status;
+      const apiMsg = e?.response?.data?.message || e?.message;
+      if (status === 500 && String(apiMsg || '').includes('WEB_PUSH')) {
+        return { ok: false, reason: 'missing_public_key', message: apiMsg };
+      }
+      return { ok: false, reason: 'api_error', message: apiMsg || e?.message };
     }
     if (!publicKey) return { ok: false, reason: 'missing_public_key' };
 

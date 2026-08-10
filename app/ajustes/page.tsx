@@ -38,6 +38,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/use-notifications";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 import { AppearanceSettingsSection } from "@/components/appearance-settings-section";
 
 interface MobileService {
@@ -388,18 +389,23 @@ export default function AjustesPage() {
 
       const result = await ensurePushSubscription({ companyId: user?.company_id, teamId: user?.id });
       if (result.ok === false) {
+        const apiBaseUrl = getApiBaseUrl();
         const msg =
-          result.reason === 'api_error'
-            ? "Não foi possível falar com a API (HTTPS/certificado). Abra também https://192.168.1.7:3444 no navegador e confira o cadeado"
-            : result.reason === 'missing_public_key'
-              ? "A API não retornou a chave pública de push"
+          result.reason === 'missing_public_key'
+            ? "Push não configurado no servidor. Contate o suporte Link Callendar."
+            : result.reason === 'api_error'
+              ? result.message?.includes('Network Error') || result.message?.toLowerCase?.().includes('network')
+                ? `Não foi possível conectar à API (${apiBaseUrl}). Verifique internet e certificado HTTPS.`
+                : result.message
+                  ? `Erro na API: ${result.message}`
+                  : `Não foi possível conectar à API (${apiBaseUrl}).`
               : result.reason === 'push_subscribe_error'
-                ? "Falha ao registrar no navegador (Push). Isso acontece quando o site não está realmente seguro/trust no dispositivo"
+                ? "Falha ao registrar no navegador (Push). Verifique se o app está instalado como PWA e se o site é confiável."
                 : result.reason === 'backend_subscribe_error'
-                  ? `A API recusou salvar a inscrição: ${result.message || 'erro' }`
-                : result.reason === 'permission_denied'
-                  ? "Permissão de notificações negada"
-                  : "Não foi possível ativar as notificações";
+                  ? `A API recusou salvar a inscrição: ${result.message || 'erro'}`
+                  : result.reason === 'permission_denied'
+                    ? "Permissão de notificações negada"
+                    : "Não foi possível ativar as notificações";
         toast.error(msg);
         return;
       }

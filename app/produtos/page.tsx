@@ -406,14 +406,14 @@ export default function ProductsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                className="rounded-md border border-primary text-primary hover:bg-primary/10"
                 onClick={() => router.push('/')}
               >
                 <ArrowLeftIcon className="h-5 w-5" />
               </Button>
               <div>
                 <h1 className="font-bold text-2xl tracking-wide flex items-center gap-2 text-gray-900">
-                  <PackageIcon className="h-6 w-6 text-[#3D583F]" />
+                  <PackageIcon className="h-6 w-6 text-primary" />
                   Produtos
                 </h1>
                 <p className="text-gray-600 text-sm mt-1">
@@ -425,7 +425,7 @@ export default function ProductsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                className="rounded-md border border-primary text-primary hover:bg-primary/10"
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <FilterIcon className="h-5 w-5" />
@@ -433,7 +433,7 @@ export default function ProductsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                className="rounded-md border border-primary text-primary hover:bg-primary/10"
                 onClick={onRefresh}
                 disabled={refreshing}
               >
@@ -441,7 +441,7 @@ export default function ProductsPage() {
               </Button>
               <Button
                 size="icon"
-                className="rounded-md bg-[#3D583F] hover:bg-[#365137] text-white"
+                className="rounded-md bg-primary hover:bg-primary/90 text-white"
                 onClick={openCreateProductModal}
               >
                 <PlusIcon className="h-5 w-5" />
@@ -451,19 +451,19 @@ export default function ProductsPage() {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="bg-white rounded-2xl p-4 border border-[#3D583F]/20">
-              <div className="text-[#3D583F] text-sm font-medium">Total de Produtos</div>
-              <div className="text-3xl font-bold text-[#3D583F] mt-1">
+            <div className="bg-white rounded-2xl p-4 border border-primary/20">
+              <div className="text-primary text-sm font-medium">Total de Produtos</div>
+              <div className="text-3xl font-bold text-primary mt-1">
                 {loading ? (
-                  <div className="animate-pulse bg-[#3D583F]/10 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-primary/10 h-8 w-12 rounded"></div>
                 ) : products.length}
               </div>
             </div>
-            <div className="bg-white rounded-2xl p-4 border border-[#3D583F]/20">
-              <div className="text-[#3D583F] text-sm font-medium">Valor Total</div>
-              <div className="text-lg font-bold text-[#3D583F] mt-1">
+            <div className="bg-white rounded-2xl p-4 border border-primary/20">
+              <div className="text-primary text-sm font-medium">Valor Total</div>
+              <div className="text-lg font-bold text-primary mt-1">
                 {loading ? (
-                  <div className="animate-pulse bg-[#3D583F]/10 h-6 w-16 rounded"></div>
+                  <div className="animate-pulse bg-primary/10 h-6 w-16 rounded"></div>
                 ) : formatCurrency(products.reduce((sum, p) => sum + (p.price * p.stock), 0))}
               </div>
             </div>
@@ -471,21 +471,21 @@ export default function ProductsPage() {
 
           {/* Filters */}
           {showFilters && (
-            <div className="mt-6 bg-white rounded-2xl p-4 border border-[#3D583F]/20">
+            <div className="mt-6 bg-white rounded-2xl p-4 border border-primary/20">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Label className="text-[#3D583F] text-sm font-medium min-w-fit">Buscar:</Label>
+                  <Label className="text-primary text-sm font-medium min-w-fit">Buscar:</Label>
                   <Input
                     placeholder="Nome do produto..."
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    className="border border-[#3D583F]/30 focus:border-[#3D583F] focus:ring-[#3D583F] w-48"
+                    className="border border-primary/30 focus:border-primary focus:ring-primary w-48"
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-[#3D583F] text-sm font-medium min-w-fit">Categoria:</Label>
+                  <Label className="text-primary text-sm font-medium min-w-fit">Categoria:</Label>
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="border border-[#3D583F]/30 focus:border-[#3D583F] w-40">
+                    <SelectTrigger className="border border-primary/30 focus:border-primary w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -502,7 +502,7 @@ export default function ProductsPage() {
                   variant="outline"
                   size="sm"
                   onClick={clearFilters}
-                  className="text-[#3D583F] border border-[#3D583F] hover:bg-[#3D583F]/10"
+                  className="text-primary border border-primary hover:bg-primary/10"
                 >
                   Limpar
                 </Button>
@@ -540,7 +540,7 @@ export default function ProductsPage() {
               }
             </p>
             {products.length === 0 && (
-              <Button onClick={openCreateProductModal} className="bg-[#3D583F] hover:bg-[#365137]">
+              <Button onClick={openCreateProductModal} className="bg-primary hover:bg-primary/90">
                 <PlusIcon className="h-4 w-4 mr-2" />
                 Criar Primeiro Produto
               </Button>
@@ -585,7 +585,7 @@ export default function ProductsPage() {
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-lg truncate flex-1">{product.name}</h3>
                     </div>
-                    <p className="text-2xl font-bold text-[#3D583F] mb-2">
+                    <p className="text-2xl font-bold text-primary mb-2">
                       {formatCurrency(product.price)}
                     </p>
                     {product.category && (
@@ -603,7 +603,7 @@ export default function ProductsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => openEditProductModal(product)}
-                        className="flex-1 border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                        className="flex-1 border border-primary text-primary hover:bg-primary/10"
                       >
                         <EditIcon className="h-4 w-4 mr-1" />
                         Editar
@@ -764,7 +764,7 @@ export default function ProductsPage() {
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-[#3D583F] hover:bg-[#365137]"
+                className="flex-1 bg-primary hover:bg-primary/90"
                 disabled={isCreating || uploadingImage}
               >
                 {isCreating ? (

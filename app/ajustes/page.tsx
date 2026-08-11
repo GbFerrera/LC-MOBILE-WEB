@@ -1391,7 +1391,7 @@ export default function AjustesPage() {
       <header className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="p-2 rounded-md text-[#3D583F] hover:bg-[#3D583F]/10">
+            <Link href="/" className="p-2 rounded-md text-primary hover:bg-primary/10">
               <ChevronLeftIcon className="h-7 w-7" />
             </Link>
             <h1 className="font-bold text-2xl tracking-wide">Ajustes</h1>
@@ -1400,7 +1400,7 @@ export default function AjustesPage() {
         </div>
       </header>
 
-      <div className="border-b relative pb-20 text-white" style={{ backgroundColor: "#3D583F" }}>
+      <div className="relative border-b pb-20 text-white bg-primary">
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <Image src="/favicon.png" alt="" width={160} height={160} className="absolute top-6 left-8 opacity-20 rotate-12" aria-hidden />
           <Image src="/favicon.png" alt="" width={96} height={96} className="absolute top-14 right-16 opacity-15 -rotate-6" aria-hidden />
@@ -1420,7 +1420,7 @@ export default function AjustesPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-md border border-white bg-white bg-[#3D583F] hover:bg-white/10"
+                    className="rounded-md border border-white bg-white bg-primary hover:bg-white/10"
                   >
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Editar
@@ -1494,7 +1494,7 @@ export default function AjustesPage() {
                         type="submit"
                         onClick={handleUpdateProfile}
                         disabled={isLoading}
-                        className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                        className="bg-primary hover:bg-primary/90 text-white"
                       >
                         {isLoading ? "Salvando..." : "Salvar"}
                       </Button>
@@ -1532,7 +1532,7 @@ export default function AjustesPage() {
                         <Button
                           onClick={() => setIsCreateServiceDialogOpen(true)}
                           size="sm"
-                          className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-md px-3 sm:px-4 py-2 w-full sm:w-auto text-sm"
+                          className="bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-md px-3 sm:px-4 py-2 w-full sm:w-auto text-sm"
                         >
                           <PlusIcon className="h-4 w-4 mr-2" />
                           Novo Serviço
@@ -1580,9 +1580,9 @@ export default function AjustesPage() {
                         <div className="space-y-3 sm:space-y-4">
                           {filteredServices.map((service, index) => (
                             <div key={service.service_id || service.id || index} className="group">
-                              <div className="bg-white border border-[#3D583F]/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:shadow-md transition-all duration-300 hover:border-[#3D583F]/30">
+                              <div className="bg-white border border-primary/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:shadow-md transition-all duration-300 hover:border-primary/30">
                                 <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-                                  <div className="w-3 h-3 bg-[#3D583F] rounded-full mt-1 sm:mt-2 flex-shrink-0"></div>
+                                  <div className="w-3 h-3 bg-primary rounded-full mt-1 sm:mt-2 flex-shrink-0"></div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-3 mb-2">
                                       <h3 className="font-semibold text-base sm:text-lg text-gray-900">
@@ -1598,11 +1598,11 @@ export default function AjustesPage() {
                                       </p>
                                     )}
                                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                                      <div className="flex items-center gap-2 bg-[#3D583F]/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
-                                        <DollarSign className="h-4 w-4 text-[#3D583F]" />
+                                      <div className="flex items-center gap-2 bg-primary/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
+                                        <DollarSign className="h-4 w-4 text-primary" />
                                         {priceDate && service.promotional_price !== null && service.promotional_price !== undefined ? (
                                           <div className="flex items-baseline gap-2">
-                                            <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
+                                            <span className="text-primary font-medium text-xs sm:text-sm">
                                               {formatPrice(service.service_price || 0)}
                                             </span>
                                             <span className="text-[11px] sm:text-xs text-gray-500 line-through">
@@ -1610,14 +1610,14 @@ export default function AjustesPage() {
                                             </span>
                                           </div>
                                         ) : (
-                                          <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
+                                          <span className="text-primary font-medium text-xs sm:text-sm">
                                             {formatPrice(service.service_price || service.base_price || 0)}
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-2 bg-[#3D583F]/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
-                                        <ClockIcon className="h-4 w-4 text-[#3D583F]" />
-                                        <span className="text-[#3D583F] font-medium text-xs sm:text-sm">
+                                      <div className="flex items-center gap-2 bg-primary/10 px-2 sm:px-3 py-1 sm:py-2 rounded-lg">
+                                        <ClockIcon className="h-4 w-4 text-primary" />
+                                        <span className="text-primary font-medium text-xs sm:text-sm">
                                           {formatDuration(service.service_duration || service.base_duration || 0)}
                                         </span>
                                       </div>
@@ -1628,7 +1628,7 @@ export default function AjustesPage() {
                                       onClick={() => openPromotionDialog(service)}
                                       size="sm"
                                       variant="outline"
-                                      className="border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 w-full sm:w-auto text-xs sm:text-sm"
+                                      className="border border-primary text-primary hover:bg-primary/10 w-full sm:w-auto text-xs sm:text-sm"
                                     >
                                       <Sparkles className="h-4 w-4 mr-1" />
                                       Promoção
@@ -1637,7 +1637,7 @@ export default function AjustesPage() {
                                       onClick={() => handleEditServiceClick(service)}
                                       size="sm"
                                       variant="outline"
-                                      className="border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 w-full sm:w-auto text-xs sm:text-sm"
+                                      className="border border-primary text-primary hover:bg-primary/10 w-full sm:w-auto text-xs sm:text-sm"
                                     >
                                       <PencilIcon className="h-4 w-4 mr-1" />
                                       Editar
@@ -1675,7 +1675,7 @@ export default function AjustesPage() {
                           <p className="text-gray-600 mb-6 max-w-sm mx-auto">Adicione seus serviços para começar a gerenciar agendamentos</p>
                           <Button
                             onClick={() => setIsCreateServiceDialogOpen(true)}
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white rounded-md"
+                            className="bg-primary hover:bg-primary/90 text-white rounded-md"
                           >
                             <PlusIcon className="h-4 w-4 mr-2" />
                             Criar Primeiro Serviço
@@ -1768,7 +1768,7 @@ export default function AjustesPage() {
                           <Button
                             onClick={savePromotion}
                             disabled={isSavingPromo || isRemovingPromo}
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                            className="bg-primary hover:bg-primary/90 text-white"
                           >
                             {isSavingPromo ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar data"}
                           </Button>
@@ -1956,8 +1956,8 @@ export default function AjustesPage() {
                   <DialogContent className="z-[1000] w-[95vw] sm:w-[90vw] max-w-md border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-[#3D583F]/10 rounded-xl shadow-lg">
-                          <PencilIcon className="h-6 w-6 text-[#3D583F]" />
+                        <div className="p-2 bg-primary/10 rounded-xl shadow-lg">
+                          <PencilIcon className="h-6 w-6 text-primary" />
                         </div>
                         Editar Serviço
                       </DialogTitle>
@@ -2045,7 +2045,7 @@ export default function AjustesPage() {
                       <Button
                         onClick={handleUpdateService}
                         disabled={isUpdatingService}
-                        className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
+                        className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
                       >
                         {isUpdatingService ? (
                           <>
@@ -2068,8 +2068,8 @@ export default function AjustesPage() {
                   <DialogContent className="z-[1000] w-[95vw] sm:w-[90vw] max-w-md border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-[#3D583F]/10 rounded-xl shadow-lg">
-                          <PlusIcon className="h-6 w-6 text-[#3D583F]" />
+                        <div className="p-2 bg-primary/10 rounded-xl shadow-lg">
+                          <PlusIcon className="h-6 w-6 text-primary" />
                         </div>
                         Criar Novo Serviço
                       </DialogTitle>
@@ -2156,7 +2156,7 @@ export default function AjustesPage() {
                       <Button
                         onClick={handleCreateService}
                         disabled={isCreatingService}
-                        className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
+                        className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
                       >
                         {isCreatingService ? (
                           <>
@@ -2180,8 +2180,8 @@ export default function AjustesPage() {
                     <DialogHeader className="pb-4 sm:pb-6 border-b border-gray-100">
                       <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                         <div className="flex items-center gap-3 sm:gap-4">
-                          <div className="p-2 sm:p-3 bg-[#3D583F]/10 rounded-2xl">
-                            <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#3D583F]" />
+                          <div className="p-2 sm:p-3 bg-primary/10 rounded-2xl">
+                            <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                           </div>
                           <div>
                             <DialogTitle className="text-lg sm:text-2xl font-bold text-gray-900">
@@ -2197,7 +2197,7 @@ export default function AjustesPage() {
                             onClick={() => setIsFreeIntervalDialogOpen(true)}
                             size="sm"
                             variant="outline"
-                            className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 px-3 sm:px-4 py-2 text-sm"
+                            className="rounded-md border border-primary text-primary hover:bg-primary/10 px-3 sm:px-4 py-2 text-sm"
                           >
                             <Calendar className="h-4 w-4 mr-2" />
                             Intervalo Livre
@@ -2205,7 +2205,7 @@ export default function AjustesPage() {
                           <Button
                             onClick={() => setIsDayOffDialogOpen(true)}
                             size="sm"
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white rounded-md px-3 sm:px-4 py-2 text-sm"
+                            className="bg-primary hover:bg-primary/90 text-white rounded-md px-3 sm:px-4 py-2 text-sm"
                           >
                             <CalendarOffIcon className="h-4 w-4 mr-2" />
                             Nova Folga
@@ -2234,14 +2234,14 @@ export default function AjustesPage() {
                                   <div className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-md ${
                                     schedule.is_day_off
                                       ? 'border-red-200 hover:border-red-300'
-                                      : 'border-[#3D583F]/20 hover:border-[#3D583F]/30'
+                                      : 'border-primary/20 hover:border-primary/30'
                                     }`}>
                                     {/* Header do dia */}
                                     <div className="p-4 sm:p-6 border-b border-gray-100">
                                       <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                                         <div className="flex items-center gap-3 sm:gap-4">
                                           <div className={`w-3 h-3 rounded-full ${
-                                            schedule.is_day_off ? 'bg-red-500' : 'bg-[#3D583F]'
+                                            schedule.is_day_off ? 'bg-red-500' : 'bg-primary'
                                           }`}></div>
                                           <h4 className="text-base sm:text-lg font-semibold text-gray-900">
                                             {formatDayOfWeek(schedule.day_of_week)}
@@ -2270,15 +2270,15 @@ export default function AjustesPage() {
                                     ) : (
                                       <div className="p-4 sm:p-6 space-y-4">
                                         {/* Horários de Trabalho */}
-                                        <div className="bg-[#3D583F]/10 rounded-xl p-4">
-                                          <h5 className="text-[#3D583F] font-medium mb-3 flex items-center gap-2">
+                                        <div className="bg-primary/10 rounded-xl p-4">
+                                          <h5 className="text-primary font-medium mb-3 flex items-center gap-2">
                                             <ClockIcon className="w-4 h-4" />
                                             Horário de Trabalho
                                           </h5>
                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                             {/* Horário de Início */}
                                             <div>
-                                              <label className="block text-xs font-medium text-[#3D583F] mb-2">
+                                              <label className="block text-xs font-medium text-primary mb-2">
                                                 Início
                                               </label>
                                               <div className="flex gap-1">
@@ -2291,7 +2291,7 @@ export default function AjustesPage() {
                                                     schedule.start_time ? schedule.start_time.split(':')[1] : "00"
                                                   )}
                                                   disabled={saving}
-                                                  className="flex-1 p-2 text-sm border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white min-w-0"
+                                                  className="flex-1 p-2 text-sm border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white min-w-0"
                                                 >
                                                   {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
                                                     <option key={hour} value={hour.toString().padStart(2, '0')}>
@@ -2299,7 +2299,7 @@ export default function AjustesPage() {
                                                     </option>
                                                   ))}
                                                 </select>
-                                                <span className="text-[#3D583F] self-center px-1">:</span>
+                                                <span className="text-primary self-center px-1">:</span>
                                                 <select
                                                   value={schedule.start_time ? schedule.start_time.split(':')[1] : "00"}
                                                   onChange={(e) => handleSeparateTimeChange(
@@ -2309,7 +2309,7 @@ export default function AjustesPage() {
                                                     e.target.value
                                                   )}
                                                   disabled={saving}
-                                                  className="flex-1 p-2 text-sm border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white min-w-0"
+                                                  className="flex-1 p-2 text-sm border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white min-w-0"
                                                 >
                                                   <option value="00">00</option>
                                                   <option value="15">15</option>
@@ -2321,7 +2321,7 @@ export default function AjustesPage() {
 
                                             {/* Horário de Fim */}
                                             <div>
-                                              <label className="block text-xs font-medium text-[#3D583F] mb-2">
+                                              <label className="block text-xs font-medium text-primary mb-2">
                                                 Fim
                                               </label>
                                               <div className="flex gap-1">
@@ -2334,7 +2334,7 @@ export default function AjustesPage() {
                                                     schedule.end_time ? schedule.end_time.split(':')[1] : "00"
                                                   )}
                                                   disabled={saving}
-                                                  className="flex-1 p-2 text-sm border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white min-w-0"
+                                                  className="flex-1 p-2 text-sm border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white min-w-0"
                                                 >
                                                   {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
                                                     <option key={hour} value={hour.toString().padStart(2, '0')}>
@@ -2342,7 +2342,7 @@ export default function AjustesPage() {
                                                     </option>
                                                   ))}
                                                 </select>
-                                                <span className="text-[#3D583F] self-center px-1">:</span>
+                                                <span className="text-primary self-center px-1">:</span>
                                                 <select
                                                   value={schedule.end_time ? schedule.end_time.split(':')[1] : "00"}
                                                   onChange={(e) => handleSeparateTimeChange(
@@ -2352,7 +2352,7 @@ export default function AjustesPage() {
                                                     e.target.value
                                                   )}
                                                   disabled={saving}
-                                                  className="flex-1 p-2 text-sm border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white min-w-0"
+                                                  className="flex-1 p-2 text-sm border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white min-w-0"
                                                 >
                                                   <option value="00">00</option>
                                                   <option value="15">15</option>
@@ -2496,7 +2496,7 @@ export default function AjustesPage() {
                           <Button
                             onClick={handleCreateSchedule}
                             disabled={saving}
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-md"
+                            className="bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-md"
                           >
                             {saving ? (
                               <>
@@ -2565,8 +2565,8 @@ export default function AjustesPage() {
                   <DialogContent className="z-[1000] sm:max-w-md border-none shadow-2xl bg-white">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-[#3D583F]/10 rounded-xl shadow-lg">
-                          <CalendarOffIcon className="h-6 w-6 text-[#3D583F]" />
+                        <div className="p-2 bg-primary/10 rounded-xl shadow-lg">
+                          <CalendarOffIcon className="h-6 w-6 text-primary" />
                         </div>
                         Adicionar Dia de Folga
                       </DialogTitle>
@@ -2606,7 +2606,7 @@ export default function AjustesPage() {
                       <Button
                         onClick={handleCreateDayOff}
                         disabled={isCreatingDayOff || !selectedDayOffDate}
-                        className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
                         {isCreatingDayOff ? (
                           <>
@@ -2629,8 +2629,8 @@ export default function AjustesPage() {
                   <DialogContent className="z-[1000] sm:max-w-lg border-none shadow-2xl bg-white w-[90vw] rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-[#3D583F]/10 rounded-xl shadow-lg">
-                          <Calendar className="h-6 w-6 text-[#3D583F]" />
+                        <div className="p-2 bg-primary/10 rounded-xl shadow-lg">
+                          <Calendar className="h-6 w-6 text-primary" />
                         </div>
                         Criar Intervalo Livre
                       </DialogTitle>
@@ -2666,7 +2666,7 @@ export default function AjustesPage() {
                               <select
                                 value={freeIntervalStartHour}
                                 onChange={(e) => setFreeIntervalStartHour(e.target.value)}
-                                className="w-full p-2 border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white text-sm"
+                                className="w-full p-2 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white text-sm"
                               >
                                 {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
                                   <option key={hour} value={hour.toString().padStart(2, '0')}>
@@ -2675,12 +2675,12 @@ export default function AjustesPage() {
                                 ))}
                               </select>
                             </div>
-                            <span className="text-[#3D583F] self-center font-medium">:</span>
+                            <span className="text-primary self-center font-medium">:</span>
                             <div className="flex-1">
                               <select
                                 value={freeIntervalStartMinute}
                                 onChange={(e) => setFreeIntervalStartMinute(e.target.value)}
-                                className="w-full p-2 border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white text-sm"
+                                className="w-full p-2 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white text-sm"
                               >
                                 <option value="00">00</option>
                                 <option value="15">15</option>
@@ -2700,7 +2700,7 @@ export default function AjustesPage() {
                               <select
                                 value={freeIntervalEndHour}
                                 onChange={(e) => setFreeIntervalEndHour(e.target.value)}
-                                className="w-full p-2 border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white text-sm"
+                                className="w-full p-2 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white text-sm"
                               >
                                 {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
                                   <option key={hour} value={hour.toString().padStart(2, '0')}>
@@ -2709,12 +2709,12 @@ export default function AjustesPage() {
                                 ))}
                               </select>
                             </div>
-                            <span className="text-[#3D583F] self-center font-medium">:</span>
+                            <span className="text-primary self-center font-medium">:</span>
                             <div className="flex-1">
                               <select
                                 value={freeIntervalEndMinute}
                                 onChange={(e) => setFreeIntervalEndMinute(e.target.value)}
-                                className="w-full p-2 border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] bg-white text-sm"
+                                className="w-full p-2 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white text-sm"
                               >
                                 <option value="00">00</option>
                                 <option value="15">15</option>
@@ -2737,26 +2737,26 @@ export default function AjustesPage() {
                           onChange={(e) => setFreeIntervalNotes(e.target.value)}
                           placeholder="Motivo do intervalo livre (ex: reunião, pausa pessoal, etc.)"
                           rows={3}
-                          className="w-full p-3 border border-[#3D583F]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3D583F] resize-none text-sm"
+                          className="w-full p-3 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm"
                         />
                       </div>
 
                       {/* Preview do Intervalo */}
                       {selectedFreeIntervalDate && (
-                        <div className="bg-[#3D583F]/10 border border-[#3D583F]/20 rounded-xl p-4">
-                          <h4 className="text-[#3D583F] font-medium mb-2 flex items-center gap-2">
+                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                          <h4 className="text-primary font-medium mb-2 flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
                             Resumo do Intervalo
                           </h4>
                           <div className="space-y-1 text-sm">
-                            <p className="text-[#3D583F]">
+                            <p className="text-primary">
                               <strong>Data:</strong> {new Date(selectedFreeIntervalDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </p>
-                            <p className="text-[#3D583F]">
+                            <p className="text-primary">
                               <strong>Horário:</strong> {freeIntervalStartHour}:{freeIntervalStartMinute} às {freeIntervalEndHour}:{freeIntervalEndMinute}
                             </p>
                             {freeIntervalNotes && (
-                              <p className="text-[#3D583F]">
+                              <p className="text-primary">
                                 <strong>Observações:</strong> {freeIntervalNotes}
                               </p>
                             )}
@@ -2785,7 +2785,7 @@ export default function AjustesPage() {
                       <Button
                         onClick={handleCreateFreeInterval}
                         disabled={isCreatingFreeInterval || !selectedFreeIntervalDate}
-                        className="bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
                         {isCreatingFreeInterval ? (
                           <>
@@ -2808,8 +2808,8 @@ export default function AjustesPage() {
                   <DialogContent className="z-[1000] w-[95vw] sm:w-[90vw] max-w-lg border-none shadow-2xl bg-white rounded-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="pb-6">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                        <div className="p-2 bg-[#3D583F]/10 rounded-xl shadow-lg">
-                          <StoreIcon className="h-6 w-6 text-[#3D583F]" />
+                        <div className="p-2 bg-primary/10 rounded-xl shadow-lg">
+                          <StoreIcon className="h-6 w-6 text-primary" />
                         </div>
                         Dados da Barbearia
                       </DialogTitle>
@@ -2821,7 +2821,7 @@ export default function AjustesPage() {
                     <div className="max-h-96 overflow-y-auto">
                       {companyDetailsLoading ? (
                         <div className="flex flex-col items-center justify-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#3D583F]/30 border-t-[#3D583F] mb-4"></div>
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/30 border-t-primary mb-4"></div>
                           <p className="text-gray-500 font-medium">Carregando detalhes...</p>
                         </div>
                       ) : companyDetails ? (
@@ -2885,7 +2885,7 @@ export default function AjustesPage() {
                     <DialogFooter className="pt-6 border-t border-gray-100">
                       <Button
                         onClick={() => setIsCompanyDetailsDialogOpen(false)}
-                        className="px-6 py-2 bg-[#3D583F] hover:bg-[#365137] text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
                         Fechar
                       </Button>
@@ -2899,9 +2899,9 @@ export default function AjustesPage() {
                 onClick={handleLogout}
                 size="sm"
                 variant="outline"
-                className="rounded-md text-[#3D583F] border border-[#3D583F] hover:bg-[#3D583F]/10"
+                className="rounded-md text-primary border border-primary hover:bg-primary/10"
               >
-                <LogOutIcon className="h-4 w-4 mr-1 text-[#3D583F]" />
+                <LogOutIcon className="h-4 w-4 mr-1 text-primary" />
                 Sair
               </Button>
             </div>
@@ -2917,11 +2917,11 @@ export default function AjustesPage() {
                 alt={barberInfo.name}
                 className="object-cover"
               />
-              <AvatarFallback className="bg-[#3D583F] text-white text-2xl font-semibold">
+              <AvatarFallback className="bg-primary text-white text-2xl font-semibold">
                 {barberInfo.name.substring(0, 2)}
               </AvatarFallback>
             </Avatar>
-            <label htmlFor="photo-upload" className="absolute -bottom-1 -right-1 bg-white hover:bg-gray-50 text-[#3D583F] rounded-full p-2 cursor-pointer shadow-lg border-2 border-white transition-all duration-200 hover:scale-105">
+            <label htmlFor="photo-upload" className="absolute -bottom-1 -right-1 bg-white hover:bg-gray-50 text-primary rounded-full p-2 cursor-pointer shadow-lg border-2 border-white transition-all duration-200 hover:scale-105">
               <input 
                 id="photo-upload" 
                 type="file" 
@@ -2944,7 +2944,7 @@ export default function AjustesPage() {
                 disabled={isUploadingPhoto}
               />
               {isUploadingPhoto ? (
-                <div className="h-4 w-4 border-2 border-[#3D583F] border-t-transparent rounded-full animate-spin"></div>
+                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <PencilIcon className="h-4 w-4" />
               )}
@@ -2959,7 +2959,7 @@ export default function AjustesPage() {
           {/* Profile Info Section */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">{barberInfo.name}</h1>
-            <p className="text-[#3D583F] font-medium mb-4">{companyDetails?.name}</p>
+            <p className="text-primary font-medium mb-4">{companyDetails?.name}</p>
             <div className="space-y-1">
               <p className="text-sm text-gray-600">{barberInfo.email}</p>
               {barberInfo.phone && (
@@ -2974,14 +2974,14 @@ export default function AjustesPage() {
           {settingButtons.map((setting, index) => (
             <Card
               key={setting.id}
-              className="border border-[#3D583F]/20 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer overflow-hidden bg-white"
+              className="border border-primary/20 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer overflow-hidden bg-white"
             >
               <CardContent className="p-0">
                 <div className={`bg-white p-3 sm:p-4 md:p-6 h-full`}> 
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     {/* Glass effect icon container */}
-                    <div className="inline-flex p-2 sm:p-3 rounded-2xl bg-[#3D583F]/10 border border-[#3D583F]/20 shadow-lg flex-shrink-0">
-                      <setting.icon className={`h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-[#3D583F]`} />
+                    <div className="inline-flex p-2 sm:p-3 rounded-2xl bg-primary/10 border border-primary/20 shadow-lg flex-shrink-0">
+                      <setting.icon className={`h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-primary`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base sm:text-lg md:text-xl mb-1 text-gray-800">
@@ -3009,7 +3009,7 @@ export default function AjustesPage() {
                           ? 'bg-green-600 hover:bg-green-700'
                           : setting.id === 'notifications' && permission === 'denied'
                             ? 'bg-gray-600 hover:bg-gray-700'
-                            : 'bg-[#3D583F] hover:bg-[#365137]'
+                            : 'bg-primary hover:bg-primary/90'
                       } hover:shadow-lg transition-all duration-300 text-white font-medium px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0`}
                     >
                       {setting.id === 'notifications'
@@ -3037,7 +3037,7 @@ export default function AjustesPage() {
       </div>
 
       {/* App Version */}
-      <div className="fixed bottom-0 left-0 w-full z-[30] bg-[#3D583F] text-center py-2 mt-5 shadow-[0_-2px_8px_rgba(0,0,0,0.03)]">
+      <div className="fixed bottom-0 left-0 w-full z-[30] bg-primary text-center py-2 mt-5 shadow-[0_-2px_8px_rgba(0,0,0,0.03)]">
         <p className="text-sm text-white font-medium">{companyDetails?.name || 'Barbearia Link'}</p>
         <p className="text-sm text-white mt-2">
           © 2025 Todos os direitos reservados

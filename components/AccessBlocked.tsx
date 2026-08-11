@@ -78,7 +78,7 @@ export default function AccessBlocked({
               const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
               window.open(whatsappUrl, '_blank');
             }}
-            className="w-full bg-[#3D573F] hover:bg-[#204749] text-white font-medium py-3"
+            className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3"
           >
             <CreditCard className="w-4 h-4 mr-2" />
             Realizar Pagamento

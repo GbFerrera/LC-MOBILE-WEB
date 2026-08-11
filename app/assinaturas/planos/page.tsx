@@ -98,10 +98,10 @@ const ServiceSelect = ({ selectedServices, setSelectedServices }: ServiceSelectP
   return (
     <div className="space-y-2">
       <Label>Serviços</Label>
-      <div className="border border-[#3D583F]/20 rounded-xl bg-white p-4 min-h-[120px]">
+      <div className="border border-primary/20 rounded-xl bg-white p-4 min-h-[120px]">
         {isLoading ? (
           <div className="flex items-center justify-center p-4">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#3D583F] border-t-transparent" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <span className="ml-2 text-sm text-gray-600">Carregando serviços...</span>
           </div>
         ) : services.length > 0 ? (
@@ -135,7 +135,7 @@ const ServiceSelect = ({ selectedServices, setSelectedServices }: ServiceSelectP
                         {service.description || service.service_description}
                       </div>
                     )}
-                    <div className="text-xs text-[#3D583F] mt-1">
+                    <div className="text-xs text-primary mt-1">
                       R$ {service.price || service.service_price} • {service.duration || service.service_duration}min
                     </div>
                   </div>
@@ -257,7 +257,7 @@ const DialogCreatePlan = ({ open, onOpenChange, editingPlan, onSuccess }: Drawer
                   placeholder="Ex: Plano Premium"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
               <div className="space-y-2">
@@ -267,13 +267,13 @@ const DialogCreatePlan = ({ open, onOpenChange, editingPlan, onSuccess }: Drawer
                   placeholder="R$ 0,00"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Recorrência</Label>
                 <Select onValueChange={(value) => setIsRecurring(value === 'true')} value={isRecurring.toString()} >
-                  <SelectTrigger className="border-[#3D583F]/20 h-12 rounded-xl bg-white">
+                  <SelectTrigger className="border-primary/20 h-12 rounded-xl bg-white">
                     <SelectValue placeholder="Selecione uma opção" />
                   </SelectTrigger>
                   <SelectContent>
@@ -289,7 +289,7 @@ const DialogCreatePlan = ({ open, onOpenChange, editingPlan, onSuccess }: Drawer
                   placeholder="Número de sessões por semana"
                   value={sessionsPerWeek}
                   onChange={(e) => setSessionsPerWeek(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -298,7 +298,7 @@ const DialogCreatePlan = ({ open, onOpenChange, editingPlan, onSuccess }: Drawer
                   placeholder="Descreva os benefícios do plano"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -314,14 +314,14 @@ const DialogCreatePlan = ({ open, onOpenChange, editingPlan, onSuccess }: Drawer
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
-            className="border-[#3D583F]/20 text-[#3D583F] hover:bg-[#3D583F]/5 hover:border-[#3D583F]/50 transition-all duration-200"
+            className="border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/50 transition-all duration-200"
           >
             Cancelar
           </Button>
           <Button 
             disabled={loading} 
             onClick={handleSubmit} 
-            className="bg-[#3D583F] hover:bg-[#3D583F]/90 text-base font-medium shadow-md hover:shadow-lg transition-all duration-200"
+            className="bg-primary hover:bg-primary/90 text-base font-medium shadow-md hover:shadow-lg transition-all duration-200"
           >
             {loading ? (
               <div className="flex items-center gap-2">
@@ -349,11 +349,11 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Card className="relative h-full flex flex-col bg-white/95 backdrop-blur-sm border border-gray-100/50 rounded-2xl overflow-hidden group transition-all duration-300 hover:shadow-2xl hover:shadow-[#3D583F]/10 hover:-translate-y-1 animate-in slide-in-from-bottom-4 fade-in duration-700">
+      <Card className="relative h-full flex flex-col bg-white/95 backdrop-blur-sm border border-gray-100/50 rounded-2xl overflow-hidden group transition-all duration-300 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1 animate-in slide-in-from-bottom-4 fade-in duration-700">
 
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3D583F] to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
 
-        <CardHeader className="relative p-4 pb-3 bg-gradient-to-br from-[#3D583F]/[0.02] via-transparent to-[#3D583F]/[0.04]">
+        <CardHeader className="relative p-4 pb-3 bg-gradient-to-br from-primary/[0.02] via-transparent to-primary/[0.04]">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 space-y-1">
               <CardTitle className="text-lg font-bold text-gray-900">
@@ -365,8 +365,8 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
             </div>
 
             <div className="relative ml-3">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#3D583F] to-[#204749] rounded-xl blur-sm" />
-              <div className="relative border-[#3D583F] bg-gradient-to-br from-[#F1F1E7] to-[#9EEA6C]/50 text-black px-3 py-2 rounded-xl shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80 rounded-xl blur-sm" />
+              <div className="relative border-primary bg-gradient-to-br from-[#F1F1E7] to-[#9EEA6C]/50 text-black px-3 py-2 rounded-xl shadow-lg">
                 <div className="text-[10px] font-medium opacity-90">Preço</div>
                 <div className="text-xl font-bold">
                   R$ {plan.price}
@@ -379,8 +379,8 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
           </div>
 
           <div className="flex gap-1.5">
-            <div className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-gradient-to-r from-[#3D583F]/10 to-[#3D583F]/20 text-[#3D583F] border border-[#3D583F]/20">
-              <div className="w-1.5 h-1.5 bg-[#3D583F] rounded-full mr-1.5" />
+            <div className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-gradient-to-r from-primary/10 to-primary/20 text-primary border border-primary/20">
+              <div className="w-1.5 h-1.5 bg-primary rounded-full mr-1.5" />
               {plan.is_recurring ? "Mensal" : "Avulso"}
             </div>
             {plan.sessions_per_week > 0 && (
@@ -398,19 +398,19 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
 
         <CardContent className="flex-grow p-4 pt-3 overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center space-x-2 mb-2">
-            <div className="w-1 h-4 bg-gradient-to-b from-[#3D583F] to-[#3D583F]/60 rounded-full" />
+            <div className="w-1 h-4 bg-gradient-to-b from-primary to-primary/60 rounded-full" />
             <h4 className="text-xs font-semibold text-gray-800">Serviços incluídos</h4>
           </div>
 
           {plan.services && plan.services.length > 0 ? (
-            <div className="space-y-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[#3D583F]/20 scrollbar-track-gray-100 hover:scrollbar-thumb-[#3D583F]/40">
+            <div className="space-y-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-gray-100 hover:scrollbar-thumb-primary/40">
               {plan.services.map((service, index) => (
                 <div
                   key={service.id}
-                  className="flex items-center py-1.5 px-2 rounded-lg hover:bg-[#3D583F]/5"
+                  className="flex items-center py-1.5 px-2 rounded-lg hover:bg-primary/5"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <div className="flex-shrink-0 w-4 h-4 rounded-full bg-gradient-to-br from-[#3D583F] to-[#204749] flex items-center justify-center mr-2 shadow-sm">
+                  <div className="flex-shrink-0 w-4 h-4 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mr-2 shadow-sm">
                     <Check className="w-2.5 h-2.5 text-white" />
                   </div>
                   <span className="text-xs text-gray-700 font-medium">
@@ -429,14 +429,14 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
           )}
         </CardContent>
 
-        <CardFooter className="relative p-4 pt-3 mt-auto bg-gradient-to-r from-gray-50/50 via-white to-[#3D583F]/[0.02] border-t border-gray-100/50">
+        <CardFooter className="relative p-4 pt-3 mt-auto bg-gradient-to-r from-gray-50/50 via-white to-primary/[0.02] border-t border-gray-100/50">
           <div className="flex items-center justify-between w-full">
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="default"
                 size="sm"
                 onClick={() => onCreateSubscription(plan)}
-                className="bg-[#3D583F] hover:bg-[#3D583F]/90 text-white px-3 py-1.5 h-auto text-xs font-medium rounded-lg shadow-sm"
+                className="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 h-auto text-xs font-medium rounded-lg shadow-sm"
               >
                 <Users className="w-3 h-3 mr-1.5" />
                 Nova Assinatura
@@ -445,7 +445,7 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
                 variant="ghost"
                 size="sm"
                 onClick={() => onEdit(plan)}
-                className="text-gray-600 hover:text-[#3D583F] hover:bg-[#3D583F]/10 px-3 py-1.5 h-auto text-xs font-medium rounded-lg border border-transparent hover:border-[#3D583F]/20"
+                className="text-gray-600 hover:text-primary hover:bg-primary/10 px-3 py-1.5 h-auto text-xs font-medium rounded-lg border border-transparent hover:border-primary/20"
               >
                 <Pencil className="w-3 h-3 mr-1.5" />
                 Editar
@@ -475,7 +475,7 @@ const PlanCard = ({ plan, onDelete, onEdit, onCreateSubscription }: { plan: Plan
                     </AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => onDelete(plan.id)}
-                      className="bg-gradient-to-r from-[#3D583F] to-[#204749] hover:from-[#204749] hover:to-[#3D583F] rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
+                      className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/80 hover:to-primary rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       Confirmar exclusão
                     </AlertDialogAction>
@@ -887,8 +887,8 @@ export default function Page() {
             </CarouselContent>
             {plans.length > 0 && (
               <div className="absolute top-1/2 -translate-y-1/2 flex justify-between w-full px-4">
-                <CarouselPrevious className="bg-white border-[#3D583F]/20 hover:bg-[#3D583F]/5 text-[#3D583F]" />
-                <CarouselNext className="bg-white border-[#3D583F]/20 hover:bg-[#3D583F]/5 text-[#3D583F]" />
+                <CarouselPrevious className="bg-white border-primary/20 hover:bg-primary/5 text-primary" />
+                <CarouselNext className="bg-white border-primary/20 hover:bg-primary/5 text-primary" />
               </div>
             )}
           </Carousel>
@@ -914,7 +914,7 @@ export default function Page() {
               <div className="space-y-2">
                 <Label htmlFor="client">Cliente *</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger className="border-[#3D583F]/20 h-12 rounded-xl bg-white">
+                  <SelectTrigger className="border-primary/20 h-12 rounded-xl bg-white">
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
                   <SelectContent>
@@ -940,7 +940,7 @@ export default function Page() {
                   type="date"
                   value={subscriptionStartDate}
                   onChange={(e) => setSubscriptionStartDate(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
 
@@ -951,7 +951,7 @@ export default function Page() {
                   type="date"
                   value={subscriptionEndDate}
                   onChange={(e) => setSubscriptionEndDate(e.target.value)}
-                  className="border-[#3D583F]/20 h-12 rounded-xl bg-white"
+                  className="border-primary/20 h-12 rounded-xl bg-white"
                 />
               </div>
 
@@ -966,10 +966,10 @@ export default function Page() {
                 </Label>
               </div>
 
-              <div className="bg-[#3D583F]/5 p-4 rounded-xl">
+              <div className="bg-primary/5 p-4 rounded-xl">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Valor do plano:</span>
-                  <span className="text-lg font-bold text-[#3D583F]">
+                  <span className="text-lg font-bold text-primary">
                     R$ {selectedPlanForSubscription?.price ? Number(selectedPlanForSubscription.price).toFixed(2) : '0.00'}
                   </span>
                 </div>
@@ -980,14 +980,14 @@ export default function Page() {
               <Button
                 variant="outline"
                 onClick={() => setIsCreateSubscriptionOpen(false)}
-                className="border-[#3D583F]/20 text-[#3D583F] hover:bg-[#3D583F]/5"
+                className="border-primary/20 text-primary hover:bg-primary/5"
               >
                 Cancelar
               </Button>
               <Button
                 disabled={isCreatingSubscription}
                 onClick={handleCreateSubscription}
-                className="bg-[#3D583F] hover:bg-[#3D583F]/90"
+                className="bg-primary hover:bg-primary/90"
               >
                 {isCreatingSubscription ? (
                   <div className="flex items-center gap-2">

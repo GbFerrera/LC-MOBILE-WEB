@@ -188,9 +188,9 @@ export default function Home() {
   }, [user]);
 
   return (
-    <div className="min-h-dvh w-full max-w-full overflow-x-clip">
+    <div className="min-h-screen">
 
-      <header className="relative min-h-[280px] overflow-hidden border-b bg-[#3D583F]">
+      <header className="relative bg-primary border-b overflow-hidden min-h-[280px] sm:min-h-[540px] overflow-hidden">
 <Image
   src="/favicon.png"
   alt="BG"
@@ -219,9 +219,9 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/ajustes" className="cursor-pointer relative">
-                <Avatar className="h-16 w-16 shrink-0 border bg-gray-100 overflow-hidden">
+                <Avatar className="h-20 w-20 sm:h-14 sm:w-14 border bg-gray-100 overflow-hidden">
                   <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
-                  <AvatarFallback className="bg-[#3D583F] text-white text-sm sm:text-base font-semibold">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm sm:text-base font-semibold">
                     {user?.name?.substring(0, 2)}
                   </AvatarFallback>
                 </Avatar>
@@ -279,7 +279,7 @@ export default function Home() {
 
         {/* Upcoming Appointments */}
         <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-[#3D583F]/20 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-primary/20 overflow-hidden">
             <div className="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
               <div>
                 <h2 className="text-gray-800 font-semibold text-base flex items-center gap-2">
@@ -290,7 +290,7 @@ export default function Home() {
                   {upcomingAppointments.length > 0 ? `${upcomingAppointments.length} a partir de agora` : 'Agenda livre a partir de agora'}
                 </p>
               </div>
-              <Link href="/agenda" className="text-[#3D583F] text-sm">Ver agenda</Link>
+              <Link href="/agenda" className="text-primary text-sm">Ver agenda</Link>
             </div>
             
             <div className="p-4">
@@ -309,7 +309,7 @@ export default function Home() {
                   {upcomingAppointments.map((appointment) => (
                     <div key={appointment.id} className="flex items-center p-3 bg-white rounded-md border">
                       <div className="flex-shrink-0">
-                        <div className="bg-[#3D583F] text-white text-xs px-2 py-1 rounded">
+                        <div className="bg-primary text-white text-xs px-2 py-1 rounded">
                           {appointment.start_time.slice(0, 5)}
                         </div>
                       </div>
@@ -347,7 +347,7 @@ export default function Home() {
               
               <div className="mt-4 flex items-center justify-center">
                 <Link href="/agenda">
-                  <Button className="px-4 py-2 bg-[#3D583F] hover:bg-[#365137] text-white rounded-md text-sm">
+                  <Button className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md text-sm">
                     <CalendarIcon className="w-4 h-4 mr-2" />
                     Ver Agenda
                   </Button>
@@ -401,7 +401,7 @@ export default function Home() {
                         <div key={service.name} className="group">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-3">
-                              <div className="w-3 h-3 rounded-full bg-[#3D583F]"></div>
+                              <div className="w-3 h-3 rounded-full bg-primary"></div>
                               <span className="font-medium text-gray-900">{service.name}</span>
                             </div>
                             <div className="text-right">
@@ -411,7 +411,7 @@ export default function Home() {
                           </div>
                           <div className="w-full bg-gray-200 rounded h-2 mb-2 overflow-hidden">
                             <div 
-                              className="h-2 bg-[#3D583F] rounded transition-all duration-700 ease-out origin-left"
+                              className="h-2 bg-primary rounded transition-all duration-700 ease-out origin-left"
                               style={{ width: `${percentage}%` }}
                             ></div>
                           </div>
@@ -442,7 +442,7 @@ export default function Home() {
         {/* Quick Actions */}
         <div className="mt-6">
           <Link href="/agenda">
-            <Button className="w-full px-4 py-3 bg-[#3D583F] hover:bg-[#365137] text-white rounded-md text-base">
+            <Button className="w-full px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-md text-base">
               Novo Agendamento
             </Button>
           </Link>

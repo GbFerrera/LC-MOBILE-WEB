@@ -74,6 +74,8 @@ export function ColorProvider({ children }: { children: ReactNode }) {
     if (savedColor) {
       setPrimaryColorState(savedColor)
       applyColorToCSS(savedColor)
+    } else {
+      applyColorToCSS("#3D583F")
     }
 
     const savedBgColor = localStorage.getItem("appBackgroundColor")
@@ -95,13 +97,11 @@ export function ColorProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    if (savedBgColor || bgImageUrl) {
-      applyBackgroundToCSS({
-        backgroundColor: savedBgColor || "",
-        backgroundImageUrl: bgImageUrl,
-        backgroundImageOpacity: bgOpacity,
-      })
-    }
+    applyBackgroundToCSS({
+      backgroundColor: savedBgColor || "",
+      backgroundImageUrl: bgImageUrl,
+      backgroundImageOpacity: bgOpacity,
+    })
   }, [])
 
   useEffect(() => {

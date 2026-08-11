@@ -327,7 +327,7 @@ export default function Transactions() {
                 <div className="px-4 py-6 sm:px-6">
                     <div className="flex items-center gap-3 mb-4">
                         <Link href="/">
-                            <Button variant="outline" size="icon" className="rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10">
+                            <Button variant="outline" size="icon" className="rounded-md border border-primary text-primary hover:bg-primary/10">
                                 <ChevronLeftIcon className="h-5 w-5" />
                             </Button>
                         </Link>
@@ -351,7 +351,7 @@ export default function Transactions() {
                             setCategory('other');
                             setIsDialogOpen(true);
                         }}
-                        className="w-full sm:w-auto bg-[#3D583F] text-white hover:bg-[#365137]"
+                        className="w-full sm:w-auto bg-primary text-white hover:bg-primary/90"
                     >
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Despesa
@@ -366,11 +366,11 @@ export default function Transactions() {
                         Resumo de {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                     </h2>
                     <div className="flex flex-col gap-3 sm:grid sm:grid-cols-4 sm:gap-4">
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-primary/20">
                             <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
-                                        <TrendingDown className="h-5 w-5 text-[#3D583F]" />
+                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                        <TrendingDown className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Total Mensal</p>
@@ -382,11 +382,11 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-primary/20">
                             <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
-                                        <TrendingUp className="h-5 w-5 text-[#3D583F]" />
+                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                        <TrendingUp className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Ativas</p>
@@ -396,7 +396,7 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-primary/20">
                             <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-yellow-100 rounded-lg">
@@ -410,7 +410,7 @@ export default function Transactions() {
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-[#3D583F]/20">
+                        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow border border-primary/20">
                             <CardContent className="p-4 min-h-[84px]">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-red-100 rounded-lg">
@@ -452,10 +452,10 @@ export default function Transactions() {
 
 
                 {/* Próximos Vencimentos */}
-                    <Card className="bg-white shadow-sm border border-[#3D583F]/20">
+                    <Card className="bg-white shadow-sm border border-primary/20">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-[#3D583F]" />
+                                <Clock className="h-5 w-5 text-primary" />
                                 Próximos Vencimentos
                             </CardTitle>
                         </CardHeader>
@@ -480,7 +480,7 @@ export default function Transactions() {
                                     const isDueSoon = daysUntilDue > 0 && daysUntilDue <= 7;
 
                                     return (
-                                        <div key={expense.id} className={`p-3 rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : isDueSoon ? 'bg-yellow-50 border-yellow-200' : 'bg-[#3D583F]/10 border-[#3D583F]/20'}`}>
+                                        <div key={expense.id} className={`p-3 rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : isDueSoon ? 'bg-yellow-50 border-yellow-200' : 'bg-primary/10 border-primary/20'}`}>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <p className="font-medium text-gray-900">{expense.name}</p>
@@ -489,7 +489,7 @@ export default function Transactions() {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-[#3D583F]'}`}>
+                                                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-primary'}`}>
                                                         {isOverdue ? `${Math.abs(daysUntilDue)} dias atrás` :
                                                             isDueToday ? 'Hoje' :
                                                                 `${daysUntilDue} dias`}
@@ -516,14 +516,14 @@ export default function Transactions() {
                 </Card>
 
                 {/* Filtros */}
-                    <Card className="bg-white shadow-sm border border-[#3D583F]/20">
+                    <Card className="bg-white shadow-sm border border-primary/20">
                         <CardContent className="p-4">
                             <div className="flex flex-wrap gap-2">
                                 <Button
                                     variant={selectedFilter === 'all' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setSelectedFilter('all')}
-                                    className={selectedFilter === 'all' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                    className={selectedFilter === 'all' ? 'bg-primary hover:bg-primary/90 text-white' : 'border border-primary text-primary hover:bg-primary/10'}
                                 >
                                     Todas ({stats.totalExpenses})
                                 </Button>
@@ -531,7 +531,7 @@ export default function Transactions() {
                                     variant={selectedFilter === 'active' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setSelectedFilter('active')}
-                                    className={selectedFilter === 'active' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                    className={selectedFilter === 'active' ? 'bg-primary hover:bg-primary/90 text-white' : 'border border-primary text-primary hover:bg-primary/10'}
                                 >
                                     Ativas ({stats.activeExpenses})
                                 </Button>
@@ -539,7 +539,7 @@ export default function Transactions() {
                                     variant={selectedFilter === 'upcoming' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setSelectedFilter('upcoming')}
-                                    className={selectedFilter === 'upcoming' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                    className={selectedFilter === 'upcoming' ? 'bg-primary hover:bg-primary/90 text-white' : 'border border-primary text-primary hover:bg-primary/10'}
                                 >
                                     Vencimentos ({stats.upcomingExpenses})
                                 </Button>
@@ -547,7 +547,7 @@ export default function Transactions() {
                                     variant={selectedFilter === 'overdue' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setSelectedFilter('overdue')}
-                                    className={selectedFilter === 'overdue' ? 'bg-[#3D583F] hover:bg-[#365137] text-white' : 'border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10'}
+                                    className={selectedFilter === 'overdue' ? 'bg-primary hover:bg-primary/90 text-white' : 'border border-primary text-primary hover:bg-primary/10'}
                                 >
                                     Em Atraso ({stats.overdueExpenses})
                                 </Button>
@@ -600,7 +600,7 @@ export default function Transactions() {
                                                 <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <h3 className="font-semibold text-gray-900">{expense.name}</h3>
-                                                    <Badge variant={expense.is_active ? 'default' : 'secondary'} className={expense.is_active ? 'bg-[#3D583F]/10 text-[#3D583F]' : ''}>
+                                                    <Badge variant={expense.is_active ? 'default' : 'secondary'} className={expense.is_active ? 'bg-primary/10 text-primary' : ''}>
                                                         {expense.is_active ? 'Ativa' : 'Inativa'}
                                                     </Badge>
                                                 </div>
@@ -658,7 +658,7 @@ export default function Transactions() {
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => handleViewExpenseDetails(expense)}
-                                                        className="flex-1 sm:flex-none border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                                                        className="flex-1 sm:flex-none border border-primary text-primary hover:bg-primary/10"
                                                     >
                                                         <Eye className="h-3 w-3 mr-1" />
                                                         Detalhes
@@ -667,7 +667,7 @@ export default function Transactions() {
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => handleEditFixedExpense(expense)}
-                                                        className="flex-1 sm:flex-none border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                                                        className="flex-1 sm:flex-none border border-primary text-primary hover:bg-primary/10"
                                                     >
                                                         <Edit className="h-3 w-3 mr-1" />
                                                         Editar
@@ -856,7 +856,7 @@ export default function Transactions() {
                         <Button
                             onClick={handleCreateFixedExpense}
                             disabled={isLoading}
-                            className="bg-[#3D583F] hover:bg-[#365137]"
+                            className="bg-primary hover:bg-primary/90"
                         >
                             {isLoading ? 'Processando...' : 'Salvar Despesa'}
                         </Button>
@@ -975,7 +975,7 @@ export default function Transactions() {
                                         setIsDetailsDialogOpen(false);
                                         handleEditFixedExpense(selectedExpenseForDetails);
                                     }}
-                                    className="bg-[#3D583F] hover:bg-[#365137]"
+                                    className="bg-primary hover:bg-primary/90"
                                 >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Editar Despesa

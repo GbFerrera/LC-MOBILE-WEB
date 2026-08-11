@@ -60,7 +60,7 @@ export default function LoginPage() {
       />
 
       {/* Header com foto + curva */}
-      <div className="relative h-[44vh] min-h-[300px] max-h-[360px] shrink-0 overflow-hidden border-0">
+      <div className="relative min-h-[300px] h-[44vh] max-h-[360px] shrink-0 overflow-hidden border-0 sm:min-h-[280px] sm:h-[42vh] sm:max-h-[380px]">
         <img
           src="/image-login.png"
           alt=""
@@ -100,7 +100,7 @@ export default function LoginPage() {
         <div className="flex w-full flex-col px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8 sm:pt-10">
           <form onSubmit={handleSubmit} className="w-full space-y-4">
             <div className="space-y-1.5">
-              <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-[#f8f9f8] transition-colors focus-within:border-[#3D583F]/35 focus-within:bg-white">
+              <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-[#f8f9f8] transition-colors focus-within:border-primary/35 focus-within:bg-white">
                 <div className="border-b border-gray-200/80 px-4 py-3.5">
                   <label
                     htmlFor="email"
@@ -178,7 +178,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={signInLoading}
-              className="flex h-[3.25rem] w-full items-center justify-center rounded-full bg-gradient-to-r from-[#4a6b4c] via-[#3D583F] to-[#2f4631] text-base font-semibold text-white shadow-none transition-opacity active:opacity-90 disabled:opacity-60"
+              className="flex h-[3.25rem] w-full items-center justify-center rounded-full bg-gradient-to-r from-primary/90 via-primary to-primary/80 text-base font-semibold text-white shadow-none transition-opacity active:opacity-90 disabled:opacity-60"
             >
               {signInLoading ? "Entrando..." : "Entrar"}
             </button>
@@ -186,7 +186,7 @@ export default function LoginPage() {
 
           <p className="pt-10 text-center text-sm text-gray-400">
             Desenvolvido por{" "}
-            <span className="font-semibold text-[#3D583F]">Link System</span>
+            <span className="font-semibold text-primary">Link System</span>
           </p>
         </div>
       </div>

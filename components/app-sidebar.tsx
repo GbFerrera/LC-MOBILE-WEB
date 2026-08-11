@@ -107,7 +107,7 @@ export default function AppSidebar() {
   return (
     <>
       <SidebarHeader>
-        <div className="px-3 py-3 flex items-center gap-3 bg-[#3D583F] text-white rounded-md">
+        <div className="px-3 py-3 flex items-center gap-3 bg-primary text-white rounded-md">
           <Image src="/icon.png" alt="Link Callendar" width={28} height={28} className="rounded-md" />
           <div>
             <div className="text-base font-semibold">{currentCompanyName || "Link Callendar"}</div>
@@ -117,7 +117,7 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="text-[#3D583F]">Unidades</SidebarGroupLabel>
+        <SidebarGroupLabel className="text-primary">Unidades</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {isLoading ? (
@@ -129,7 +129,7 @@ export default function AppSidebar() {
                 <Collapsible key={company.id}>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton isActive={belongsToCompany(company)}>
-                      <Building2 className={belongsToCompany(company) ? "h-4 w-4 text-[#3D583F]" : "h-4 w-4"} />
+                      <Building2 className={belongsToCompany(company) ? "h-4 w-4 text-primary" : "h-4 w-4"} />
                       <span>{company.name}</span>
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
@@ -142,11 +142,11 @@ export default function AppSidebar() {
                             switchToCompany(company.id);
                             if (isMobile) setOpenMobile(false);
                           }}
-                          className={(!isInBranchContext && user?.company_id === company.id) ? "bg-[#3D583F]/10 text-[#3D583F] border-l-2 border-[#3D583F]" : ""}
+                          className={(!isInBranchContext && user?.company_id === company.id) ? "bg-primary/10 text-primary border-l-2 border-primary" : ""}
                         >
-                          <Building2 className={(!isInBranchContext && user?.company_id === company.id) ? "h-4 w-4 text-[#3D583F]" : "h-4 w-4"} />
+                          <Building2 className={(!isInBranchContext && user?.company_id === company.id) ? "h-4 w-4 text-primary" : "h-4 w-4"} />
                           <span>Matriz</span>
-                          {(!isInBranchContext && user?.company_id === company.id) && <Check className="ml-auto h-4 w-4 text-[#3D583F]" />}
+                          {(!isInBranchContext && user?.company_id === company.id) && <Check className="ml-auto h-4 w-4 text-primary" />}
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                       {(company.branches || []).map((branch: any) => (
@@ -156,11 +156,11 @@ export default function AppSidebar() {
                               switchToBranch(branch.id);
                               if (isMobile) setOpenMobile(false);
                             }}
-                            className={(isInBranchContext && user?.company_id === branch.id) ? "bg-[#3D583F]/10 text-[#3D583F] border-l-2 border-[#3D583F]" : ""}
+                            className={(isInBranchContext && user?.company_id === branch.id) ? "bg-primary/10 text-primary border-l-2 border-primary" : ""}
                           >
-                            <Building className={(isInBranchContext && user?.company_id === branch.id) ? "h-4 w-4 text-[#3D583F]" : "h-4 w-4"} />
+                            <Building className={(isInBranchContext && user?.company_id === branch.id) ? "h-4 w-4 text-primary" : "h-4 w-4"} />
                             <span>{branch.name}</span>
-                            {(isInBranchContext && user?.company_id === branch.id) && <Check className="ml-auto h-4 w-4 text-[#3D583F]" />}
+                            {(isInBranchContext && user?.company_id === branch.id) && <Check className="ml-auto h-4 w-4 text-primary" />}
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
@@ -176,7 +176,7 @@ export default function AppSidebar() {
       <SidebarContent className="flex flex-col gap-2">
         {grupos.map((grupo) => (
           <SidebarGroup key={grupo.titulo}>
-            <SidebarGroupLabel className="text-[#3D583F]">{grupo.titulo}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-primary">{grupo.titulo}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {grupo.itens.map((item) => {
@@ -190,8 +190,8 @@ export default function AppSidebar() {
                         tooltip={item.label}
                         className={
                           isActive
-                            ? "bg-[#3D583F]/10 text-[#3D583F] border-l-4 border-[#3D583F] pl-[calc(0.5rem-4px)]"
-                            : "hover:bg-[#3D583F]/5"
+                            ? "bg-primary/10 text-primary border-l-4 border-primary pl-[calc(0.5rem-4px)]"
+                            : "hover:bg-primary/5"
                         }
                       >
                         <Link
@@ -201,7 +201,7 @@ export default function AppSidebar() {
                             if (isMobile) setOpenMobile(false);
                           }}
                         >
-                          <Icon className={isActive ? "h-4 w-4 text-[#3D583F]" : "h-4 w-4"} />
+                          <Icon className={isActive ? "h-4 w-4 text-primary" : "h-4 w-4"} />
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -218,7 +218,7 @@ export default function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="bg-[#3D583F] text-white"
+              className="bg-primary text-white"
               onClick={() => {
                 if (isMobile) setOpenMobile(false);
                 signOut();

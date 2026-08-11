@@ -1290,14 +1290,14 @@ export default function CommandsPage() {
   return (
     <div className="min-h-screen overflow-x-hidden">
       {/* Header */}
-        <header className="bg-[#3D583F]">
+        <header className="bg-primary">
         <div className="w-full mx-auto ">
           <div className="flex items-center justify-between bg-white border-b px-4 py-2">
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+                className="rounded-full border-primary text-primary bg-white hover:bg-primary/10"
                 onClick={() => router.push('/')}
               >
                 <ArrowLeftIcon className="h-5 w-5" />
@@ -1311,7 +1311,7 @@ export default function CommandsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+                className="rounded-full border-primary text-primary bg-white hover:bg-primary/10"
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <FilterIcon className="h-5 w-5" />
@@ -1321,7 +1321,7 @@ export default function CommandsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+                className="rounded-full border-primary text-primary bg-white hover:bg-primary/10"
                 onClick={openCreateCommandModal}
               >
                 <PlusIcon className="h-5 w-5" />
@@ -1603,7 +1603,7 @@ export default function CommandsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xl font-bold text-gray-800">
-                        Total: <span className="text-#3D583F">R$ {command.total.toFixed(2)}</span>
+                        Total: <span className="text-primary">R$ {command.total.toFixed(2)}</span>
                       </span>
                     </div>
                     
@@ -1617,7 +1617,7 @@ export default function CommandsPage() {
                               e.stopPropagation();
                               openAddItemModal(command.id.toString());
                             }}
-                            className="w-12 h-12 rounded-full border-2 border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10"
+                            className="w-12 h-12 rounded-full border-2 border-primary text-primary hover:bg-primary/10"
                           >
                             <PlusIcon className="w-5 h-5" />
                           </Button>
@@ -1626,7 +1626,7 @@ export default function CommandsPage() {
                               e.stopPropagation();
                               openPaymentModal(command);
                             }}
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2"
+                            className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2"
                           >
                             <CreditCardIcon className="w-5 h-5" />
                             Fechar Comanda
@@ -1638,11 +1638,11 @@ export default function CommandsPage() {
 
                   {/* Informações de pagamento para comandas fechadas */}
                   {command.status === 'closed' && command.payment?.payment_methods && (
-                    <div className="mt-4 p-4 bg-[#3D583F]/10 rounded-xl border border-[#3D583F]/30">
-                      <p className="text-sm font-medium text-[#3D583F] mb-2">Pagamento processado:</p>
+                    <div className="mt-4 p-4 bg-primary/10 rounded-xl border border-primary/30">
+                      <p className="text-sm font-medium text-primary mb-2">Pagamento processado:</p>
                       <div className="space-y-1">
                         {command.payment.payment_methods.map((method, index) => (
-                          <div key={index} className="flex justify-between text-sm text-[#3D583F]">
+                          <div key={index} className="flex justify-between text-sm text-primary">
                             <span>{getPaymentMethodLabel(method.method)}</span>
                             <span className="font-medium">{formatCurrency(parseFloat(method.amount))}</span>
                           </div>
@@ -1659,7 +1659,7 @@ export default function CommandsPage() {
         {/* Botão flutuante para criar comanda */}
         <Button
           onClick={openCreateCommandModal}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-[#3D583F] shadow-2xl transition-all duration-200 hover:scale-110 hover:bg-[#365137]"
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary shadow-2xl transition-all duration-200 hover:scale-110 hover:bg-primary/90"
           size="icon"
         >
           <PlusIcon className="h-6 w-6" />
@@ -1669,7 +1669,7 @@ export default function CommandsPage() {
       {/* Modal para criar comanda */}
       <Dialog open={createCommandModalOpen} onOpenChange={setCreateCommandModalOpen}>
         <DialogContent className="flex h-[95dvh] max-h-[95dvh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 rounded-t-lg bg-[#3D583F] p-4 text-white sm:p-6">
+          <DialogHeader className="shrink-0 rounded-t-lg bg-primary p-4 text-white sm:p-6">
             <DialogTitle className="flex items-center gap-2 text-lg sm:gap-3 sm:text-xl">
               <div className="rounded-full bg-white/20 p-1.5 sm:p-2">
                 <PlusIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -1686,13 +1686,13 @@ export default function CommandsPage() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {currentTab === 'responsible' && (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
-              <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
-                <div className="border-b border-[#3D583F]/10 px-4 py-4 sm:px-5">
+              <div className="overflow-hidden rounded-2xl border border-primary/12 bg-white shadow-sm">
+                <div className="border-b border-primary/10 px-4 py-4 sm:px-5">
                   <Label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
                     Profissional responsável
                   </Label>
                   <Select value={selectedProfessional || undefined} onValueChange={setSelectedProfessional}>
-                    <SelectTrigger className="h-11 w-full border-[#3D583F]/15 bg-gray-50/80 focus:border-[#3D583F]">
+                    <SelectTrigger className="h-11 w-full border-primary/15 bg-gray-50/80 focus:border-primary">
                       <SelectValue placeholder="Selecione o profissional" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1705,25 +1705,25 @@ export default function CommandsPage() {
                   </Select>
                 </div>
 
-                <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                <div className="border-b border-primary/10 px-4 py-3 sm:px-5">
                   <div className="relative">
                     <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <Input
                       placeholder="Buscar cliente por nome ou telefone..."
                       value={clientFilter}
                       onChange={(e) => setClientFilter(e.target.value)}
-                      className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
+                      className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-primary/25"
                     />
                   </div>
                 </div>
 
                 {loadingClients ? (
                   <div className="flex flex-col items-center py-14 text-gray-500">
-                    <RefreshCwIcon className="mb-2 h-7 w-7 animate-spin text-[#3D583F]/40" />
+                    <RefreshCwIcon className="mb-2 h-7 w-7 animate-spin text-primary/40" />
                     <p className="text-sm">Buscando clientes...</p>
                   </div>
                 ) : filteredClients.length > 0 ? (
-                  <ul className="divide-y divide-[#3D583F]/8">
+                  <ul className="divide-y divide-primary/8">
                     {filteredClients.map((client) => {
                       const isSelected = selectedClient === client.id;
                       return (
@@ -1733,15 +1733,15 @@ export default function CommandsPage() {
                             onClick={() => setSelectedClient(client.id)}
                             className={cn(
                               "flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors sm:gap-4 sm:px-5 sm:py-4",
-                              isSelected ? "bg-[#3D583F]/8" : "hover:bg-gray-50",
+                              isSelected ? "bg-primary/8" : "hover:bg-gray-50",
                             )}
                           >
                             <div
                               className={cn(
                                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
                                 isSelected
-                                  ? "bg-[#3D583F] text-white"
-                                  : "bg-[#3D583F]/10 text-[#3D583F]",
+                                  ? "bg-primary text-white"
+                                  : "bg-primary/10 text-primary",
                               )}
                             >
                               {getClientInitials(client.name)}
@@ -1764,7 +1764,7 @@ export default function CommandsPage() {
                               </div>
                             </div>
                             {isSelected && (
-                              <CheckIcon className="h-5 w-5 shrink-0 text-[#3D583F]" />
+                              <CheckIcon className="h-5 w-5 shrink-0 text-primary" />
                             )}
                           </button>
                         </li>
@@ -1798,15 +1798,15 @@ export default function CommandsPage() {
 
             {currentTab === 'items' && (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
-              <div className="mb-4 flex rounded-xl border border-[#3D583F]/12 bg-[#3D583F]/5 p-1">
+              <div className="mb-4 flex rounded-xl border border-primary/12 bg-primary/5 p-1">
                 <button
                   type="button"
                   onClick={() => setItemTab('service')}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
                     itemTab === 'service'
-                      ? "bg-white text-[#3D583F] shadow-sm"
-                      : "text-gray-600 hover:text-[#3D583F]",
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-gray-600 hover:text-primary",
                   )}
                 >
                   <ClockIcon className="h-4 w-4" />
@@ -1818,8 +1818,8 @@ export default function CommandsPage() {
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
                     itemTab === 'product'
-                      ? "bg-white text-[#3D583F] shadow-sm"
-                      : "text-gray-600 hover:text-[#3D583F]",
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-gray-600 hover:text-primary",
                   )}
                 >
                   <ShoppingCartIcon className="h-4 w-4" />
@@ -1828,15 +1828,15 @@ export default function CommandsPage() {
               </div>
 
               {itemTab === 'service' && (
-                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
-                  <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                <div className="overflow-hidden rounded-2xl border border-primary/12 bg-white shadow-sm">
+                  <div className="border-b border-primary/10 px-4 py-3 sm:px-5">
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <Input
                         placeholder="Buscar serviços..."
                         value={serviceFilter}
                         onChange={(e) => setServiceFilter(e.target.value)}
-                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
+                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-primary/25"
                       />
                     </div>
                   </div>
@@ -1852,7 +1852,7 @@ export default function CommandsPage() {
                       </p>
                     </div>
                   ) : (
-                    <ul className="divide-y divide-[#3D583F]/8">
+                    <ul className="divide-y divide-primary/8">
                       {services
                         .filter((service) =>
                           serviceFilter === '' ||
@@ -1866,7 +1866,7 @@ export default function CommandsPage() {
                           const isInCart = cartItems.some((item) => item.id === serviceId && item.type === 'service');
 
                           return (
-                            <li key={serviceId} className={cn("px-4 py-3.5 sm:px-5 sm:py-4", isInCart && "bg-[#3D583F]/[0.03]")}>
+                            <li key={serviceId} className={cn("px-4 py-3.5 sm:px-5 sm:py-4", isInCart && "bg-primary/[0.03]")}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <p className="font-medium text-gray-900">{serviceName}</p>
@@ -1875,16 +1875,16 @@ export default function CommandsPage() {
                                     {service.service_description && ` · ${service.service_description}`}
                                   </p>
                                 </div>
-                                <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                                <p className="shrink-0 text-sm font-semibold tabular-nums text-primary">
                                   {formatCurrency(servicePrice)}
                                 </p>
                               </div>
                               <div className="mt-3 flex items-center justify-between gap-3">
-                                <div className="flex items-center rounded-lg border border-[#3D583F]/15">
+                                <div className="flex items-center rounded-lg border border-primary/15">
                                   <button
                                     type="button"
                                     onClick={() => updateItemQuantity(serviceId, quantity - 1, 'service')}
-                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    className="flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10"
                                     aria-label="Diminuir quantidade"
                                   >
                                     <MinusCircleIcon className="h-4 w-4" />
@@ -1901,7 +1901,7 @@ export default function CommandsPage() {
                                         setItemQuantities((prev) => ({ ...prev, [serviceId]: quantity + 1 }));
                                       }
                                     }}
-                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    className="flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10"
                                     aria-label="Aumentar quantidade"
                                   >
                                     <PlusCircleIcon className="h-4 w-4" />
@@ -1919,7 +1919,7 @@ export default function CommandsPage() {
                                     "h-8 shrink-0",
                                     isInCart
                                       ? "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                      : "bg-[#3D583F] text-white hover:bg-[#365137]",
+                                      : "bg-primary text-white hover:bg-primary/90",
                                   )}
                                 >
                                   {isInCart ? (
@@ -1944,15 +1944,15 @@ export default function CommandsPage() {
               )}
 
               {itemTab === 'product' && (
-                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
-                  <div className="border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                <div className="overflow-hidden rounded-2xl border border-primary/12 bg-white shadow-sm">
+                  <div className="border-b border-primary/10 px-4 py-3 sm:px-5">
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <Input
                         placeholder="Buscar produtos..."
                         value={productFilter}
                         onChange={(e) => setProductFilter(e.target.value)}
-                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-[#3D583F]/25"
+                        className="h-10 border-0 bg-gray-50/80 pl-10 shadow-none focus-visible:ring-primary/25"
                       />
                     </div>
                   </div>
@@ -1968,7 +1968,7 @@ export default function CommandsPage() {
                       </p>
                     </div>
                   ) : (
-                    <ul className="divide-y divide-[#3D583F]/8">
+                    <ul className="divide-y divide-primary/8">
                       {products
                         .filter((product) =>
                           productFilter === '' ||
@@ -1984,7 +1984,7 @@ export default function CommandsPage() {
                               key={product.id}
                               className={cn(
                                 "px-4 py-3.5 sm:px-5 sm:py-4",
-                                isInCart && "bg-[#3D583F]/[0.03]",
+                                isInCart && "bg-primary/[0.03]",
                                 outOfStock && "opacity-60",
                               )}
                             >
@@ -1997,16 +1997,16 @@ export default function CommandsPage() {
                                     {product.description && ` · ${product.description}`}
                                   </p>
                                 </div>
-                                <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                                <p className="shrink-0 text-sm font-semibold tabular-nums text-primary">
                                   {formatCurrency(product.price)}
                                 </p>
                               </div>
                               <div className="mt-3 flex items-center justify-between gap-3">
-                                <div className="flex items-center rounded-lg border border-[#3D583F]/15">
+                                <div className="flex items-center rounded-lg border border-primary/15">
                                   <button
                                     type="button"
                                     onClick={() => updateItemQuantity(product.id, quantity - 1, 'product')}
-                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10"
+                                    className="flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10"
                                     aria-label="Diminuir quantidade"
                                   >
                                     <MinusCircleIcon className="h-4 w-4" />
@@ -2024,7 +2024,7 @@ export default function CommandsPage() {
                                       }
                                     }}
                                     disabled={product.stock !== undefined && quantity >= product.stock}
-                                    className="flex h-8 w-8 items-center justify-center text-[#3D583F] transition-colors hover:bg-[#3D583F]/10 disabled:opacity-40"
+                                    className="flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
                                     aria-label="Aumentar quantidade"
                                   >
                                     <PlusCircleIcon className="h-4 w-4" />
@@ -2043,7 +2043,7 @@ export default function CommandsPage() {
                                     "h-8 shrink-0",
                                     isInCart
                                       ? "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                      : "bg-[#3D583F] text-white hover:bg-[#365137]",
+                                      : "bg-primary text-white hover:bg-primary/90",
                                   )}
                                 >
                                   {isInCart ? (
@@ -2068,14 +2068,14 @@ export default function CommandsPage() {
               )}
 
               {cartItems.length > 0 && (
-                <div className="mt-4 flex items-center justify-between rounded-xl border border-[#3D583F]/12 bg-[#3D583F]/5 px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm text-[#3D583F]">
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-primary/12 bg-primary/5 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm text-primary">
                     <ShoppingCartIcon className="h-4 w-4" />
                     <span className="font-medium">
                       {cartItems.length} {cartItems.length === 1 ? 'item no carrinho' : 'itens no carrinho'}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold tabular-nums text-[#3D583F]">
+                  <span className="text-sm font-semibold tabular-nums text-primary">
                     {formatCurrency(getCartTotal())}
                   </span>
                 </div>
@@ -2087,13 +2087,13 @@ export default function CommandsPage() {
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
               {cartItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <ShoppingCartIcon className="mb-3 h-10 w-10 text-[#3D583F]/25" />
+                  <ShoppingCartIcon className="mb-3 h-10 w-10 text-primary/25" />
                   <p className="font-medium text-gray-700">Carrinho vazio</p>
                   <p className="mt-1 text-sm text-gray-500">Volte e adicione serviços ou produtos</p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-2xl border border-[#3D583F]/12 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-[#3D583F]/10 px-4 py-3 sm:px-5">
+                <div className="overflow-hidden rounded-2xl border border-primary/12 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-primary/10 px-4 py-3 sm:px-5">
                     <p className="text-sm font-medium text-gray-700">
                       {cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'}
                     </p>
@@ -2106,13 +2106,13 @@ export default function CommandsPage() {
                     </button>
                   </div>
 
-                  <ul className="divide-y divide-[#3D583F]/8">
+                  <ul className="divide-y divide-primary/8">
                     {cartItems.map((item) => (
                       <li
                         key={`${item.id}-${item.type}`}
                         className="flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4"
                       >
-                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3D583F]/8 text-[#3D583F]">
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
                           {item.type === 'service' ? (
                             <ClockIcon className="h-4 w-4" />
                           ) : (
@@ -2123,7 +2123,7 @@ export default function CommandsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <p className="truncate font-medium text-gray-900">{item.name}</p>
-                            <p className="shrink-0 text-sm font-semibold tabular-nums text-[#3D583F]">
+                            <p className="shrink-0 text-sm font-semibold tabular-nums text-primary">
                               {formatCurrency(item.total)}
                             </p>
                           </div>
@@ -2146,9 +2146,9 @@ export default function CommandsPage() {
                     ))}
                   </ul>
 
-                  <div className="flex items-center justify-between border-t border-[#3D583F]/10 bg-[#3D583F]/[0.04] px-4 py-4 sm:px-5">
+                  <div className="flex items-center justify-between border-t border-primary/10 bg-primary/[0.04] px-4 py-4 sm:px-5">
                     <span className="text-sm font-medium text-gray-600">Total da comanda</span>
-                    <span className="text-2xl font-bold tabular-nums tracking-tight text-[#3D583F]">
+                    <span className="text-2xl font-bold tabular-nums tracking-tight text-primary">
                       {formatCurrency(getCartTotal())}
                     </span>
                   </div>
@@ -2158,12 +2158,12 @@ export default function CommandsPage() {
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col gap-3 border-t border-[#3D583F]/10 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex shrink-0 flex-col gap-3 border-t border-primary/10 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button 
                 variant="outline" 
                 onClick={() => setCreateCommandModalOpen(false)}
-                className="w-full border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 sm:w-auto"
+                className="w-full border-primary/30 text-primary hover:bg-primary/10 sm:w-auto"
               >
                 Cancelar
               </Button>
@@ -2171,7 +2171,7 @@ export default function CommandsPage() {
                 <Button
                   variant="outline"
                   onClick={goToPreviousCreateStep}
-                  className="w-full border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 sm:w-auto"
+                  className="w-full border-primary/30 text-primary hover:bg-primary/10 sm:w-auto"
                 >
                   <ArrowLeftIcon className="mr-2 h-4 w-4" />
                   Voltar
@@ -2182,7 +2182,7 @@ export default function CommandsPage() {
               <Button
                 onClick={goToNextCreateStep}
                 disabled={isFirstCreateStep && (!selectedClient || !selectedProfessional)}
-                className="w-full bg-[#3D583F] text-white hover:bg-[#365137] sm:w-auto"
+                className="w-full bg-primary text-white hover:bg-primary/90 sm:w-auto"
               >
                 {currentTab === 'items' && cartItems.length > 0
                   ? `Ver carrinho (${cartItems.length})`
@@ -2193,7 +2193,7 @@ export default function CommandsPage() {
               <Button
                 onClick={createCommand}
                 disabled={!selectedClient || !selectedProfessional || cartItems.length === 0 || isCreatingCommand}
-                className="w-full bg-[#3D583F] text-white hover:bg-[#365137] sm:w-auto"
+                className="w-full bg-primary text-white hover:bg-primary/90 sm:w-auto"
               >
                 {isCreatingCommand ? 'Criando...' : 'Criar Comanda'}
               </Button>
@@ -2206,7 +2206,7 @@ export default function CommandsPage() {
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[#3D583F]">
+            <DialogTitle className="flex items-center gap-2 text-primary">
               <CreditCardIcon className="h-5 w-5" />
               Fechar Comanda #{selectedCommand?.id}
             </DialogTitle>
@@ -2215,8 +2215,8 @@ export default function CommandsPage() {
           {selectedCommand && (
             <div className="space-y-6">
               {/* Itens com desconto */}
-              <div className="space-y-3 rounded-xl border border-[#3D583F]/20 p-4">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-[#3D583F]">
+              <div className="space-y-3 rounded-xl border border-primary/20 p-4">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
                   <ShoppingCartIcon className="h-4 w-4" />
                   Itens da Comanda
                 </h3>
@@ -2231,14 +2231,14 @@ export default function CommandsPage() {
                     return (
                       <div
                         key={`${item.id}-${index}`}
-                        className="rounded-lg border border-[#3D583F]/15 bg-[#3D583F]/5 p-3"
+                        className="rounded-lg border border-primary/15 bg-primary/5 p-3"
                       >
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-[#3D583F]">
+                            <p className="truncate text-sm font-medium text-primary">
                               {item.name}
                             </p>
-                            <p className="mt-1 text-xs text-[#3D583F]/70">
+                            <p className="mt-1 text-xs text-primary/70">
                               Qtd: {item.quantity} · Unitário: {formatCurrency(originalPrice)}
                             </p>
                           </div>
@@ -2248,7 +2248,7 @@ export default function CommandsPage() {
                                 <p className="text-xs text-gray-400 line-through">
                                   {formatCurrency(originalPrice * Number(item.quantity))}
                                 </p>
-                                <p className="text-xs font-medium text-[#3D583F]">
+                                <p className="text-xs font-medium text-primary">
                                   {formatDiscountInfo(
                                     item.discount_type || "none",
                                     item.discount_value || 0,
@@ -2257,15 +2257,15 @@ export default function CommandsPage() {
                                 </p>
                               </>
                             )}
-                            <p className="text-sm font-bold text-[#3D583F]">
+                            <p className="text-sm font-bold text-primary">
                               {formatCurrency(unitPrice * Number(item.quantity))}
                             </p>
                           </div>
                         </div>
 
-                        <div className="rounded-md border border-[#3D583F]/15 bg-white p-3">
+                        <div className="rounded-md border border-primary/15 bg-white p-3">
                           <div className="mb-2 flex items-center justify-between">
-                            <span className="flex items-center gap-1 text-xs font-medium text-[#3D583F]">
+                            <span className="flex items-center gap-1 text-xs font-medium text-primary">
                               <PercentIcon className="h-3 w-3" />
                               Aplicar desconto
                             </span>
@@ -2283,7 +2283,7 @@ export default function CommandsPage() {
 
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                             <select
-                              className="rounded-md border border-[#3D583F]/20 bg-white px-2 py-2 text-xs text-[#3D583F]"
+                              className="rounded-md border border-primary/20 bg-white px-2 py-2 text-xs text-primary"
                               value={item.discount_type || "none"}
                               onChange={(e) => {
                                 const value = e.target.value as "none" | "percentage" | "fixed";
@@ -2331,7 +2331,7 @@ export default function CommandsPage() {
                                 />
                                 <Button
                                   size="sm"
-                                  className="h-9 bg-[#3D583F] text-white hover:bg-[#365137]"
+                                  className="h-9 bg-primary text-white hover:bg-primary/90"
                                   onClick={() => {
                                     const value = parseFloat(discountDrafts[index] || "0");
                                     if (!Number.isNaN(value) && value > 0) {
@@ -2356,10 +2356,10 @@ export default function CommandsPage() {
               </div>
 
               {/* Resumo da Comanda */}
-              <Card className="border-[#3D583F]/20 bg-[#3D583F]/10 p-4">
+              <Card className="border-primary/20 bg-primary/10 p-4">
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-[#3D583F]">Resumo da Comanda</h3>
-                  <p className="text-[#3D583F]/80">{selectedCommand.client_name}</p>
+                  <h3 className="font-semibold text-primary">Resumo da Comanda</h3>
+                  <p className="text-primary/80">{selectedCommand.client_name}</p>
                   {(() => {
                     const originalTotal = commandItems.reduce((sum, item) => {
                       return (
@@ -2374,20 +2374,20 @@ export default function CommandsPage() {
                     return (
                       <>
                         {hasDiscounts && (
-                          <div className="flex justify-between text-sm text-[#3D583F]/70">
+                          <div className="flex justify-between text-sm text-primary/70">
                             <span>Subtotal:</span>
                             <span>{formatCurrency(originalTotal)}</span>
                           </div>
                         )}
                         {hasDiscounts && (
-                          <div className="flex justify-between text-sm text-[#3D583F]">
+                          <div className="flex justify-between text-sm text-primary">
                             <span>Desconto:</span>
                             <span>- {formatCurrency(totalDiscount)}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between">
-                          <span className="text-[#3D583F]">Total:</span>
-                          <span className="text-2xl font-bold text-[#3D583F]">
+                          <span className="text-primary">Total:</span>
+                          <span className="text-2xl font-bold text-primary">
                             {formatCurrency(finalTotal)}
                           </span>
                         </div>
@@ -2395,8 +2395,8 @@ export default function CommandsPage() {
                     );
                   })()}
                   <div className="flex justify-between items-center">
-                    <span className="text-[#3D583F]">Restante:</span>
-                    <span className="font-semibold text-[#3D583F]">
+                    <span className="text-primary">Restante:</span>
+                    <span className="font-semibold text-primary">
                       {formatCurrency(getRemainingPaymentAmount())}
                     </span>
                   </div>
@@ -2405,7 +2405,7 @@ export default function CommandsPage() {
 
               {/* Adicionar Pagamento */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold text-[#3D583F]">
+                <Label className="text-base font-semibold text-primary">
                   Adicionar Pagamento
                 </Label>
 
@@ -2416,8 +2416,8 @@ export default function CommandsPage() {
                       variant={selectedPaymentType === method.value ? "default" : "outline"}
                       className={`flex items-center justify-center gap-2 ${
                         selectedPaymentType === method.value
-                          ? "bg-[#3D583F] text-white hover:bg-[#365137]"
-                          : "border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
+                          ? "bg-primary text-white hover:bg-primary/90"
+                          : "border-primary/30 text-primary hover:bg-primary/10"
                       }`}
                       onClick={() => setSelectedPaymentType(method.value as any)}
                     >
@@ -2425,7 +2425,7 @@ export default function CommandsPage() {
                         method.value,
                         selectedPaymentType === method.value
                           ? "h-4 w-4 text-white"
-                          : "h-4 w-4 text-[#3D583F]",
+                          : "h-4 w-4 text-primary",
                       )}
                       <span className="text-sm">{method.label}</span>
                     </Button>
@@ -2433,7 +2433,7 @@ export default function CommandsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="paymentAmount" className="text-[#3D583F]">
+                  <Label htmlFor="paymentAmount" className="text-primary">
                     Valor (Máx: {formatCurrency(getRemainingPaymentAmount())})
                   </Label>
                   <Input
@@ -2450,7 +2450,7 @@ export default function CommandsPage() {
                       );
                       setPaymentAmount(formatted);
                     }}
-                    className={`text-lg ${maxValueReached ? "border-orange-400 bg-orange-50" : "border-[#3D583F]/20"}`}
+                    className={`text-lg ${maxValueReached ? "border-orange-400 bg-orange-50" : "border-primary/20"}`}
                   />
                   {maxValueReached && (
                     <p className="flex items-center gap-1 text-sm text-orange-600">
@@ -2462,7 +2462,7 @@ export default function CommandsPage() {
 
                 <Button
                   onClick={addPaymentMethod}
-                  className="w-full bg-[#3D583F] text-white hover:bg-[#365137]"
+                  className="w-full bg-primary text-white hover:bg-primary/90"
                   disabled={!paymentAmount || parseCurrencyInput(paymentAmount) <= 0}
                 >
                   <PlusIcon className="mr-2 h-4 w-4" />
@@ -2473,21 +2473,21 @@ export default function CommandsPage() {
               {/* Métodos Selecionados */}
               {selectedPaymentMethods.length > 0 && (
                 <div className="space-y-4">
-                  <Label className="text-base font-semibold text-[#3D583F]">
+                  <Label className="text-base font-semibold text-primary">
                     Métodos Selecionados
                   </Label>
                   <div className="space-y-2">
                     {selectedPaymentMethods.map((method, index) => (
-                      <Card key={index} className="border-[#3D583F]/15 p-3">
+                      <Card key={index} className="border-primary/15 p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            {getPaymentMethodIcon(method.method, "h-4 w-4 text-[#3D583F]")}
-                            <span className="text-[#3D583F]">
+                            {getPaymentMethodIcon(method.method, "h-4 w-4 text-primary")}
+                            <span className="text-primary">
                               {getPaymentMethodLabel(method.method)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[#3D583F]">
+                            <span className="font-semibold text-primary">
                               {formatCurrency(method.amount)}
                             </span>
                             <Button
@@ -2510,7 +2510,7 @@ export default function CommandsPage() {
                 <Button
                   variant="outline"
                   onClick={() => setPaymentModalOpen(false)}
-                  className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
+                  className="border-primary/30 text-primary hover:bg-primary/10"
                 >
                   Cancelar
                 </Button>
@@ -2521,7 +2521,7 @@ export default function CommandsPage() {
                     selectedPaymentMethods.length === 0 ||
                     isProcessingPayment
                   }
-                  className="bg-[#3D583F] text-white hover:bg-[#365137]"
+                  className="bg-primary text-white hover:bg-primary/90"
                 >
                   {isProcessingPayment ? "Processando..." : "Finalizar Pagamento"}
                 </Button>
@@ -2534,8 +2534,8 @@ export default function CommandsPage() {
       {/* Modal de Detalhes da Comanda */}
       <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
         <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-[#3D583F]/20">
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-[#3D583F]">
+          <DialogHeader className="border-b border-primary/20">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-primary">
               <EyeIcon className="h-5 w-5 flex-shrink-0" />
               Detalhes da Comanda
             </DialogTitle>
@@ -2544,9 +2544,9 @@ export default function CommandsPage() {
           {selectedCommandForDetails && (
             <div className="space-y-4 sm:space-y-6">
               {/* Informações da Comanda */}
-              <Card className="p-3 sm:p-4 border border-[#3D583F]/20">
+              <Card className="p-3 sm:p-4 border border-primary/20">
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">Informações da Comanda</h3>
+                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-primary">Informações da Comanda</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Cliente:</Label>
@@ -2564,7 +2564,7 @@ export default function CommandsPage() {
                     </div>
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Total:</Label>
-                      <p className="text-xl sm:text-2xl font-bold text-[#3D583F]">
+                      <p className="text-xl sm:text-2xl font-bold text-primary">
                         {formatCurrency(selectedCommandForDetails.total)}
                       </p>
                     </div>
@@ -2572,20 +2572,20 @@ export default function CommandsPage() {
                   {selectedCommandForDetails.professional_name && (
                     <div>
                       <Label className="text-xs sm:text-sm text-gray-600">Profissional:</Label>
-                      <p className="font-medium text-[#3D583F] text-sm sm:text-base">{selectedCommandForDetails.professional_name}</p>
+                      <p className="font-medium text-primary text-sm sm:text-base">{selectedCommandForDetails.professional_name}</p>
                     </div>
                   )}
                 </div>
               </Card>
 
               {/* Lista de Itens */}
-              <Card className="p-3 sm:p-4 border border-[#3D583F]/20">
-                <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">
+              <Card className="p-3 sm:p-4 border border-primary/20">
+                <h3 className="font-semibold text-base sm:text-lg mb-3 text-primary">
                   Itens da Comanda ({selectedCommandForDetails.items.length})
                 </h3>
                 <div className="space-y-2 sm:space-y-3">
                   {selectedCommandForDetails.items.map((item, index) => (
-                    <Card key={index} className="p-2 sm:p-3 bg-[#3D583F]/5 border border-[#3D583F]/20">
+                    <Card key={index} className="p-2 sm:p-3 bg-primary/5 border border-primary/20">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm sm:text-base truncate">{item.name}</h4>
@@ -2594,7 +2594,7 @@ export default function CommandsPage() {
                           </p>
                         </div>
                         <div className="text-left sm:text-right flex-shrink-0">
-                          <p className="font-semibold text-[#3D583F] text-sm sm:text-base">
+                          <p className="font-semibold text-primary text-sm sm:text-base">
                             {formatCurrency(parseFloat(item.price) * item.quantity)}
                           </p>
                         </div>
@@ -2606,20 +2606,20 @@ export default function CommandsPage() {
 
               {/* Informações de Pagamento */}
               {selectedCommandForDetails.status === 'closed' && selectedCommandForDetails.payment?.payment_methods && (
-                <Card className="p-3 sm:p-4 bg-[#3D583F]/10 border-[#3D583F]/30">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-[#3D583F]">Detalhes do Pagamento</h3>
+                <Card className="p-3 sm:p-4 bg-primary/10 border-primary/30">
+                  <h3 className="font-semibold text-base sm:text-lg mb-3 text-primary">Detalhes do Pagamento</h3>
                   <div className="space-y-2">
                     {selectedCommandForDetails.payment.paid_at && (
-                      <p className="text-xs sm:text-sm text-[#3D583F]">
+                      <p className="text-xs sm:text-sm text-primary">
                         Pago em: {formatDate(selectedCommandForDetails.payment.paid_at)}
                       </p>
                     )}
                     {selectedCommandForDetails.payment.payment_methods.map((method, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-[#3D583F] text-xs sm:text-sm">
+                        <span className="text-primary text-xs sm:text-sm">
                           {getPaymentMethodLabel(method.method)}
                         </span>
-                        <span className="font-semibold text-[#3D583F] text-xs sm:text-sm">
+                        <span className="font-semibold text-primary text-xs sm:text-sm">
                           {formatCurrency(parseFloat(method.amount))}
                         </span>
                       </div>
@@ -2639,7 +2639,7 @@ export default function CommandsPage() {
                 </Button>
                 <Button 
                   onClick={() => setDetailsModalOpen(false)}
-                  className="bg-[#3D583F] hover:bg-[#365137] w-full sm:w-auto text-sm"
+                  className="bg-primary hover:bg-primary/90 w-full sm:w-auto text-sm"
                 >
                   Fechar
                 </Button>

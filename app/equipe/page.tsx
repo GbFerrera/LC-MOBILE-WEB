@@ -558,7 +558,7 @@ export default function Equipe() {
       <div className="bg-white border-b p-4">
         <div className="flex items-center justify-between mb-4">
           <Link href="/">
-            <Button variant="outline" size="sm" className="border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10">
+            <Button variant="outline" size="sm" className="border-primary text-primary bg-white hover:bg-primary/10">
               <ChevronLeftIcon className="h-5 w-5" />
             </Button>
           </Link>
@@ -568,37 +568,37 @@ export default function Equipe() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Card className="border border-[#3D583F]/20">
+          <Card className="border border-primary/20">
             <CardContent className="p-3 text-center">
-              <UserSquare2Icon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <UserSquare2Icon className="h-6 w-6 mx-auto mb-1 text-primary" />
               <p className="text-xs text-gray-500">Admins</p>
-              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.admin}</p>
+              <p className="text-lg font-bold text-primary">{teamSummary.admin}</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#3D583F]/20">
+          <Card className="border border-primary/20">
             <CardContent className="p-3 text-center">
-              <Users2Icon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <Users2Icon className="h-6 w-6 mx-auto mb-1 text-primary" />
               <p className="text-xs text-gray-500">Gerentes</p>
-              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.manager}</p>
+              <p className="text-lg font-bold text-primary">{teamSummary.manager}</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#3D583F]/20">
+          <Card className="border border-primary/20">
             <CardContent className="p-3 text-center">
-              <UserIcon className="h-6 w-6 mx-auto mb-1 text-[#3D583F]" />
+              <UserIcon className="h-6 w-6 mx-auto mb-1 text-primary" />
               <p className="text-xs text-gray-500">Funcionários</p>
-              <p className="text-lg font-bold text-[#3D583F]">{teamSummary.employee}</p>
+              <p className="text-lg font-bold text-primary">{teamSummary.employee}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Search Bar */}
         <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#3D583F]" />
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary" />
           <Input
             placeholder="Buscar membros da equipe..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white border border-[#3D583F]/20 text-gray-800 placeholder-[#3D583F]"
+            className="pl-10 bg-white border border-primary/20 text-gray-800 placeholder-primary"
           />
         </div>
       </div>
@@ -608,7 +608,7 @@ export default function Equipe() {
         {/* Add Member Button */}
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
-            <Button className="w-full bg-[#3D583F] hover:bg-[#365137] shadow-lg">
+            <Button className="w-full bg-primary hover:bg-primary/90 shadow-lg">
               <PlusIcon className="h-5 w-5 mr-2" />
               Novo Integrante
             </Button>
@@ -645,7 +645,7 @@ export default function Equipe() {
                         <img 
                           src={imagePreview} 
                           alt="Preview" 
-                          className="w-20 h-20 rounded-full object-cover border-2 border-[#3D583F]/30"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-primary/30"
                           style={{ objectFit: 'cover' }}
                         />
                         <button 
@@ -747,7 +747,7 @@ export default function Equipe() {
               <Button 
                 onClick={handleSubmit}
                 disabled={uploading}
-                className="bg-[#3D583F] hover:bg-[#365137]"
+                className="bg-primary hover:bg-primary/90"
               >
                   {uploading ? (
                     <div className="flex items-center gap-2">
@@ -787,7 +787,7 @@ export default function Equipe() {
                       {member.photo_url ? (
                         <AvatarImage src={member.photo_url} alt={member.name} className="object-cover" />
                       ) : (
-                        <AvatarFallback className="bg-[#3D583F]/10 text-[#3D583F]">
+                        <AvatarFallback className="bg-primary/10 text-primary">
                           {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       )}
@@ -844,11 +844,11 @@ export default function Equipe() {
                       </div>
 
                       <div className="flex flex-wrap gap-2 mb-2">
-                        <Badge variant="secondary" className="bg-[#3D583F]/10 text-[#3D583F]">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary">
                           {getPositionLabel(member.position)}
                         </Badge>
                         {member.can_schedule && (
-                          <Badge variant="outline" className="border-[#3D583F]/30 text-[#3D583F]">
+                          <Badge variant="outline" className="border-primary/30 text-primary">
                             <CalendarIcon className="h-3 w-3 mr-1" />
                             Agenda
                           </Badge>
@@ -857,17 +857,17 @@ export default function Equipe() {
 
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center">
-                          <MailIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
+                          <MailIcon className="h-3 w-3 mr-2 text-primary" />
                           <span className="truncate">{member.email}</span>
                         </div>
                         {member.phone_number && (
                           <div className="flex items-center">
-                            <PhoneIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
+                            <PhoneIcon className="h-3 w-3 mr-2 text-primary" />
                             <span>{member.phone_number}</span>
                           </div>
                         )}
                         <div className="flex items-center">
-                          <CalendarIcon className="h-3 w-3 mr-2 text-[#3D583F]" />
+                          <CalendarIcon className="h-3 w-3 mr-2 text-primary" />
                           <span>Desde {formatDate(member.created_at)}</span>
                         </div>
                       </div>
@@ -960,7 +960,7 @@ export default function Equipe() {
               <Button 
                 onClick={handleEditMember}
                 disabled={editLoading}
-                className="bg-[#3D583F] hover:bg-[#365137]"
+                className="bg-primary hover:bg-primary/90"
               >
                 {editLoading ? (
                   <div className="flex items-center gap-2">
@@ -998,7 +998,7 @@ export default function Equipe() {
                       <img
                         src={photoPreview}
                         alt="Preview"
-                      className="w-24 h-24 rounded-full object-cover border-2 border-[#3D583F]/30"
+                      className="w-24 h-24 rounded-full object-cover border-2 border-primary/30"
                         style={{ objectFit: 'cover' }}
                       />
                       <button
@@ -1051,7 +1051,7 @@ export default function Equipe() {
               <Button 
                 onClick={handlePhotoUpload}
                 disabled={photoLoading || !photoFile}
-                className="bg-[#3D583F] hover:bg-[#365137]"
+                className="bg-primary hover:bg-primary/90"
               >
                 {photoLoading ? (
                   <div className="flex items-center gap-2">

@@ -435,7 +435,7 @@ export default function ClientesPage() {
           <div className="flex items-center gap-3">
             <Link 
               href="/" 
-              className="p-2 rounded-full border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10 transition-colors"
+              className="p-2 rounded-full border border-primary text-primary hover:bg-primary/10 transition-colors"
             >
               <ChevronLeftIcon className="h-4 w-4" />
             </Link>
@@ -452,7 +452,7 @@ export default function ClientesPage() {
               size="sm"
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className="h-9 px-3 border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+              className="h-9 px-3 border-primary text-primary bg-white hover:bg-primary/10"
             >
               <FilterIcon className="h-4 w-4" />
             </Button>
@@ -463,7 +463,7 @@ export default function ClientesPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-9 px-3 border-[#3D583F] text-[#3D583F] bg-white hover:bg-[#3D583F]/10"
+                  className="h-9 px-3 border-primary text-primary bg-white hover:bg-primary/10"
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>
@@ -475,7 +475,7 @@ export default function ClientesPage() {
 
         {/* Filtros - Aparece apenas quando showFilters é true */}
         {showFilters && (
-          <div className="bg-[#3D583F] rounded-xl p-3 mb-3 shadow-md border border-white/20">
+          <div className="bg-primary rounded-xl p-3 mb-3 shadow-md border border-white/20">
             <div className="space-y-2">
               {/* Filtro por Status */}
               <div className="flex items-center gap-2">
@@ -549,7 +549,7 @@ export default function ClientesPage() {
                 <Button
                   onClick={clearAllFilters}
                   variant="outline"
-                  className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10 hover:border-[#3D583F]/40"
+                  className="border-primary/30 text-primary hover:bg-primary/10 hover:border-primary/40"
                 >
                   <XIcon className="h-4 w-4 mr-2" />
                   Limpar filtros
@@ -594,7 +594,7 @@ export default function ClientesPage() {
                     <Button 
                       onClick={() => setSearchTerm('')}
                       variant="outline" 
-                      className="border-[#3D583F]/30 text-[#3D583F] hover:bg-[#3D583F]/10"
+                      className="border-primary/30 text-primary hover:bg-primary/10"
                     >
                       Limpar Busca
                     </Button>
@@ -605,7 +605,7 @@ export default function ClientesPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Cliente</h3>
                     <p className="text-gray-600 mb-4">Você ainda não possui clientes cadastrados</p>
                     <Link href="/clientes/novo">
-                      <Button className="bg-[#3D583F] hover:bg-[#365137] text-white">
+                      <Button className="bg-primary hover:bg-primary/90 text-white">
                         <PlusIcon className="h-4 w-4 mr-2" />
                         Cadastrar Primeiro Cliente
                       </Button>
@@ -634,7 +634,7 @@ export default function ClientesPage() {
                   <Button
                     onClick={loadMoreClients}
                     disabled={isLoadingMore}
-                    className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                    className="bg-primary hover:bg-primary/90 text-white"
                   >
                     {isLoadingMore ? 'Carregando...' : 'Carregar mais'}
                   </Button>
@@ -673,7 +673,7 @@ export default function ClientesPage() {
                                     appointment.status === 'completed' ? 'secondary' : 
                                     appointment.status === 'cancelled' ? 'destructive' : 'outline'}
                             className={
-                              appointment.status === 'confirmed' ? 'bg-[#3D583F]/10 text-[#3D583F] border-[#3D583F]/30' :
+                              appointment.status === 'confirmed' ? 'bg-primary/10 text-primary border-primary/30' :
                               appointment.status === 'completed' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                               appointment.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-200' :
                               'bg-gray-100 text-gray-800 border-gray-200'
@@ -685,7 +685,7 @@ export default function ClientesPage() {
                              appointment.status || 'Pendente'}
                           </Badge>
                           {appointment.professional_name && (
-                            <span className="text-sm font-medium text-[#3D583F]">
+                            <span className="text-sm font-medium text-primary">
                               {appointment.professional_name}
                             </span>
                           )}
@@ -1219,7 +1219,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
           {/* Header com avatar e info básica */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 ring-2 ring-[#3D583F]/20">
+              <Avatar className="h-12 w-12 ring-2 ring-primary/20">
                 {client.profile_photo ? (
                   <AvatarImage 
                     src={client.profile_photo} 
@@ -1227,7 +1227,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                     className="object-cover"
                   />
                 ) : null}
-                <AvatarFallback className="bg-[#3D583F] text-white font-semibold text-sm">
+                <AvatarFallback className="bg-primary text-white font-semibold text-sm">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -1268,7 +1268,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
             <div className="mb-3">
               <Badge 
                 variant="secondary" 
-                className="bg-[#3D583F]/10 text-[#3D583F] hover:bg-[#3D583F]/20 cursor-pointer transition-colors"
+                className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors"
                 onClick={handleShowAppointments}
               >
                 <ClockIcon className="h-3 w-3 mr-1" />
@@ -1282,7 +1282,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
             <Button
               size="sm"
               onClick={handleSchedule}
-              className="flex-1 bg-[#3D583F] hover:bg-[#365137] text-white h-9 text-sm font-medium"
+              className="flex-1 bg-primary hover:bg-primary/90 text-white h-9 text-sm font-medium"
             >
               <CalendarIcon className="h-4 w-4 mr-1" />
               Agendar
@@ -1311,7 +1311,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                 <div className="mx-auto w-full max-w-sm">
                   <DrawerHeader className="text-center pb-4">
                     <div className="mx-auto mb-4">
-                      <Avatar className="h-16 w-16 ring-4 ring-[#3D583F]/20">
+                      <Avatar className="h-16 w-16 ring-4 ring-primary/20">
                         {client.profile_photo ? (
                           <AvatarImage 
                             src={client.profile_photo} 
@@ -1319,7 +1319,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                             className="object-cover"
                           />
                         ) : null}
-                        <AvatarFallback className="bg-[#3D583F] text-white font-bold text-lg">
+                        <AvatarFallback className="bg-primary text-white font-bold text-lg">
                           {initials}
                         </AvatarFallback>
                       </Avatar>
@@ -1327,7 +1327,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                     <DrawerTitle className="text-xl font-bold text-gray-900">
                       {client.name && client.name.length > 10 ? `${client.name.slice(0, 10)}...` : client.name}
                     </DrawerTitle>
-                    <DrawerDescription className="text-[#3D583F]">
+                    <DrawerDescription className="text-primary">
                       Informações completas
                     </DrawerDescription>
                   </DrawerHeader>
@@ -1372,8 +1372,8 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                     
                     {/* Data de Cadastro */}
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className="p-2 bg-[#3D583F]/10 rounded-full">
-                        <CalendarIcon className="h-4 w-4 text-[#3D583F]" />
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <CalendarIcon className="h-4 w-4 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente desde</p>
@@ -1394,7 +1394,7 @@ function ClientCard({ client, getClientStatus, appointments, onShowAppointments,
                   <DrawerFooter className="pt-6">
                     <Button 
                       onClick={handleSchedule}
-                      className="w-full bg-[#3D583F] hover:bg-[#365137] text-white h-12"
+                      className="w-full bg-primary hover:bg-primary/90 text-white h-12"
                     >
                       <CalendarIcon className="h-4 w-4 mr-2" />
                       Agendar Serviço

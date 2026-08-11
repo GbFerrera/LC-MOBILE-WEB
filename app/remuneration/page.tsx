@@ -265,7 +265,7 @@ export default function Remuneration() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-[#3D583F]/30 border-t-[#3D583F] rounded-full animate-spin mx-auto"></div>
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600">Carregando remunerações...</p>
         </div>
       </div>
@@ -278,7 +278,7 @@ export default function Remuneration() {
       <header className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <Link href="/" className="p-2 rounded-md border border-[#3D583F] text-[#3D583F] hover:bg-[#3D583F]/10">
+            <Link href="/" className="p-2 rounded-md border border-primary text-primary hover:bg-primary/10">
               <ChevronLeftIcon className="h-7 w-7" />
             </Link>
             <h1 className="font-bold text-2xl tracking-wide text-gray-900">Remunerações</h1>
@@ -286,7 +286,7 @@ export default function Remuneration() {
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                  className="bg-primary hover:bg-primary/90 text-white"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Nova
@@ -297,8 +297,8 @@ export default function Remuneration() {
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-                    <div className="p-2 bg-[#3D583F]/10 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-[#3D583F]" />
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-primary" />
                     </div>
                     Nova Remuneração
                   </DialogTitle>
@@ -388,7 +388,7 @@ export default function Remuneration() {
                 <Button
                   onClick={handleCreateRemuneration}
                   disabled={isSubmitting || !formData.professional_id || !formData.value}
-                  className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                  className="bg-primary hover:bg-primary/90 text-white"
                 >
                   {isSubmitting ? (
                     <>
@@ -484,7 +484,7 @@ export default function Remuneration() {
                 placeholder="Buscar por profissional..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white border-gray-200 focus:border-[#3D583F] focus:ring-[#3D583F]"
+                className="pl-10 bg-white border-gray-200 focus:border-primary focus:ring-primary"
               />
             </div>
           </div>
@@ -523,7 +523,7 @@ export default function Remuneration() {
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <div className="flex items-center gap-1 text-[#3D583F]">
+                          <div className="flex items-center gap-1 text-primary">
                             <Banknote className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span className="font-bold text-sm sm:text-lg whitespace-nowrap">{formatCurrency(remuneration.value)}</span>
                           </div>
@@ -555,7 +555,7 @@ export default function Remuneration() {
                           <Button
                             onClick={() => handleMarkAsPaid(remuneration.id)}
                             size="sm"
-                            className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                            className="bg-primary hover:bg-primary/90 text-white"
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Confirmar
@@ -585,8 +585,8 @@ export default function Remuneration() {
                           <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-                                <div className="p-2 bg-[#3D583F]/10 rounded-lg">
-                                  <Edit className="h-5 w-5 text-[#3D583F]" />
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                  <Edit className="h-5 w-5 text-primary" />
                                 </div>
                                 Editar Remuneração
                               </DialogTitle>
@@ -703,7 +703,7 @@ export default function Remuneration() {
                               <Button
                                 onClick={handleEditRemuneration}
                                 disabled={isSubmitting}
-                                className="bg-[#3D583F] hover:bg-[#365137] text-white"
+                                className="bg-primary hover:bg-primary/90 text-white"
                               >
                                 {isSubmitting ? (
                                   <>

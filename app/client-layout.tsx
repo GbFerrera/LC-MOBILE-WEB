@@ -15,6 +15,7 @@ import { io, Socket } from "socket.io-client";
 import { useNotifications } from "@/hooks/use-notifications";
 import AccessGuard from "@/components/AccessGuard";
 import { useCompanyAccess } from "@/hooks/useCompanyAccess";
+import { DynamicHead } from "@/components/DynamicHead";
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -161,27 +162,41 @@ function LayoutContent({ children }: { children: ReactNode }) {
   }
 
   if (isLoginRoute) {
-    return <div className="min-h-dvh w-full overflow-x-hidden overflow-y-auto">{children}</div>;
+    return (
+      <div className="min-h-dvh w-full max-w-full min-w-0 overflow-x-clip overflow-y-auto" data-pwa-content>
+        <div className="hidden">
+          <DynamicHead />
+        </div>
+        {children}
+      </div>
+    );
   }
 
   return (
     <AccessGuard companyId={companyId}>
       <CompanyProvider>
         <SidebarProvider defaultOpen>
-          <div className="flex min-h-screen w-full">
+          <div className="flex min-h-dvh w-full max-w-full min-w-0 overflow-x-clip" data-pwa-shell>
             <Sidebar variant="inset">
               <AppSidebar />
             </Sidebar>
-            <SidebarInset>
-              <div className="sticky top-0 z-10 border-b text-white" style={{ backgroundColor: "#3D583F" }}>
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <div className="text-white">
+            <SidebarInset className="min-w-0 max-w-full overflow-x-clip">
+              <div className="hidden">
+                <DynamicHead />
+              </div>
+              <div className="sticky top-0 z-10 border-b bg-primary text-primary-foreground">
+                <div className="flex min-w-0 items-center gap-2 px-3 py-2">
+                  <div className="shrink-0 text-primary-foreground">
                     <SidebarTrigger />
                   </div>
-                  <HeaderCompanyName />
+                  <div className="min-w-0 truncate">
+                    <HeaderCompanyName />
+                  </div>
                 </div>
               </div>
-              <div>{children}</div>
+              <div className="min-w-0 max-w-full overflow-x-clip" data-pwa-content>
+                {children}
+              </div>
             </SidebarInset>
           </div>
         </SidebarProvider>

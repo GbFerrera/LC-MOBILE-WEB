@@ -60,7 +60,7 @@ export default function LoginPage() {
       />
 
       {/* Header com foto + curva */}
-      <div className="relative min-h-[300px] h-[44vh] max-h-[360px] shrink-0 overflow-hidden border-0 sm:min-h-[280px] sm:h-[42vh] sm:max-h-[380px]">
+      <div className="relative h-[44vh] min-h-[300px] max-h-[360px] shrink-0 overflow-hidden border-0">
         <img
           src="/image-login.png"
           alt=""

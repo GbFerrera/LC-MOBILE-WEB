@@ -77,17 +77,30 @@ export function ColorProvider({ children }: { children: ReactNode }) {
     }
 
     const savedBgColor = localStorage.getItem("appBackgroundColor")
-    if (savedBgColor) setBackgroundColorState(savedBgColor)
+    if (savedBgColor) {
+      setBackgroundColorState(savedBgColor)
+    }
 
     const savedBgImageUrl = localStorage.getItem("appBackgroundImageUrl")
+    const bgImageUrl = savedBgImageUrl || null
     if (savedBgImageUrl) setBackgroundImageUrlState(savedBgImageUrl)
 
     const savedBgOpacity = localStorage.getItem("appBackgroundImageOpacity")
+    let bgOpacity = 0.2
     if (savedBgOpacity) {
       const parsed = Number(savedBgOpacity)
       if (!Number.isNaN(parsed)) {
-        setBackgroundImageOpacityState(Math.max(0, Math.min(1, parsed)))
+        bgOpacity = Math.max(0, Math.min(1, parsed))
+        setBackgroundImageOpacityState(bgOpacity)
       }
+    }
+
+    if (savedBgColor || bgImageUrl) {
+      applyBackgroundToCSS({
+        backgroundColor: savedBgColor || "",
+        backgroundImageUrl: bgImageUrl,
+        backgroundImageOpacity: bgOpacity,
+      })
     }
   }, [])
 

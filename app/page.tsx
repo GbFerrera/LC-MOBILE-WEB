@@ -33,6 +33,7 @@ import {
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/auth";
+import { useColor } from "@/contexts/ColorContext";
 import { useRouter } from "next/navigation";
 
 interface Service {
@@ -83,6 +84,7 @@ interface ScheduleResponse {
 
 export default function Home() {
   const { user } = useAuth();
+  const { backgroundImageUrl, backgroundImageOpacity } = useColor();
   const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +193,20 @@ export default function Home() {
     <div className="min-h-screen">
 
       <header className="relative bg-primary border-b overflow-hidden min-h-[280px] sm:min-h-[540px] overflow-hidden">
+        {backgroundImageUrl ? (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url("${backgroundImageUrl}")`,
+                opacity: Math.max(0.35, Math.min(1, backgroundImageOpacity + 0.15)),
+              }}
+            />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-black/70" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-[2] bg-primary/45" />
+          </>
+        ) : null}
 <Image
   src="/favicon.png"
   alt="BG"
@@ -209,13 +225,13 @@ export default function Home() {
     select-none 
     origin-left 
     scale-[2.8]
-    z-0
+    z-[3]
   "
 />
 
 
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/ajustes" className="cursor-pointer relative">

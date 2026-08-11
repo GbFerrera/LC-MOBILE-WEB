@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/auth";
 import { useCompanyContext } from "@/contexts/CompanyContext";
 import Image from "next/image";
+import { api } from "@/services/api";
 import {
   SidebarContent,
   SidebarGroup,
@@ -42,12 +43,22 @@ import {
   UserPlus
 } from "lucide-react";
 
+function upgradeToHttpsIfNeeded(url: string) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (typeof window !== "undefined" && window.location.protocol === "https:" && /^http:\/\//i.test(value)) {
+    return value.replace(/^http:\/\//i, "https://");
+  }
+  return value;
+}
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const { user } = useAuth();
   const { currentCompanyName } = useCompanyContext();
   const { signOut } = useAuth();
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const {
     availableCompanies,
     isLoading,
@@ -56,6 +67,38 @@ export default function AppSidebar() {
     isInBranchContext,
   } = useCompanyContext();
   const belongsToCompany = (company: any) => company.id === user?.company_id || (company.branches || []).some((b: any) => b.id === user?.company_id);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCompanyLogo = async () => {
+      if (!user?.company_id) return;
+      try {
+        const response = await api.get("/companies/details", {
+          headers: {
+            company_id: String(user.company_id),
+            Authorization: `Bearer ${localStorage.getItem("token") || localStorage.getItem("@linkCallendar:token") || ""}`,
+          },
+        });
+        if (cancelled) return;
+        const nextUrl = upgradeToHttpsIfNeeded(response.data?.logo_url || "");
+        setCompanyLogoUrl(nextUrl || null);
+      } catch {
+        if (cancelled) return;
+        setCompanyLogoUrl(null);
+      }
+    };
+
+    loadCompanyLogo();
+    const handler = () => loadCompanyLogo();
+    window.addEventListener("navigationContextChanged", handler);
+    window.addEventListener("companyContextChanged", handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("navigationContextChanged", handler);
+      window.removeEventListener("companyContextChanged", handler);
+    };
+  }, [user?.company_id]);
 
   const grupos = [
     {
@@ -107,11 +150,19 @@ export default function AppSidebar() {
   return (
     <>
       <SidebarHeader>
-        <div className="px-3 py-3 flex items-center gap-3 bg-primary text-white rounded-md">
-          <Image src="/icon.png" alt="Link Callendar" width={28} height={28} className="rounded-md" />
+        <div className="flex items-center gap-3 rounded-md bg-primary px-3 py-3 text-primary-foreground">
+          {companyLogoUrl ? (
+            <img
+              src={upgradeToHttpsIfNeeded(companyLogoUrl)}
+              alt="Logo da empresa"
+              className="h-9 w-9 rounded-md bg-white/10 object-contain"
+            />
+          ) : (
+            <Image src="/icon.png" alt="Link Callendar" width={36} height={36} className="rounded-md" />
+          )}
           <div>
             <div className="text-base font-semibold">{currentCompanyName || "Link Callendar"}</div>
-            <div className="text-xs text-white/80">{user?.name}</div>
+            <div className="text-xs text-primary-foreground/80">{user?.name}</div>
           </div>
         </div>
       </SidebarHeader>

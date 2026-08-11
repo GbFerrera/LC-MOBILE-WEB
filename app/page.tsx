@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { 
@@ -90,7 +89,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const router = useRouter();
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -171,24 +169,6 @@ export default function Home() {
     }
   }, [])
 
-  // Buscar foto do perfil
-  const fetchProfilePhoto = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const response = await api.get(`/team-photos/${user.id}`);
-      if (response.data?.photo_url) {
-        setProfilePhoto(response.data.photo_url);
-      }
-    } catch (error) {
-      console.log('Foto de perfil não encontrada ou erro:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfilePhoto();
-  }, [user]);
-
   return (
     <div className="min-h-screen">
 
@@ -200,13 +180,14 @@ export default function Home() {
               className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
               style={{
                 backgroundImage: `url("${backgroundImageUrl}")`,
-                opacity: Math.max(0.35, Math.min(1, backgroundImageOpacity + 0.15)),
+                opacity: Math.max(0.75, Math.min(1, backgroundImageOpacity + 0.35)),
               }}
             />
-            <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-black/70" />
-            <div aria-hidden className="pointer-events-none absolute inset-0 z-[2] bg-primary/45" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-black/40" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-[2] bg-primary/20" />
           </>
         ) : null}
+{backgroundImageUrl ? null : (
 <Image
   src="/favicon.png"
   alt="BG"
@@ -228,21 +209,12 @@ export default function Home() {
     z-[3]
   "
 />
-
+)}
 
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-6">
-              <Link href="/ajustes" className="cursor-pointer relative">
-                <Avatar className="h-20 w-20 sm:h-14 sm:w-14 border bg-gray-100 overflow-hidden">
-                  <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm sm:text-base font-semibold">
-                    {user?.name?.substring(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-              <div className="min-w-0 flex-1 relative">
+            <div className="min-w-0 flex-1 relative">
                 <h1 className="font-semibold text-lg sm:text-xl tracking-wide text-white truncate max-w-[220px]">Olá, {user?.name}!</h1>
                 <p className="text-white/80 text-xs sm:text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -260,7 +232,6 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            </div>
            
           </div>
 

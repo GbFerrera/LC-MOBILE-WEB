@@ -224,20 +224,36 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overflow-x: clip;
+    width: 100%;
+  }
+
   body {
-    @apply text-foreground text-[18px] md:text-[19px];
+    @apply text-foreground text-base;
     background-color: var(--app-bg-color, #F1F1E7);
     font-family: var(--font-outfit), var(--font-geist-sans), system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  img,
+  video,
+  svg {
+    max-width: 100%;
   }
 }
 
-@media (max-width: 640px) {
-  .text-xs { font-size: 0.95rem !important; }
-  .text-sm { font-size: 1.05rem !important; }
-  .text-base { font-size: 1.15rem !important; }
-  .text-lg { font-size: 1.30rem !important; }
-  .text-xl { font-size: 1.45rem !important; }
-  .text-2xl { font-size: 1.65rem !important; }
+[data-pwa-shell],
+[data-pwa-content] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 /* Sonner Toast Styles */

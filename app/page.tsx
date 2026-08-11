@@ -188,9 +188,9 @@ export default function Home() {
   }, [user]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh w-full max-w-full overflow-x-clip">
 
-      <header className="relative bg-[#3D583F] border-b overflow-hidden min-h-[280px] sm:min-h-[540px] overflow-hidden">
+      <header className="relative min-h-[280px] overflow-hidden border-b bg-[#3D583F]">
 <Image
   src="/favicon.png"
   alt="BG"
@@ -219,7 +219,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/ajustes" className="cursor-pointer relative">
-                <Avatar className="h-20 w-20 sm:h-14 sm:w-14 border bg-gray-100 overflow-hidden">
+                <Avatar className="h-16 w-16 shrink-0 border bg-gray-100 overflow-hidden">
                   <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
                   <AvatarFallback className="bg-[#3D583F] text-white text-sm sm:text-base font-semibold">
                     {user?.name?.substring(0, 2)}

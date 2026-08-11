@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { 
@@ -89,6 +90,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const router = useRouter();
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -169,6 +171,23 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    const fetchProfilePhoto = async () => {
+      if (!user?.id) return;
+
+      try {
+        const response = await api.get(`/team-photos/${user.id}`);
+        if (response.data?.photo_url) {
+          setProfilePhoto(response.data.photo_url);
+        }
+      } catch {
+        setProfilePhoto(null);
+      }
+    };
+
+    fetchProfilePhoto();
+  }, [user?.id]);
+
   return (
     <div className="min-h-screen">
 
@@ -214,7 +233,16 @@ export default function Home() {
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1 relative">
+            <div className="flex items-center gap-3 sm:gap-6">
+              <Link href="/ajustes" className="cursor-pointer relative shrink-0">
+                <Avatar className="h-20 w-20 sm:h-14 sm:w-14 border bg-gray-100 overflow-hidden">
+                  <AvatarImage src={profilePhoto || "/barber-avatar.png"} alt={user?.name || ""} className="object-cover bg-gray-100" />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm sm:text-base font-semibold">
+                    {user?.name?.substring(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="min-w-0 flex-1 relative">
                 <h1 className="font-semibold text-lg sm:text-xl tracking-wide text-white truncate max-w-[220px]">Olá, {user?.name}!</h1>
                 <p className="text-white/80 text-xs sm:text-sm mt-1">
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -232,7 +260,8 @@ export default function Home() {
                   </div>
                 )}
               </div>
-           
+            </div>
+
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-4">
